@@ -62,6 +62,8 @@ public class IngestionPipelineServiceImpl implements IngestionPipelineService {
     @Transactional(rollbackFor = Exception.class)
     public IngestionPipelineVO create(IngestionPipelineCreateRequest request) {
         Assert.notNull(request, () -> new ClientException("请求不能为空"));
+
+        // 构建流水线主记录并插入，依赖数据库唯一索引保证名称不重复
         IngestionPipelineDO pipeline = IngestionPipelineDO.builder()
                 .name(request.getName())
                 .description(request.getDescription())
@@ -71,18 +73,25 @@ public class IngestionPipelineServiceImpl implements IngestionPipelineService {
         try {
             pipelineMapper.insert(pipeline);
         } catch (DuplicateKeyException dke) {
+            // 数据库唯一键冲突转换为业务异常，对调用方屏蔽底层错误
             throw new ClientException("流水线名称已存在");
         }
+
+        // 插入节点配置列表（全量写入）
         upsertNodes(pipeline.getId(), request.getNodes());
+
+        // 重新查询节点列表以保证返回数据与库中一致
         return toVO(pipeline, fetchNodes(pipeline.getId()));
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public IngestionPipelineVO update(String pipelineId, IngestionPipelineUpdateRequest request) {
+        // 校验流水线存在
         IngestionPipelineDO pipeline = pipelineMapper.selectById(pipelineId);
         Assert.notNull(pipeline, () -> new ClientException("未找到流水线"));
 
+        // Patch 语义：name 非空才更新；description 非 null 才更新（允许传空字符串清空）
         if (StringUtils.hasText(request.getName())) {
             pipeline.setName(request.getName());
         }
@@ -92,6 +101,7 @@ public class IngestionPipelineServiceImpl implements IngestionPipelineService {
         pipeline.setUpdatedBy(UserContext.getUsername());
         pipelineMapper.updateById(pipeline);
 
+        // nodes 非 null 时执行全量替换：先删旧节点再重新插入
         if (request.getNodes() != null) {
             upsertNodes(pipeline.getId(), request.getNodes());
         }
@@ -123,12 +133,16 @@ public class IngestionPipelineServiceImpl implements IngestionPipelineService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void delete(String pipelineId) {
+        // 校验流水线存在
         IngestionPipelineDO pipeline = pipelineMapper.selectById(pipelineId);
         Assert.notNull(pipeline, () -> new ClientException("未找到流水线"));
+
+        // 流水线主记录逻辑删除（deleted=1）
         pipeline.setDeleted(1);
         pipeline.setUpdatedBy(UserContext.getUsername());
         pipelineMapper.updateById(pipeline);
 
+        // 节点记录执行物理删除（节点无独立生命周期，随流水线一起清除）
         LambdaQueryWrapper<IngestionPipelineNodeDO> qw = new LambdaQueryWrapper<IngestionPipelineNodeDO>()
                 .eq(IngestionPipelineNodeDO::getPipelineId, pipeline.getId());
         nodeMapper.delete(qw);
@@ -150,13 +164,20 @@ public class IngestionPipelineServiceImpl implements IngestionPipelineService {
                 .build();
     }
 
+    /**
+     * 全量替换流水线节点：先物理删除该流水线下的所有节点，再逐条插入新节点。
+     * nodes 为 null 时直接返回，不做任何变更。
+     */
     private void upsertNodes(String pipelineId, List<IngestionPipelineNodeRequest> nodes) {
         if (nodes == null) {
             return;
         }
+        // 物理删除旧节点（全量替换，不保留历史快照）
         LambdaQueryWrapper<IngestionPipelineNodeDO> qw = new LambdaQueryWrapper<IngestionPipelineNodeDO>()
                 .eq(IngestionPipelineNodeDO::getPipelineId, pipelineId);
         nodeMapper.delete(qw);
+
+        // 逐条插入新节点；nodeType 经枚举校验规范化后存储，settings/condition 序列化为 JSON 字符串
         for (IngestionPipelineNodeRequest node : nodes) {
             if (node == null) {
                 continue;

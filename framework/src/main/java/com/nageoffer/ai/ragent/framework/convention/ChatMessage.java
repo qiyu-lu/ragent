@@ -34,29 +34,29 @@ import lombok.NoArgsConstructor;
  * 该结构适合在不同模型/厂商之间做一层通用抽象
  * </p>
  */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+@Data //自动生成setter, getter
+@NoArgsConstructor  //生成无参构造方法
+@AllArgsConstructor //生成全参构造方法
 public class ChatMessage {
 
     /**
      * 消息角色类型
      */
-    public enum Role {
+    public enum Role {//表示消息角色
         /**
          * 系统角色，一般用于设定对话规则、身份设定、风格约束等
          */
-        SYSTEM,
+        SYSTEM,//系统消息一般用于设置模型行为,对模型的约束
 
         /**
          * 用户角色，表示真实用户的提问或输入内容
          */
-        USER,
+        USER, //用户消息,表示真实用户输入的问题
 
         /**
          * 助手机器人角色，表示大模型返回的回复内容
          */
-        ASSISTANT;
+        ASSISTANT;//大模型之前返回的内容
 
         /**
          * 根据字符串值匹配对应的角色枚举
@@ -65,8 +65,11 @@ public class ChatMessage {
          * @return 匹配到的 {@link Role} 枚举值
          * @throws IllegalArgumentException 当传入的字符串无法匹配任何角色时抛出异常
          */
+        //根据字符串转换成对应的枚举角色
         public static Role fromString(String value) {
             for (Role role : Role.values()) {
+                //equalsIgnoreCase(value) 不区分大小写
+                // name ：枚举类继承的方法，返回这个枚举常量的名字字符串
                 if (role.name().equalsIgnoreCase(value)) {
                     return role;
                 }
@@ -85,6 +88,7 @@ public class ChatMessage {
      */
     private String content;
 
+    //三个静态工厂方法
     /**
      * 创建一条系统消息
      *

@@ -34,6 +34,13 @@ import java.util.Map;
 import java.util.Random;
 import java.util.stream.Collectors;
 
+/**
+ * 软件销售数据查询 MCP 工具执行器
+ * <p>
+ * toolId：sales_query，支持按地区、时间段、产品、销售人员筛选，
+ * 提供四种视图：汇总(summary)、排名(ranking)、明细(detail)、趋势(trend)。
+ * 数据为模拟生成，按时间段范围生成工作日订单，日内缓存避免重复生成。
+ */
 @Slf4j
 @Component
 public class SalesMCPExecutor implements MCPToolExecutor {
@@ -143,6 +150,7 @@ public class SalesMCPExecutor implements MCPToolExecutor {
         }
     }
 
+    /** 汇总视图：总销售额、成交订单数、平均单价，并按产品/地区分布展示占比 */
     private String buildSummaryResult(List<SalesRecord> data, String region, String period,
                                       String product, String salesPerson) {
         double totalAmount = data.stream().mapToDouble(r -> r.amount).sum();
@@ -176,6 +184,7 @@ public class SalesMCPExecutor implements MCPToolExecutor {
         return sb.toString().trim();
     }
 
+    /** 排名视图：按销售人员聚合销售额，降序排列，最多返回 limit 名 */
     private String buildRankingResult(List<SalesRecord> data, String region, String period, int limit) {
         Map<String, Double> bySales = data.stream()
                 .collect(Collectors.groupingBy(r -> r.salesPerson, Collectors.summingDouble(r -> r.amount)));
@@ -195,6 +204,7 @@ public class SalesMCPExecutor implements MCPToolExecutor {
         return sb.toString().trim();
     }
 
+    /** 明细视图：按订单金额降序，展示最多 limit 条，包含客户、产品、销售人员、日期 */
     private String buildDetailResult(List<SalesRecord> data, String region, String period, int limit) {
         List<SalesRecord> topRecords = data.stream().sorted((a, b) -> Double.compare(b.amount, a.amount)).limit(limit).toList();
         StringBuilder sb = new StringBuilder();
@@ -211,6 +221,7 @@ public class SalesMCPExecutor implements MCPToolExecutor {
         return sb.toString().trim();
     }
 
+    /** 趋势视图：按自然周（月内第几周）聚合销售额，展示各周销售走势 */
     private String buildTrendResult(List<SalesRecord> data, String region, String period) {
         Map<String, Double> byWeek = data.stream().collect(Collectors.groupingBy(
                 r -> "第" + ((LocalDate.parse(r.date).getDayOfMonth() - 1) / 7 + 1) + "周",
@@ -230,6 +241,7 @@ public class SalesMCPExecutor implements MCPToolExecutor {
         return sb.toString().trim();
     }
 
+    /** 多维度链式过滤：null 值表示不限该维度 */
     private List<SalesRecord> filterData(List<SalesRecord> data, String region, String product, String salesPerson) {
         return data.stream()
                 .filter(r -> region == null || region.equals(r.region))
@@ -238,6 +250,7 @@ public class SalesMCPExecutor implements MCPToolExecutor {
                 .toList();
     }
 
+    /** 日内缓存：key = period + "_" + 今日日期，同一天同时间段重复调用直接返回缓存 */
     private List<SalesRecord> getOrGenerateData(String period) {
         String key = period + "_" + LocalDate.now();
         if (cachedData != null && key.equals(cacheKey)) return cachedData;
@@ -247,6 +260,7 @@ public class SalesMCPExecutor implements MCPToolExecutor {
         return cachedData;
     }
 
+    /** 将时间段枚举（本月/上月/本季度/上季度/本年）转换为 [startDate, endDate] */
     private LocalDate[] getDateRange(String period) {
         LocalDate now = LocalDate.now();
         return switch (period) {
@@ -266,6 +280,10 @@ public class SalesMCPExecutor implements MCPToolExecutor {
         };
     }
 
+    /**
+     * 生成模拟销售订单：遍历 [start, end] 范围内的工作日，每天随机 3~8 笔订单。
+     * 企业版单价 50~200 万，专业版 10~50 万，基础版 1~10 万，模拟真实价格梯度。
+     */
     private List<SalesRecord> generateMockData(LocalDate start, LocalDate end) {
         List<SalesRecord> records = new ArrayList<>();
         Random random = new Random(start.toEpochDay());

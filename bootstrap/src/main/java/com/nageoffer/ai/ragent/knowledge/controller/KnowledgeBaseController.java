@@ -41,7 +41,7 @@ import java.util.List;
 
 /**
  * 知识库控制器
- * 提供知识库的增删改查等基础操作接口
+ * 提供知识库的增删改查等基础操作接口，以及分块策略枚举查询
  */
 @RestController
 @RequiredArgsConstructor
@@ -51,6 +51,10 @@ public class KnowledgeBaseController {
 
     /**
      * 创建知识库
+     * 校验名称唯一性后，在 MySQL、S3（对象存储）和 Milvus（向量库）中同步初始化资源
+     *
+     * @param requestParam 包含知识库名称、嵌入模型和 Milvus Collection 名称
+     * @return 新创建知识库的 ID
      */
     @PostMapping("/knowledge-base")
     public Result<String> createKnowledgeBase(@RequestBody KnowledgeBaseCreateRequest requestParam) {
@@ -59,6 +63,10 @@ public class KnowledgeBaseController {
 
     /**
      * 重命名知识库
+     * 仅允许修改知识库名称；校验新名称在系统内唯一（排除当前知识库自身）
+     *
+     * @param kbId         路径变量，知识库 ID
+     * @param requestParam 包含新名称的请求体
      */
     @PutMapping("/knowledge-base/{kb-id}")
     public Result<Void> renameKnowledgeBase(@PathVariable("kb-id") String kbId,
@@ -68,7 +76,10 @@ public class KnowledgeBaseController {
     }
 
     /**
-     * 删除知识库
+     * 删除知识库（逻辑删除）
+     * 要求知识库下不存在未删除文档，否则拒绝删除并提示先清理文档
+     *
+     * @param kbId 路径变量，知识库 ID
      */
     @DeleteMapping("/knowledge-base/{kb-id}")
     public Result<Void> deleteKnowledgeBase(@PathVariable("kb-id") String kbId) {
@@ -78,6 +89,10 @@ public class KnowledgeBaseController {
 
     /**
      * 查询知识库详情
+     * 根据 ID 查询单条知识库记录，返回名称、嵌入模型、Collection 名称等基本信息
+     *
+     * @param kbId 路径变量，知识库 ID
+     * @return 知识库详情 VO
      */
     @GetMapping("/knowledge-base/{kb-id}")
     public Result<KnowledgeBaseVO> queryKnowledgeBase(@PathVariable("kb-id") String kbId) {
@@ -86,14 +101,24 @@ public class KnowledgeBaseController {
 
     /**
      * 分页查询知识库列表
+     * 支持按名称模糊过滤，结果按更新时间倒序排列，并附带每个知识库的文档数量
+     *
+     * @param requestParam 分页参数（current、size）及可选的名称过滤条件
+     * @return 分页后的知识库列表
      */
+    //这个参数会有 ： current=1&size=200 这里没有写是由于使用mybatis-plus的page分页
+    //requestParam.getCurrent(), requestParam.getSize()
     @GetMapping("/knowledge-base")
     public Result<IPage<KnowledgeBaseVO>> pageQuery(KnowledgeBasePageRequest requestParam) {
         return Results.success(knowledgeBaseService.pageQuery(requestParam));
     }
 
     /**
-     * 查询支持的分块策略列表
+     * 查询系统支持的分块策略列表
+     * 遍历 ChunkingMode 枚举，仅返回对外可见（visible=true）的策略，
+     * 每条记录包含策略标识（value）、展示名称（label）和默认配置参数（defaultConfig）
+     *
+     * @return 可用分块策略列表
      */
     @GetMapping("/knowledge-base/chunk-strategies")
     public Result<List<ChunkStrategyVO>> listChunkStrategies() {

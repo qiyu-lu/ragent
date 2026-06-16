@@ -22,11 +22,23 @@ import lombok.Data;
 
 import java.util.List;
 
+/**
+ * 折线图的单条时间序列。
+ *
+ * <p>大多数指标只返回一条序列；{@code quality} 指标同时返回两条（错误率 + 无知识率），
+ * 前端按 {@code name} 区分图例。</p>
+ */
 @Data
 @Builder
 public class DashboardTrendSeriesVO {
 
+    /**
+     * 序列显示名称，用于前端图例，如
+     * {@code "会话数"}、{@code "消息数"}、{@code "活跃用户"}、
+     * {@code "平均响应时间"}、{@code "错误率"}、{@code "无知识率"}。
+     */
     private String name;
 
+    /** 该序列的时间点列表，按时间升序排列，缺失的桶已补 0，横轴连续。 */
     private List<DashboardTrendPointVO> data;
 }

@@ -33,6 +33,13 @@ import java.util.Map;
 import java.util.Random;
 import java.util.stream.Collectors;
 
+/**
+ * 客户技术支持工单查询 MCP 工具执行器
+ * <p>
+ * toolId：ticket_query，支持按地区、状态、优先级、产品、客户名关键字筛选，
+ * 提供三种视图：汇总概览(summary)、工单列表(list)、统计分析(stats)。
+ * 数据为模拟生成，以当天日期为种子、覆盖最近 30 个工作日，日内缓存避免重复生成。
+ */
 @Slf4j
 @Component
 public class TicketMCPExecutor implements MCPToolExecutor {
@@ -173,6 +180,7 @@ public class TicketMCPExecutor implements MCPToolExecutor {
         }
     }
 
+    /** 汇总视图：状态分布、解决率、紧急/高优工单数、按产品/地区分布 */
     private String buildSummaryResult(List<TicketRecord> data, String region, String status,
                                        String priority, String product) {
         int total = data.size();
@@ -230,6 +238,7 @@ public class TicketMCPExecutor implements MCPToolExecutor {
         return sb.toString().trim();
     }
 
+    /** 列表视图：按优先级（紧急→高→中→低）+ 创建时间倒序，最多返回 limit 条 */
     private String buildListResult(List<TicketRecord> data, int limit) {
         List<TicketRecord> sorted = data.stream()
                 .sorted((a, b) -> {
@@ -255,6 +264,7 @@ public class TicketMCPExecutor implements MCPToolExecutor {
         return sb.toString().trim();
     }
 
+    /** 统计视图：问题分类占比、各产品解决率、处理人待处理工单量排名（Top 5） */
     private String buildStatsResult(List<TicketRecord> data) {
         StringBuilder sb = new StringBuilder();
         sb.append("【工单统计分析】\n\n");
@@ -294,6 +304,7 @@ public class TicketMCPExecutor implements MCPToolExecutor {
         return sb.toString().trim();
     }
 
+    /** 多维度链式过滤：null 值表示不限该维度 */
     private List<TicketRecord> filterData(List<TicketRecord> data, String region, String status,
                                            String priority, String product, String customerName) {
         return data.stream()
@@ -305,6 +316,7 @@ public class TicketMCPExecutor implements MCPToolExecutor {
                 .toList();
     }
 
+    /** 日内缓存：key = "tickets_" + 今日日期，同一天重复调用直接返回缓存数据 */
     private List<TicketRecord> getOrGenerateData() {
         String key = "tickets_" + LocalDate.now();
         if (cachedData != null && key.equals(cacheKey)) return cachedData;
@@ -313,6 +325,10 @@ public class TicketMCPExecutor implements MCPToolExecutor {
         return cachedData;
     }
 
+    /**
+     * 生成模拟工单数据：覆盖最近 30 个日历日中的工作日，每天随机 2~6 条。
+     * 越近的工单越多处于"待处理/处理中"，超过 7 天的工单大多已关闭，模拟真实工单生命周期。
+     */
     private List<TicketRecord> generateMockData() {
         List<TicketRecord> records = new ArrayList<>();
         LocalDate today = LocalDate.now();

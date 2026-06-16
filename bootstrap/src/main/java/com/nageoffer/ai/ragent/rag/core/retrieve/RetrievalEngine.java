@@ -125,6 +125,12 @@ public class RetrievalEngine {
                 .build();
     }
 
+    /**
+     * 针对单个子问题，分别执行 KB 检索和 MCP 工具调用并组装结果。
+     *
+     * <p>KB 检索走多通道引擎，MCP 工具调用在专属线程池中并行执行。
+     * 两路结果互相独立，其中一路为空不影响另一路。</p>
+     */
     private SubQuestionContext buildSubQuestionContext(SubQuestionIntent intent, int topK) {
         List<NodeScore> kbIntents = filterKbIntents(intent.nodeScores());
         List<NodeScore> mcpIntents = filterMCPIntents(intent.nodeScores());
@@ -154,6 +160,7 @@ public class RetrievalEngine {
                 .orElse(fallbackTopK);
     }
 
+    /** 按"--- 子问题 / 相关文档"格式将单个子问题的检索结果追加到汇总 Builder 中。 */
     private void appendSection(StringBuilder builder, String question, String context) {
         builder.append("---\n")
                 .append("**子问题**：").append(question).append("\n\n")
@@ -161,6 +168,7 @@ public class RetrievalEngine {
                 .append(context).append("\n\n");
     }
 
+    /** 过滤出得分达标、类型为 MCP 且配置了 mcpToolId 的意图，供 MCP 工具调用使用。 */
     private List<NodeScore> filterMCPIntents(List<NodeScore> nodeScores) {
         return nodeScores.stream()
                 .filter(ns -> ns.getScore() >= INTENT_MIN_SCORE)
@@ -169,6 +177,7 @@ public class RetrievalEngine {
                 .toList();
     }
 
+    /** 过滤出得分达标、类型为 KB（或 kind 为 null 时默认视为 KB）的意图，供知识库检索使用。 */
     private List<NodeScore> filterKbIntents(List<NodeScore> nodeScores) {
         return nodeScores.stream()
                 .filter(ns -> ns.getScore() >= INTENT_MIN_SCORE)
@@ -182,6 +191,11 @@ public class RetrievalEngine {
                 .toList();
     }
 
+    /**
+     * 并行调用所有命中的 MCP 工具，并将成功结果格式化为上下文字符串。
+     *
+     * <p>全部工具调用失败时返回空字符串，不会让后续流程以空 MCP 上下文组装 Prompt。</p>
+     */
     private String executeMcpAndMerge(String question, List<NodeScore> mcpIntents) {
         if (CollUtil.isEmpty(mcpIntents)) {
             return "";
@@ -224,6 +238,12 @@ public class RetrievalEngine {
         return new KbResult(groupedContext, intentChunks);
     }
 
+    /**
+     * 批量并行执行 MCP 工具请求。
+     *
+     * <p>每个意图构建一个 {@link MCPRequest} 后提交到 {@code mcpBatchExecutor} 线程池异步执行，
+     * 最后统一等待所有结果返回。单个工具失败不影响其他工具。</p>
+     */
     private List<MCPResponse> executeMcpTools(String question, List<NodeScore> mcpIntentScores) {
         List<MCPRequest> requests = mcpIntentScores.stream()
                 .map(ns -> buildMcpRequest(question, ns.getNode()))
@@ -244,6 +264,12 @@ public class RetrievalEngine {
                 .toList();
     }
 
+    /**
+     * 执行单个 MCP 工具请求。
+     *
+     * <p>从注册表中查找对应的执行器后调用 {@code execute}；
+     * 工具不存在或调用抛出异常时均返回 {@link MCPResponse#error} 而非向上抛出。</p>
+     */
     private MCPResponse executeSingleMcpTool(MCPRequest request) {
         String toolId = request.getToolId();
         Optional<MCPToolExecutor> executorOpt = mcpToolRegistry.getExecutor(toolId);
@@ -260,6 +286,12 @@ public class RetrievalEngine {
         }
     }
 
+    /**
+     * 根据用户问题和意图节点构建 MCP 工具调用请求。
+     *
+     * <p>通过 {@link MCPParameterExtractor} 从问题中抽取工具所需参数（如时间、地点、编号等），
+     * 工具执行器不存在时返回 {@code null}（调用方会过滤掉 null 请求）。</p>
+     */
     private MCPRequest buildMcpRequest(String question, IntentNode intentNode) {
         String toolId = intentNode.getMcpToolId();
         Optional<MCPToolExecutor> executorOpt = mcpToolRegistry.getExecutor(toolId);

@@ -20,18 +20,19 @@ package com.nageoffer.ai.ragent.rag.controller.request;
 import lombok.Data;
 
 /**
- * 关键词映射更新请求
+ * 关键词映射更新请求（Patch 语义：所有字段均可选，非 null 才更新）
+ * sourceTerm/targetTerm 传值后会 trim，trim 后为空则抛出 ClientException
  */
 @Data
 public class QueryTermMappingUpdateRequest {
 
     /**
-     * 用户原始短语
+     * 用户原始短语（Patch：非 null 时更新，trim 后不能为空）
      */
     private String sourceTerm;
 
     /**
-     * 归一化后的目标短语
+     * 归一化后的目标短语（Patch：非 null 时更新，trim 后不能为空）
      */
     private String targetTerm;
 
@@ -51,7 +52,7 @@ public class QueryTermMappingUpdateRequest {
     private Boolean enabled;
 
     /**
-     * 备注
+     * 备注（传 "" 可清空；null 不修改）
      */
     private String remark;
 }

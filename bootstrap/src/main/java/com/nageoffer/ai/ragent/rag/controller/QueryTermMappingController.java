@@ -36,6 +36,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * 关键词映射管理控制器
+ * 管理 RAG 查询改写阶段的术语归一化规则（Query Term Mapping）：
+ * 用户输入的原始查询（sourceTerm）在进入向量检索前，会先经过 QueryTermMappingService
+ * 按优先级顺序替换为标准化目标词（targetTerm），提升检索召回率。
+ * 每次增删改后会立即触发内存缓存重载，无需重启服务即可生效。
  */
 @RestController
 @RequiredArgsConstructor
@@ -44,7 +48,12 @@ public class QueryTermMappingController {
     private final QueryTermMappingAdminService queryTermMappingAdminService;
 
     /**
-     * 分页查询映射规则
+     * 分页查询映射规则列表
+     * 支持按 keyword 同时模糊匹配 sourceTerm 或 targetTerm（OR 关系）；
+     * 结果按优先级升序（数值小的在前）、更新时间倒序排列
+     *
+     * @param requestParam 分页参数（current、size）及可选的 keyword 过滤
+     * @return 分页后的映射规则列表
      */
     @GetMapping("/mappings")
     public Result<IPage<QueryTermMappingVO>> pageQuery(QueryTermMappingPageRequest requestParam) {
@@ -52,7 +61,10 @@ public class QueryTermMappingController {
     }
 
     /**
-     * 查询映射规则详情
+     * 查询单条映射规则详情
+     *
+     * @param id 路径变量，映射规则 ID
+     * @return 映射规则详情 VO
      */
     @GetMapping("/mappings/{id}")
     public Result<QueryTermMappingVO> queryById(@PathVariable String id) {
@@ -61,6 +73,12 @@ public class QueryTermMappingController {
 
     /**
      * 创建映射规则
+     * sourceTerm 和 targetTerm 均自动 trim，不允许纯空白；
+     * matchType 默认 1（精确匹配），priority 默认 0，enabled 默认 true；
+     * 创建成功后立即重载内存缓存，规则即刻生效
+     *
+     * @param requestParam 包含 sourceTerm、targetTerm、matchType、priority、enabled、remark
+     * @return 新创建规则的 ID
      */
     @PostMapping("/mappings")
     public Result<String> create(@RequestBody QueryTermMappingCreateRequest requestParam) {
@@ -68,7 +86,12 @@ public class QueryTermMappingController {
     }
 
     /**
-     * 更新映射规则
+     * 更新映射规则（Patch 语义，仅更新请求体中非 null 的字段）
+     * sourceTerm/targetTerm 若传值则自动 trim，且 trim 后不能为空；
+     * 更新成功后立即重载内存缓存，规则即刻生效
+     *
+     * @param id           路径变量，映射规则 ID
+     * @param requestParam 要更新的字段（均可选）
      */
     @PutMapping("/mappings/{id}")
     public Result<Void> update(@PathVariable String id, @RequestBody QueryTermMappingUpdateRequest requestParam) {
@@ -77,7 +100,10 @@ public class QueryTermMappingController {
     }
 
     /**
-     * 删除映射规则
+     * 删除映射规则（物理删除）
+     * 删除后立即重载内存缓存，规则即刻失效
+     *
+     * @param id 路径变量，映射规则 ID
      */
     @DeleteMapping("/mappings/{id}")
     public Result<Void> delete(@PathVariable String id) {

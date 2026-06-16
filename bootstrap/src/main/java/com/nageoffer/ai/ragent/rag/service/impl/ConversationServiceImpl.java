@@ -68,7 +68,12 @@ public class ConversationServiceImpl implements ConversationService {
         if (StrUtil.isBlank(userId)) {
             return List.of();
         }
-
+        //类似这样的 sql 语句：
+        //SELECT *
+        //FROM conversation
+        //WHERE user_id = '10001'
+        //  AND deleted = 0
+        //ORDER BY last_time DESC;
         List<ConversationDO> records = conversationMapper.selectList(
                 Wrappers.lambdaQuery(ConversationDO.class)
                         .eq(ConversationDO::getUserId, userId)
@@ -78,7 +83,7 @@ public class ConversationServiceImpl implements ConversationService {
         if (records == null || records.isEmpty()) {
             return List.of();
         }
-
+        // DO 转 VO
         return records.stream()
                 .map(item -> ConversationVO.builder()
                         .conversationId(item.getConversationId())
@@ -88,6 +93,15 @@ public class ConversationServiceImpl implements ConversationService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 创建或更新会话记录。
+     *
+     * <p>逻辑为：若数据库中不存在该 conversationId 的未删除记录，则创建新会话并
+     * 调用大模型生成标题；若已存在，则只更新 last_time（最后活跃时间），不修改标题。
+     * 每次用户发消息都会触发此方法，以保持会话列表按最近活跃排序。</p>
+     *
+     * @param request 包含 conversationId、userId、用户问题和 lastTime 的创建/更新请求
+     */
     @Override
     public void createOrUpdate(ConversationCreateRequest request) {
         String userId = request.getUserId();
@@ -120,6 +134,15 @@ public class ConversationServiceImpl implements ConversationService {
         conversationMapper.updateById(existing);
     }
 
+    /**
+     * 重命名会话标题。
+     *
+     * <p>校验规则：标题不得为空，且长度不超过配置项 {@code title-max-length} 指定的字符数。
+     * 操作前会验证会话归属（conversationId + userId），防止跨用户篡改。</p>
+     *
+     * @param conversationId 要重命名的会话 ID
+     * @param request        包含新标题的更新请求
+     */
     @Override
     public void rename(String conversationId, ConversationUpdateRequest request) {
         String userId = UserContext.getUserId();
@@ -150,6 +173,19 @@ public class ConversationServiceImpl implements ConversationService {
         conversationMapper.updateById(record);
     }
 
+    /**
+     * 删除会话及其所有消息和摘要（逻辑删除）。
+     *
+     * <p>在事务内级联删除：
+     * <ol>
+     *   <li>从 conversation 表删除会话主体</li>
+     *   <li>从 conversation_message 表删除该会话下全部消息</li>
+     *   <li>从 conversation_summary 表删除该会话下全部摘要</li>
+     * </ol>
+     * 任一步骤失败时回滚，保证三张表的一致性。</p>
+     *
+     * @param conversationId 要删除的会话 ID，必须属于当前登录用户
+     */
     @Transactional(rollbackFor = Exception.class)
     @Override
     public void delete(String conversationId) {
@@ -183,6 +219,15 @@ public class ConversationServiceImpl implements ConversationService {
         );
     }
 
+    /**
+     * 根据用户首次提问调用大模型生成会话标题。
+     *
+     * <p>使用低温度（0.7）和低 topP（0.3）让标题紧贴问题内容，减少随机发散。
+     * LLM 调用失败时降级返回"新对话"，不阻断会话创建。</p>
+     *
+     * @param question 用户首次提问内容
+     * @return LLM 生成的标题；失败时返回 {@code "新对话"}
+     */
     private String generateTitleFromQuestion(String question) {
         int maxLen = memoryProperties.getTitleMaxLength();
         if (maxLen <= 0) {

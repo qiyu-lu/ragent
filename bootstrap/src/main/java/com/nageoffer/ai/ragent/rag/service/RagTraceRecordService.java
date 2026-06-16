@@ -23,15 +23,28 @@ import com.nageoffer.ai.ragent.rag.dao.entity.RagTraceRunDO;
 import java.util.Date;
 
 /**
- * RAG Trace 记录服务
+ * RAG Trace 写入服务，供 AOP 切面调用
+ * 不对外暴露 REST 接口，只由 RagTraceAspect 在拦截到 @RagTraceRoot / @RagTraceNode 时调用
  */
 public interface RagTraceRecordService {
 
+    /**
+     * 链路开始：insert 一条状态为 RUNNING 的 TraceRun 记录
+     */
     void startRun(RagTraceRunDO run);
 
+    /**
+     * 链路结束：将 TraceRun 状态更新为 SUCCESS 或 ERROR，并补充耗时信息
+     */
     void finishRun(String traceId, String status, String errorMessage, Date endTime, long durationMs);
 
+    /**
+     * 节点开始：insert 一条状态为 RUNNING 的 TraceNode 记录
+     */
     void startNode(RagTraceNodeDO node);
 
+    /**
+     * 节点结束：将 TraceNode 状态更新为 SUCCESS 或 ERROR，并补充耗时信息
+     */
     void finishNode(String traceId, String nodeId, String status, String errorMessage, Date endTime, long durationMs);
 }

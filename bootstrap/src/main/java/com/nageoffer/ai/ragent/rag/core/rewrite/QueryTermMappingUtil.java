@@ -24,18 +24,21 @@ public class QueryTermMappingUtil {
      * - 只替换 sourceTerm
      * - 如果当前位置本身已经是 targetTerm 起始（例如文本中已经是“平安保司”），则不重复替换
      */
+    //在 text 中查找 sourceTerm，如果找到了，就替换成 targetTerm；但如果当前位置已经是 targetTerm，就不重复替换。
     public static String applyMapping(String text, String sourceTerm, String targetTerm) {
+        //如果原文本为空，或者源词为空，就没法替换，直接返回原文本。
         if (text == null || text.isEmpty() || sourceTerm == null || sourceTerm.isEmpty()) {
             return text;
         }
 
-        StringBuilder sb = new StringBuilder();
-        int idx = 0;
-        int len = text.length();
-        int sourceLen = sourceTerm.length();
-        int targetLen = targetTerm.length();
+        StringBuilder sb = new StringBuilder();//保存替换后的结果
+        int idx = 0; //当前扫描到的位置
+        int len = text.length(); //原文本长度
+        int sourceLen = sourceTerm.length(); //源词长度
+        int targetLen = targetTerm.length(); //目标词长度
 
         while (idx < len) {
+            //从 idx 位置开始，查找下一次出现 sourceTerm 的位置。
             int hit = text.indexOf(sourceTerm, idx);
             if (hit < 0) {
                 // 后面没有命中，整体拷贝

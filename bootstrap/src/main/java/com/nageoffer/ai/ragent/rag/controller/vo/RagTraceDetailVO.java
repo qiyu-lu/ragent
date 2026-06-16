@@ -23,13 +23,15 @@ import lombok.Data;
 import java.util.List;
 
 /**
- * RAG Trace 详情
+ * RAG Trace 详情（运行记录 + 节点列表的组合视图）
  */
 @Data
 @Builder
 public class RagTraceDetailVO {
 
+    /** 链路运行摘要（触发信息、状态、总耗时等） */
     private RagTraceRunVO run;
 
+    /** 链路中所有执行节点，按 startTime ASC 排序，反映实际执行顺序 */
     private List<RagTraceNodeVO> nodes;
 }

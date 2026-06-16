@@ -44,11 +44,14 @@ public class QueryTermMappingAdminServiceImpl implements QueryTermMappingAdminSe
     @Override
     public String create(QueryTermMappingCreateRequest requestParam) {
         Assert.notNull(requestParam, () -> new ClientException("请求不能为空"));
+
+        // trim 去除首尾空白，并在为空时设为 null，再断言非 null/blank
         String sourceTerm = StrUtil.trimToNull(requestParam.getSourceTerm());
         String targetTerm = StrUtil.trimToNull(requestParam.getTargetTerm());
         Assert.notBlank(sourceTerm, () -> new ClientException("原始词不能为空"));
         Assert.notBlank(targetTerm, () -> new ClientException("目标词不能为空"));
 
+        // 构建实体，设置默认值：matchType=1（精确匹配），priority=0，enabled=1（生效）
         QueryTermMappingDO record = new QueryTermMappingDO();
         record.setSourceTerm(sourceTerm);
         record.setTargetTerm(targetTerm);
@@ -58,6 +61,8 @@ public class QueryTermMappingAdminServiceImpl implements QueryTermMappingAdminSe
         record.setRemark(StrUtil.trimToNull(requestParam.getRemark()));
 
         queryTermMappingMapper.insert(record);
+
+        // 写库后立即重载内存缓存，新规则无需重启即可生效
         queryTermMappingService.loadMappings();
         return String.valueOf(record.getId());
     }
@@ -65,8 +70,12 @@ public class QueryTermMappingAdminServiceImpl implements QueryTermMappingAdminSe
     @Override
     public void update(String id, QueryTermMappingUpdateRequest requestParam) {
         Assert.notNull(requestParam, () -> new ClientException("请求不能为空"));
+
+        // 校验规则存在
         QueryTermMappingDO record = loadById(id);
 
+        // Patch 语义：所有字段仅在非 null 时才更新
+        // sourceTerm/targetTerm 传值后 trim，且 trim 后不能为空（防止设置为纯空白词）
         if (requestParam.getSourceTerm() != null) {
             String sourceTerm = StrUtil.trimToNull(requestParam.getSourceTerm());
             Assert.notBlank(sourceTerm, () -> new ClientException("原始词不能为空"));
@@ -86,18 +95,24 @@ public class QueryTermMappingAdminServiceImpl implements QueryTermMappingAdminSe
         if (requestParam.getEnabled() != null) {
             record.setEnabled(requestParam.getEnabled() ? 1 : 0);
         }
+        // remark 传 "" 时 trimToNull 返回 null，可清空备注；null 不更新
         if (requestParam.getRemark() != null) {
             record.setRemark(StrUtil.trimToNull(requestParam.getRemark()));
         }
 
         queryTermMappingMapper.updateById(record);
+
+        // 更新后立即重载内存缓存，变更即刻生效
         queryTermMappingService.loadMappings();
     }
 
     @Override
     public void delete(String id) {
+        // 校验规则存在后物理删除（t_query_term_mapping 无逻辑删除字段）
         QueryTermMappingDO record = loadById(id);
         queryTermMappingMapper.deleteById(record.getId());
+
+        // 删除后立即重载内存缓存，规则即刻失效
         queryTermMappingService.loadMappings();
     }
 
@@ -109,16 +124,20 @@ public class QueryTermMappingAdminServiceImpl implements QueryTermMappingAdminSe
 
     @Override
     public IPage<QueryTermMappingVO> pageQuery(QueryTermMappingPageRequest requestParam) {
+        // keyword trim 后为 null 则不加过滤条件，返回全部规则
         String keyword = StrUtil.trimToNull(requestParam.getKeyword());
         Page<QueryTermMappingDO> page = new Page<>(requestParam.getCurrent(), requestParam.getSize());
         IPage<QueryTermMappingDO> result = queryTermMappingMapper.selectPage(
                 page,
                 Wrappers.lambdaQuery(QueryTermMappingDO.class)
+                        // keyword 非空时：sourceTerm LIKE '%keyword%' OR targetTerm LIKE '%keyword%'
                         .and(StrUtil.isNotBlank(keyword), wrapper -> wrapper
                                 .like(QueryTermMappingDO::getSourceTerm, keyword)
                                 .or()
                                 .like(QueryTermMappingDO::getTargetTerm, keyword))
+                        // 主排序：priority 升序（数值小的优先级高，排在前面）
                         .orderByAsc(QueryTermMappingDO::getPriority)
+                        // 次排序：最近更新的排在前面
                         .orderByDesc(QueryTermMappingDO::getUpdateTime)
         );
         return result.convert(this::toVO);

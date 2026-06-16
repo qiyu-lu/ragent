@@ -30,9 +30,18 @@ import java.util.List;
  */
 public interface RagTraceQueryService {
 
+    /**
+     * 分页查询链路运行记录，支持按 traceId/conversationId/taskId/status 过滤
+     */
     IPage<RagTraceRunVO> pageRuns(RagTraceRunPageRequest request);
 
+    /**
+     * 查询指定链路的运行详情（含节点列表）；traceId 不存在时返回 null
+     */
     RagTraceDetailVO detail(String traceId);
 
+    /**
+     * 查询指定链路的所有执行节点，按 startTime ASC 排序
+     */
     List<RagTraceNodeVO> listNodes(String traceId);
 }

@@ -22,27 +22,29 @@ import com.nageoffer.ai.ragent.framework.exception.ClientException;
 
 /**
  * 用户上下文容器（基于 TTL 传递当前线程的登录用户）
+ * 作用：把当前请求对应的登录用户信息，存到当前线程中，
+ * 让整个业务代码随时都能获取当前用户。
  */
 public final class UserContext {
 
     private static final TransmittableThreadLocal<LoginUser> CONTEXT = new TransmittableThreadLocal<>();
 
     /**
-     * 设置当前线程的用户上下文
+     * 设置当前线程的用户上下文，存用户
      */
     public static void set(LoginUser user) {
         CONTEXT.set(user);
     }
 
     /**
-     * 获取当前线程的用户上下文
+     * 获取当前线程的用户上下文，得到用户
      */
     public static LoginUser get() {
         return CONTEXT.get();
     }
 
     /**
-     * 获取当前线程用户，若不存在则抛异常
+     * 获取当前线程用户，若不存在则抛异常，必须获取到用户，如果没有抛出异常。
      */
     public static LoginUser requireUser() {
         LoginUser user = CONTEXT.get();
@@ -92,7 +94,7 @@ public final class UserContext {
     }
 
     /**
-     * 判断是否已存在用户上下文
+     * 判断是否已存在用户上下文，判断是否登录，等价于 UserContext.get() != null
      */
     public static boolean hasUser() {
         return CONTEXT.get() != null;

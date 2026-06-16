@@ -21,16 +21,27 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * {@code GET /user/me} 接口的响应体。
+ *
+ * <p>字段值直接来源于 {@link com.nageoffer.ai.ragent.framework.context.UserContext} 中
+ * 预存的 {@link com.nageoffer.ai.ragent.framework.context.LoginUser} 快照，
+ * 由 {@code UserContextInterceptor} 在每次请求前从 SaToken + 数据库填充，不走额外 DB 查询。</p>
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class CurrentUserVO {
 
+    /** 用户唯一 ID（雪花 ID 字符串）。 */
     private String userId;
 
+    /** 登录用户名。 */
     private String username;
 
+    /** 用户角色（如 {@code admin} / {@code user}），用于前端权限控制。 */
     private String role;
 
+    /** 用户头像 URL；用户未配置时返回 GitHub 默认头像地址。 */
     private String avatar;
 }

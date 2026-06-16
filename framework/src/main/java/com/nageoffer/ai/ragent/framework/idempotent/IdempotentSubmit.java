@@ -25,9 +25,9 @@ import java.lang.annotation.Target;
 /**
  * 幂等注解，防止用户重复提交表单信息
  */
-@Target(ElementType.METHOD)
-@Retention(RetentionPolicy.RUNTIME)
-public @interface IdempotentSubmit {
+@Target(ElementType.METHOD) //这个注解只能标在方法上
+@Retention(RetentionPolicy.RUNTIME) //运行时仍然可以被反射读取
+public @interface IdempotentSubmit { // 是一个 注解类型
 
     /**
      * 通过 SpEL 表达式生成的唯一 Key，优先级高于默认幂等逻辑

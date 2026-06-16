@@ -65,21 +65,22 @@ public class IntentTreeServiceImpl extends ServiceImpl<IntentNodeMapper, IntentN
 
     @Override
     public List<IntentNodeTreeVO> getFullTree() {
+        // 一次性加载全部未删除节点，按 sortOrder、id 升序
         List<IntentNodeDO> list = this.list(new LambdaQueryWrapper<IntentNodeDO>()
                 .eq(IntentNodeDO::getDeleted, 0)
                 .orderByAsc(IntentNodeDO::getSortOrder, IntentNodeDO::getId));
 
-        // 先按 parentCode 分组
+        // 按 parentCode 分组：parentCode 为 null 的节点归入虚拟 "ROOT" 分组
         Map<String, List<IntentNodeDO>> parentMap = list.stream()
                 .collect(Collectors.groupingBy(node -> {
                     String parent = node.getParentCode();
                     return parent == null ? "ROOT" : parent;
                 }));
 
-        // 根节点：parentCode 为空
+        // 根节点：parentCode 为空（即 "ROOT" 分组中的节点）
         List<IntentNodeDO> roots = parentMap.getOrDefault("ROOT", Collections.emptyList());
 
-        // 递归构建树
+        // 对每个根节点递归构建子树（深度优先）
         List<IntentNodeTreeVO> tree = new ArrayList<>();
         for (IntentNodeDO root : roots) {
             tree.add(buildTree(root, parentMap));
@@ -105,7 +106,7 @@ public class IntentTreeServiceImpl extends ServiceImpl<IntentNodeMapper, IntentN
 
     @Override
     public String createNode(IntentNodeCreateRequest requestParam) {
-        // 简单重复校验：intentCode 不允许重复
+        // intentCode 全局唯一性校验（已逻辑删除的不参与判断）
         long count = this.count(new LambdaQueryWrapper<IntentNodeDO>()
                 .eq(IntentNodeDO::getIntentCode, requestParam.getIntentCode())
                 .eq(IntentNodeDO::getDeleted, 0));
@@ -113,12 +114,14 @@ public class IntentTreeServiceImpl extends ServiceImpl<IntentNodeMapper, IntentN
             throw new ClientException("意图标识已存在: " + requestParam.getIntentCode());
         }
 
+        // TOPIC 层级的 KB(RAG) 类型节点必须绑定知识库，否则检索时无法定位向量空间
         if (Objects.equals(requestParam.getLevel(), IntentLevel.TOPIC.getCode())
                 && Objects.equals(requestParam.getKind(), IntentKind.KB.getCode())
                 && StrUtil.isBlank(requestParam.getKbId())) {
             throw new ClientException("TOPIC级别的RAG检索节点必须指定目标知识库");
         }
 
+        // kbId 非空时，通过知识库表反查 collectionName，存入节点方便检索时直接使用
         IntentNodeDO node = IntentNodeDO.builder()
                 .intentCode(requestParam.getIntentCode())
                 .kbId(
@@ -132,16 +135,20 @@ public class IntentTreeServiceImpl extends ServiceImpl<IntentNodeMapper, IntentN
                 .parentCode(requestParam.getParentCode())
                 .description(requestParam.getDescription())
                 .mcpToolId(requestParam.getMcpToolId())
+                // examples 序列化为 JSON 数组字符串存储
                 .examples(
                         requestParam.getExamples() == null ? null : GSON.toJson(requestParam.getExamples())
                 )
                 .topK(normalizeTopK(requestParam.getTopK()))
+                // kind 默认 0（KB/RAG）
                 .kind(
                         requestParam.getKind() == null ? 0 : requestParam.getKind()
                 )
+                // sortOrder 默认 0（最高优先级）
                 .sortOrder(
                         requestParam.getSortOrder() == null ? 0 : requestParam.getSortOrder()
                 )
+                // enabled 默认 1（启用）
                 .enabled(
                         requestParam.getEnabled() == null ? 1 : requestParam.getEnabled()
                 )
@@ -155,7 +162,7 @@ public class IntentTreeServiceImpl extends ServiceImpl<IntentNodeMapper, IntentN
 
         this.save(node);
 
-        // 清除Redis缓存，下次读取时会重新从数据库加载
+        // 节点写入后，Redis 中的意图树缓存已过时，主动清除，下次访问时重建
         intentTreeCacheManager.clearIntentTreeCache();
 
         return String.valueOf(node.getId());
@@ -163,11 +170,13 @@ public class IntentTreeServiceImpl extends ServiceImpl<IntentNodeMapper, IntentN
 
     @Override
     public void updateNode(String id, IntentNodeUpdateRequest req) {
+        // 校验节点存在且未被逻辑删除
         IntentNodeDO node = this.getById(id);
         if (node == null || Objects.equals(node.getDeleted(), 1)) {
             throw new ServiceException("节点不存在或已删除: id=" + id);
         }
 
+        // Patch 语义：仅更新请求体中非 null 的字段，避免覆盖未传入的字段
         if (req.getName() != null) {
             node.setName(req.getName());
         }
@@ -181,6 +190,7 @@ public class IntentTreeServiceImpl extends ServiceImpl<IntentNodeMapper, IntentN
             node.setDescription(req.getDescription());
         }
         if (req.getExamples() != null) {
+            // examples 为 List，序列化为 JSON 字符串存储
             node.setExamples(GSON.toJson(req.getExamples()));
         }
         if (req.getCollectionName() != null) {
@@ -210,7 +220,7 @@ public class IntentTreeServiceImpl extends ServiceImpl<IntentNodeMapper, IntentN
         node.setUpdateBy(UserContext.getUsername());
         this.updateById(node);
 
-        // 清除Redis缓存，下次读取时会重新从数据库加载
+        // 节点变更后清除 Redis 意图树缓存，下次访问时从数据库重建
         intentTreeCacheManager.clearIntentTreeCache();
     }
 
@@ -238,10 +248,15 @@ public class IntentTreeServiceImpl extends ServiceImpl<IntentNodeMapper, IntentN
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void batchDisableNodes(List<String> ids) {
+        // 校验并加载目标节点列表
         List<IntentNodeDO> targetNodes = listAndValidateTargetNodes(ids);
+        // 一次性加载全部活跃节点，用于构建子孙关系图（避免递归查库）
         List<IntentNodeDO> allActiveNodes = listActiveNodes();
         Map<String, List<IntentNodeDO>> childrenMap = buildChildrenMap(allActiveNodes);
         Set<String> targetIdSet = targetNodes.stream().map(IntentNodeDO::getId).collect(Collectors.toSet());
+
+        // 逐个检查：若某目标节点存在"已启用 且 未被选中"的子孙节点，则拒绝操作
+        // 原因：父节点停用但子节点仍启用会导致意图路由逻辑混乱
         for (IntentNodeDO targetNode : targetNodes) {
             List<IntentNodeDO> descendants = collectDescendants(targetNode.getIntentCode(), childrenMap);
             List<IntentNodeDO> enabledButNotSelected = descendants.stream()
@@ -257,6 +272,8 @@ public class IntentTreeServiceImpl extends ServiceImpl<IntentNodeMapper, IntentN
                 );
             }
         }
+
+        // 校验通过后批量设置 enabled=0
         String operator = UserContext.getUsername();
         targetNodes.forEach(node -> {
             node.setEnabled(0);
@@ -269,16 +286,20 @@ public class IntentTreeServiceImpl extends ServiceImpl<IntentNodeMapper, IntentN
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void batchDeleteNodes(List<String> ids) {
+        // 校验并加载目标节点列表
         List<IntentNodeDO> targetNodes = listAndValidateTargetNodes(ids);
         List<IntentNodeDO> allActiveNodes = listActiveNodes();
         Map<String, List<IntentNodeDO>> childrenMap = buildChildrenMap(allActiveNodes);
         Set<String> targetIdSet = targetNodes.stream().map(IntentNodeDO::getId).collect(Collectors.toSet());
+
+        // 逐个检查：若某目标节点存在"未被选中"的子孙节点，则拒绝操作（防止产生孤儿节点）
         for (IntentNodeDO targetNode : targetNodes) {
             List<IntentNodeDO> descendants = collectDescendants(targetNode.getIntentCode(), childrenMap);
             List<IntentNodeDO> notSelectedDescendants = descendants.stream()
                     .filter(item -> !targetIdSet.contains(item.getId()))
                     .collect(Collectors.toList());
             if (CollectionUtils.isNotEmpty(notSelectedDescendants)) {
+                // 优先报启用子节点的错，给用户更明确的操作提示
                 List<IntentNodeDO> enabledDescendants = notSelectedDescendants.stream()
                         .filter(item -> Objects.equals(item.getEnabled(), 1))
                         .collect(Collectors.toList());
@@ -300,6 +321,8 @@ public class IntentTreeServiceImpl extends ServiceImpl<IntentNodeMapper, IntentN
                 );
             }
         }
+
+        // 校验通过后批量逻辑删除
         this.removeByIds(targetIdSet);
         intentTreeCacheManager.clearIntentTreeCache();
     }

@@ -97,6 +97,17 @@ public class RAGPromptService {
         return messages;
     }
 
+    /**
+     * 根据 KB 意图及其实际检索片段，决定本次应使用的系统 Prompt 模板。
+     *
+     * <p>规则：
+     * <ol>
+     *   <li>先剔除没有命中任何检索片段的意图（打分命中但向量检索未返回内容）。</li>
+     *   <li>单个有效意图且该意图节点配置了自定义模板 → 使用节点自定义模板。</li>
+     *   <li>其余情况（多意图或无自定义模板）→ 返回 null，调用方使用场景默认模板。</li>
+     * </ol>
+     * </p>
+     */
     private PromptPlan planPrompt(List<NodeScore> intents, Map<String, List<RetrievedChunk>> intentChunks) {
         List<NodeScore> safeIntents = intents == null ? Collections.emptyList() : intents;
 
@@ -133,6 +144,12 @@ public class RAGPromptService {
         }
     }
 
+    /**
+     * 根据检索上下文（是否有 MCP / KB 证据）选择对应的 Prompt 规划策略。
+     *
+     * <p>MCP-only、KB-only、Mixed 三种场景对应不同的系统提示词和参数组合。
+     * 两路均为空时抛出 {@link IllegalStateException}，防止无证据情况下进入 LLM 调用。</p>
+     */
     private PromptBuildPlan plan(PromptContext context) {
         if (context.hasMcp() && !context.hasKb()) {
             return planMcpOnly(context);
@@ -146,6 +163,7 @@ public class RAGPromptService {
         throw new IllegalStateException("PromptContext requires MCP or KB context.");
     }
 
+    /** 纯知识库场景：调用 planPrompt 决定是否使用节点自定义模板，否则加载企业 RAG 默认模板。 */
     private PromptBuildPlan planKbOnly(PromptContext context) {
         PromptPlan plan = planPrompt(context.getKbIntents(), context.getIntentChunks());
         return PromptBuildPlan.builder()
@@ -157,6 +175,7 @@ public class RAGPromptService {
                 .build();
     }
 
+    /** 纯 MCP 工具场景：单个 MCP 意图节点配置了自定义模板时优先使用，否则加载 MCP 默认模板。 */
     private PromptBuildPlan planMcpOnly(PromptContext context) {
         List<NodeScore> intents = context.getMcpIntents();
         String baseTemplate = null;
@@ -177,6 +196,7 @@ public class RAGPromptService {
                 .build();
     }
 
+    /** KB + MCP 混合场景：固定使用混合场景默认模板，不读取节点自定义模板。 */
     private PromptBuildPlan planMixed(PromptContext context) {
         return PromptBuildPlan.builder()
                 .scene(PromptScene.MIXED)
@@ -186,6 +206,12 @@ public class RAGPromptService {
                 .build();
     }
 
+    /**
+     * 按场景类型加载对应的默认系统 Prompt 模板。
+     *
+     * <p>模板路径常量定义在 {@code RAGConstant} 中：
+     * KB_ONLY → 企业 RAG 模板，MCP_ONLY → MCP 默认模板，MIXED → 混合模板。</p>
+     */
     private String defaultTemplate(PromptScene scene) {
         return switch (scene) {
             case KB_ONLY -> promptTemplateLoader.load(RAG_ENTERPRISE_PROMPT_PATH);
@@ -195,6 +221,7 @@ public class RAGPromptService {
         };
     }
 
+    /** 在证据内容前拼接区块标题（如 "## 文档内容"），便于模型区分 MCP 数据和 KB 文档。 */
     private String formatEvidence(String header, String body) {
         return header + "\n" + body.trim();
     }

@@ -40,8 +40,17 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 用户控制器
- * 提供当前登录用户信息查询接口
+ * 用户管理控制器。
+ *
+ * <p>提供两类接口：
+ * <ul>
+ *   <li><b>当前用户</b>：{@code GET /user/me}（查自己信息）、{@code PUT /user/password}（改自己密码）</li>
+ *   <li><b>管理员操作</b>：{@code GET/POST/PUT/DELETE /users/**}，均通过 {@code StpUtil.checkRole("admin")} 鉴权</li>
+ * </ul>
+ * </p>
+ *
+ * <p>所有接口均受 {@code SaInterceptor} 登录拦截；当前用户信息由 {@code UserContextInterceptor}
+ * 在请求前置阶段写入 {@link UserContext}，控制器直接读取，无额外 DB 调用。</p>
  */
 @RestController
 @RequiredArgsConstructor
@@ -50,7 +59,14 @@ public class UserController {
     private final UserService userService;
 
     /**
-     * 获取当前登录用户信息
+     * 获取当前登录用户的个人信息。
+     *
+     * <p>数据来源：{@link UserContext#requireUser()} — 由 {@code UserContextInterceptor}
+     * 在每次请求前从 SaToken 中解析 loginId，再查询数据库填充到线程上下文中。
+     * 本方法本身不访问数据库，属于纯内存读取。</p>
+     *
+     * @return 包含 {@link CurrentUserVO}（userId / username / role / avatar）的统一响应
+     * @throws com.nageoffer.ai.ragent.framework.exception.ClientException 若上下文中无登录用户（理论上已被拦截器过滤）
      */
     @GetMapping("/user/me")
     public Result<CurrentUserVO> currentUser() {

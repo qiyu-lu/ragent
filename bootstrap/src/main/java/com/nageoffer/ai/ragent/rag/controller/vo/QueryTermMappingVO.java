@@ -33,13 +33,36 @@ import java.util.Date;
 @Builder
 public class QueryTermMappingVO {
 
+    /** 映射规则主键 ID */
     private String id;
+
+    /** 用户原始短语（查询中需要被替换的词） */
     private String sourceTerm;
+
+    /** 归一化后的目标短语（替换为标准词） */
     private String targetTerm;
+
+    /**
+     * 匹配类型：
+     * 1=精确匹配（当前仅实现此类型）
+     * 2=前缀匹配
+     * 3=正则匹配
+     * 4=整词匹配
+     */
     private Integer matchType;
+
+    /** 优先级，数值越小优先级越高；长词建议设置更小的值以避免短词先行替换打断长词 */
     private Integer priority;
+
+    /** 是否生效：true=启用，false=禁用 */
     private Boolean enabled;
+
+    /** 备注说明 */
     private String remark;
+
+    /** 创建时间 */
     private Date createTime;
+
+    /** 更新时间 */
     private Date updateTime;
 }

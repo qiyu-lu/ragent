@@ -114,14 +114,17 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
     @Override
     public void update(KnowledgeBaseUpdateRequest requestParam) {
+        // 校验知识库存在且未被逻辑删除
         KnowledgeBaseDO kb = knowledgeBaseMapper.selectById(requestParam.getId());
         if (kb == null || kb.getDeleted() != null && kb.getDeleted() == 1) {
             throw new ClientException("知识库不存在：" + requestParam.getId());
         }
 
+        // 若请求中携带了新的嵌入模型且与当前值不同，则进行额外校验
         if (StringUtils.hasText(requestParam.getEmbeddingModel())
                 && !requestParam.getEmbeddingModel().equals(kb.getEmbeddingModel())) {
 
+            // 已有向量化文档（chunkCount > 0）时，禁止变更嵌入模型，否则历史向量与新模型不兼容
             Long docCount = knowledgeDocumentMapper.selectCount(
                     new LambdaQueryWrapper<KnowledgeDocumentDO>()
                             .eq(KnowledgeDocumentDO::getKbId, requestParam.getId())
@@ -135,6 +138,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
             kb.setEmbeddingModel(requestParam.getEmbeddingModel());
         }
 
+        // 更新名称（可选）
         if (StringUtils.hasText(requestParam.getName())) {
             kb.setName(requestParam.getName());
         }
@@ -176,11 +180,13 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void delete(String kbId) {
+        // 校验知识库存在且未被逻辑删除
         KnowledgeBaseDO kbDO = knowledgeBaseMapper.selectById(kbId);
         if (kbDO == null || kbDO.getDeleted() != null && kbDO.getDeleted() == 1) {
             throw new ClientException("知识库不存在");
         }
 
+        // 前置保护：知识库下仍有未删除文档时，拒绝删除，避免孤立向量数据残留
         Long docCount = knowledgeDocumentMapper.selectCount(
                 Wrappers.lambdaQuery(KnowledgeDocumentDO.class)
                         .eq(KnowledgeDocumentDO::getKbId, kbId)
@@ -190,6 +196,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
             throw new ClientException("当前知识库下还有文档，请删除文档");
         }
 
+        // 执行逻辑删除（deleted=1），数据库物理记录保留
         kbDO.setDeleted(1);
         kbDO.setUpdatedBy(UserContext.getUsername());
         knowledgeBaseMapper.deleteById(kbDO);
@@ -197,22 +204,28 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
     @Override
     public KnowledgeBaseVO queryById(String kbId) {
+        // 按主键查询，并过滤已删除记录
         KnowledgeBaseDO kbDO = knowledgeBaseMapper.selectById(kbId);
         if (kbDO == null || kbDO.getDeleted() != null && kbDO.getDeleted() == 1) {
             throw new ClientException("知识库不存在");
         }
+        // 将数据库实体映射为前端 VO 返回
         return BeanUtil.toBean(kbDO, KnowledgeBaseVO.class);
     }
 
     @Override
     public IPage<KnowledgeBaseVO> pageQuery(KnowledgeBasePageRequest requestParam) {
+        // 构建查询条件：仅查未删除记录，名称非空时启用模糊匹配，按更新时间倒序
         LambdaQueryWrapper<KnowledgeBaseDO> queryWrapper = Wrappers.lambdaQuery(KnowledgeBaseDO.class)
                 .like(StringUtils.hasText(requestParam.getName()), KnowledgeBaseDO::getName, requestParam.getName())
                 .eq(KnowledgeBaseDO::getDeleted, 0)
                 .orderByDesc(KnowledgeBaseDO::getUpdateTime);
 
+        // 执行分页查询
         Page<KnowledgeBaseDO> page = new Page<>(requestParam.getCurrent(), requestParam.getSize());
         IPage<KnowledgeBaseDO> result = knowledgeBaseMapper.selectPage(page, queryWrapper);
+
+        // 批量统计当前页各知识库的文档数量，避免 N+1 查询
         Map<String, Long> docCountMap = new HashMap<>();
         if (CollUtil.isNotEmpty(result.getRecords())) {
             List<String> kbIds = result.getRecords().stream()
@@ -220,6 +233,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                     .filter(Objects::nonNull)
                     .collect(Collectors.toList());
             if (!kbIds.isEmpty()) {
+                // 用 GROUP BY 一次查出所有 kbId 对应的文档数量
                 List<Map<String, Object>> rows = knowledgeDocumentMapper.selectMaps(
                         Wrappers.query(KnowledgeDocumentDO.class)
                                 .select("kb_id AS kbId", "COUNT(1) AS docCount")
@@ -227,6 +241,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                                 .eq("deleted", 0)
                                 .groupBy("kb_id")
                 );
+                // 将查询结果转换为 Map<kbId, count>，兼容不同数据库驱动返回的类型（Number/String）
                 for (Map<String, Object> row : rows) {
                     Object kbIdValue = row.get("kbId");
                     Object countValue = row.get("docCount");
@@ -244,6 +259,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 }
             }
         }
+        // 将 DO 转换为 VO，并填充文档数量（未查到则默认为 0）
         return result.convert(each -> {
             KnowledgeBaseVO vo = BeanUtil.toBean(each, KnowledgeBaseVO.class);
             Long docCount = docCountMap.get(each.getId());

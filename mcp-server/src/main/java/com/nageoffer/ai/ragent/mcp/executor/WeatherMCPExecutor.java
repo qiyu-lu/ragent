@@ -31,6 +31,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+/**
+ * 天气查询 MCP 工具执行器
+ * <p>
+ * toolId：weather_query，支持查询当前天气和未来多天预报。
+ * 数据为模拟生成：以城市经纬度 + 日期为随机种子，按季节规则生成温度、湿度、风力等，
+ * 同一天多次调用结果确定性一致。
+ */
 @Slf4j
 @Component
 public class WeatherMCPExecutor implements MCPToolExecutor {
@@ -131,6 +138,7 @@ public class WeatherMCPExecutor implements MCPToolExecutor {
         }
     }
 
+    /** 构建当前天气文本：温度、湿度、风力、空气质量，并附加出行提示 */
     private String buildCurrentResult(String city) {
         LocalDate today = LocalDate.now();
         WeatherData weather = generateWeatherForDate(city, today);
@@ -158,6 +166,7 @@ public class WeatherMCPExecutor implements MCPToolExecutor {
         return sb.toString().trim();
     }
 
+    /** 构建未来 N 天预报文本，末尾附加升降温趋势提示（差值 ≥5°C 才显示） */
     private String buildForecastResult(String city, int days) {
         LocalDate today = LocalDate.now();
 
@@ -187,6 +196,11 @@ public class WeatherMCPExecutor implements MCPToolExecutor {
         return sb.toString().trim();
     }
 
+    /**
+     * 按城市 + 日期生成模拟天气数据。
+     * 随机种子 = date.toEpochDay() * 31 + city.hashCode()，保证同城同日结果稳定。
+     * 基础气温根据城市纬度和当前季节推算，随机量在此基础上浮动。
+     */
     private WeatherData generateWeatherForDate(String city, LocalDate date) {
         double[] coords = CITY_COORDINATES.get(city);
         double latitude = coords[0];

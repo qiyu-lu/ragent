@@ -28,19 +28,47 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+/**
+ * Patch 语义：所有字段均可选，非 null 才会被更新到数据库
+ */
 public class IntentNodeUpdateRequest {
 
+    /** 节点展示名称 */
     private String name;
+
+    /** 节点层级：0=DOMAIN，1=CATEGORY，2=TOPIC */
     private Integer level;
+
+    /** 父节点 intentCode */
     private String parentCode;
+
+    /** 节点描述 */
     private String description;
+
+    /** 示例问题列表（全量覆盖，非追加） */
     private List<String> examples;
+
+    /** Milvus Collection 名称（直接指定，优先于 kbId 推导） */
     private String collectionName;
+
+    /** 节点级 TopK，null 表示沿用全局默认 */
     private Integer topK;
+
+    /** 节点类型：0=KB，1=SYSTEM，2=MCP */
     private Integer kind;
+
+    /** 同层排序权重 */
     private Integer sortOrder;
+
+    /** 是否启用：1=启用，0=停用 */
     private Integer enabled;
+
+    /** 短规则片段（可选，注入到 Prompt 头部） */
     private String promptSnippet;
+
+    /** 场景完整 Prompt 模板（可选） */
     private String promptTemplate;
+
+    /** 参数提取提示词模板（MCP 模式专属） */
     private String paramPromptTemplate;
 }

@@ -24,6 +24,17 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * Ragent 核心应用启动类
+ *
+ * 本类是 Ragent 项目的 Spring Boot 应用程序入口点，负责初始化和启动整个应用。
+ *
+ * 功能说明：
+ * 1. @SpringBootApplication: 标注这是一个 Spring Boot 应用，自动开启组件扫描和自动配置
+ * 2. @EnableScheduling: 启用定时任务调度功能，支持 @Scheduled 注解
+ * 3. @MapperScan: 配置 MyBatis 的 Mapper 接口扫描路径，包括四个主要模块：
+ *    - rag.dao.mapper: RAG（检索增强生成）相关的数据访问层
+ *    - ingestion.dao.mapper: 数据摄取模块的数据访问层
+ *    - knowledge.dao.mapper: 知识库管理模块的数据访问层
+ *    - user.dao.mapper: 用户管理模块的数据访问层
  */
 @SpringBootApplication
 @EnableScheduling
@@ -35,6 +46,18 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 })
 public class RagentApplication {
 
+    /**
+     * Spring Boot 应用程序入口方法
+     *
+     * @param args 命令行参数，通过 args 可以传递应用配置参数
+     *
+     * 执行流程：
+     * 1. SpringApplication.run() 方法启动 Spring Boot 应用
+     * 2. 自动扫描并注册所有标注的 Bean
+     * 3. 初始化内置 Tomcat 容器
+     * 4. 启动定时任务调度器
+     * 5. 扫描指定包中的 MyBatis Mapper 接口
+     */
     public static void main(String[] args) {
         SpringApplication.run(RagentApplication.class, args);
     }

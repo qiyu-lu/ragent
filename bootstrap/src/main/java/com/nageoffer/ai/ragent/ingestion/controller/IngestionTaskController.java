@@ -43,6 +43,9 @@ import java.util.List;
 
 /**
  * 知识库采集任务控制层
+ * 提供文档摄入任务的创建、查询接口。
+ * 任务执行为同步阻塞模式：接口调用会等待整条流水线（fetcher→parser→chunker→indexer）
+ * 全部跑完后才返回结果，适合文件较小的场景。
  */
 @RestController
 @RequiredArgsConstructor
@@ -52,7 +55,12 @@ public class IngestionTaskController {
     private final IngestionTaskService taskService;
 
     /**
-     * 创建并执行采集任务
+     * 创建并同步执行采集任务（JSON 方式指定文档来源）
+     * 通过 source.type 指定文档来源类型（file/url/feishu/s3），
+     * 流水线执行完成后同步返回任务 ID、最终状态和生成的 Chunk 数量
+     *
+     * @param request 包含 pipelineId、source（来源类型+位置+凭证）、vectorSpaceId（可选）
+     * @return 摄入结果概要（taskId、status、chunkCount、message）
      */
     @PostMapping("/ingestion/tasks")
     public Result<IngestionResult> create(@RequestBody IngestionTaskCreateRequest request) {
@@ -60,7 +68,13 @@ public class IngestionTaskController {
     }
 
     /**
-     * 上传文件并触发采集任务
+     * 上传文件并同步触发采集任务（multipart 方式）
+     * 服务端通过魔数（magic bytes）自动检测文件 MIME 类型，无需客户端传 Content-Type；
+     * 文件字节直接传入流水线，不落本地磁盘
+     *
+     * @param pipelineId 请求参数，指定执行此次摄入的流水线 ID
+     * @param file       multipart 文件部分，Part 名称固定为 "file"
+     * @return 摄入结果概要（taskId、status、chunkCount、message）
      */
     @SneakyThrows
     @PostMapping(value = "/ingestion/tasks/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -70,7 +84,11 @@ public class IngestionTaskController {
     }
 
     /**
-     * 根据任务 ID 获取任务详情
+     * 根据任务 ID 查询任务详情
+     * 返回任务基本信息、最终状态、Chunk 数量、错误信息及节点运行日志摘要（不含节点输出体）
+     *
+     * @param id 路径变量，任务 ID
+     * @return 任务详情 VO
      */
     @GetMapping("/ingestion/tasks/{id}")
     public Result<IngestionTaskVO> get(@PathVariable String id) {
@@ -78,7 +96,11 @@ public class IngestionTaskController {
     }
 
     /**
-     * 根据任务 ID 获取任务节点运行记录
+     * 查询任务各节点的运行记录
+     * 按节点执行顺序（nodeOrder 升序）返回每个节点的类型、状态、耗时、消息及输出摘要
+     *
+     * @param id 路径变量，任务 ID
+     * @return 节点运行记录列表（含 success/failed/skipped 状态）
      */
     @GetMapping("/ingestion/tasks/{id}/nodes")
     public Result<List<IngestionTaskNodeVO>> nodes(@PathVariable String id) {
@@ -86,7 +108,13 @@ public class IngestionTaskController {
     }
 
     /**
-     * 分页查询采集任务
+     * 分页查询采集任务列表
+     * 支持按任务状态过滤（pending/running/completed/failed），结果按创建时间倒序
+     *
+     * @param pageNo   当前页码，默认 1
+     * @param pageSize 每页条数，默认 10
+     * @param status   状态过滤（可选，不传则查全部）
+     * @return 分页后的任务列表
      */
     @GetMapping("/ingestion/tasks")
     public Result<IPage<IngestionTaskVO>> page(@RequestParam(value = "pageNo", defaultValue = "1") int pageNo,

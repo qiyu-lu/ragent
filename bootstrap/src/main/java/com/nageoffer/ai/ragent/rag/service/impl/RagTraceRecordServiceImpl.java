@@ -30,6 +30,8 @@ import java.util.Date;
 
 /**
  * RAG Trace 记录服务实现
+ * 采用"开始时 insert + 结束时 update"的两阶段写入模式：
+ * 即使方法执行中途宕机，也能在数据库中看到 RUNNING 状态的记录，便于故障排查
  */
 @Service
 @RequiredArgsConstructor
@@ -40,11 +42,13 @@ public class RagTraceRecordServiceImpl implements RagTraceRecordService {
 
     @Override
     public void startRun(RagTraceRunDO run) {
+        // 链路开始，插入 RUNNING 记录；endTime/durationMs 为 null，结束时补充
         runMapper.insert(run);
     }
 
     @Override
     public void finishRun(String traceId, String status, String errorMessage, Date endTime, long durationMs) {
+        // 按 traceId 更新状态、错误信息和耗时；其余字段（userId、conversationId 等）不变
         RagTraceRunDO update = RagTraceRunDO.builder()
                 .status(status)
                 .errorMessage(errorMessage)
@@ -57,11 +61,13 @@ public class RagTraceRecordServiceImpl implements RagTraceRecordService {
 
     @Override
     public void startNode(RagTraceNodeDO node) {
+        // 节点开始，插入 RUNNING 记录
         nodeMapper.insert(node);
     }
 
     @Override
     public void finishNode(String traceId, String nodeId, String status, String errorMessage, Date endTime, long durationMs) {
+        // 按 traceId + nodeId 联合定位（nodeId 在单链路内唯一，traceId 保证跨链路不误更新）
         RagTraceNodeDO update = RagTraceNodeDO.builder()
                 .status(status)
                 .errorMessage(errorMessage)

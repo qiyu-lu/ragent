@@ -26,8 +26,12 @@ import java.util.Deque;
  * RAG Trace 上下文
  * 使用 TTL 在异步线程池中透传 traceId 与节点栈
  */
+//链路追踪上下文工具类 用于在一次 RAG 任务执行过程中保存一些“当前线程上下文信息”
 public final class RagTraceContext {
 
+    //traceId：一次请求/链路的唯一 ID 表示一次完整请求的唯一标识
+    //taskId：某个任务的 ID 表示当前 RAG 任务、智能体任务、工作流任务的 ID
+    //nodeStack：当前执行到哪个节点，以及节点调用层级 这个栈用于记录当前正在执行的节点路径
     private static final TransmittableThreadLocal<String> TRACE_ID = new TransmittableThreadLocal<>();
     private static final TransmittableThreadLocal<String> TASK_ID = new TransmittableThreadLocal<>();
     private static final TransmittableThreadLocal<Deque<String>> NODE_STACK = new TransmittableThreadLocal<>();
@@ -61,6 +65,9 @@ public final class RagTraceContext {
         return stack == null ? null : stack.peek();
     }
 
+    //先从 ThreadLocal 里取节点栈
+    //如果没有栈，就创建一个新的 ArrayDeque
+    //然后把 nodeId 压入栈顶
     public static void pushNode(String nodeId) {
         Deque<String> stack = NODE_STACK.get();
         if (stack == null) {

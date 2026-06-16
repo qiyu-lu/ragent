@@ -80,7 +80,9 @@ public class IngestionTaskServiceImpl implements IngestionTaskService {
     @Transactional(rollbackFor = Exception.class)
     public IngestionResult execute(IngestionTaskCreateRequest request) {
         Assert.notNull(request, () -> new ClientException("请求不能为空"));
+        // 将请求中的 DocumentSourceRequest 转换为领域对象 DocumentSource，并校验 type 非空
         DocumentSource source = toSource(request.getSource());
+        // rawBytes/mimeType 为 null 表示由 fetcher 节点自行从远程获取文档内容
         return executeInternal(request.getPipelineId(), source, null, null, request.getVectorSpaceId());
     }
 
@@ -89,17 +91,20 @@ public class IngestionTaskServiceImpl implements IngestionTaskService {
     public IngestionResult upload(String pipelineId, MultipartFile file) {
         Assert.notNull(file, () -> new ClientException("文件不能为空"));
         try {
+            // 一次性读取文件字节，不落磁盘，直接传入流水线内存处理
             byte[] bytes = file.getBytes();
             String fileName = file.getOriginalFilename();
             if (!StringUtils.hasText(fileName)) {
                 fileName = "upload.bin";
             }
+            // 通过魔数（magic bytes）自动检测 MIME 类型，优先于 Content-Type 头
             String mimeType = MimeTypeDetector.detect(bytes, fileName);
             DocumentSource source = DocumentSource.builder()
                     .type(SourceType.FILE)
                     .location(fileName)
                     .fileName(fileName)
                     .build();
+            // 上传场景下 vectorSpaceId 为 null，由流水线 indexer 节点配置决定写入目标
             return executeInternal(pipelineId, source, bytes, mimeType, null);
         } catch (Exception e) {
             throw new ClientException("读取上传文件失败: " + e.getMessage());
@@ -138,14 +143,25 @@ public class IngestionTaskServiceImpl implements IngestionTaskService {
         return nodes.stream().map(this::toNodeVO).toList();
     }
 
+    /**
+     * 摄入任务执行核心方法，由 execute() 和 upload() 共同调用。
+     *
+     * @param pipelineId    流水线 ID（必填）
+     * @param source        文档来源描述（类型、位置、文件名）
+     * @param rawBytes      文件字节（upload 场景提供；execute 场景为 null，由 fetcher 节点自行拉取）
+     * @param mimeType      MIME 类型（upload 场景由魔数检测；execute 场景为 null）
+     * @param vectorSpaceId 目标向量空间（可为 null，由 indexer 节点配置决定）
+     */
     private IngestionResult executeInternal(String pipelineId,
                                             DocumentSource source,
                                             byte[] rawBytes,
                                             String mimeType,
                                             VectorSpaceId vectorSpaceId) {
+        // 校验并获取流水线定义（含节点链配置）
         String resolvedPipelineId = resolvePipelineId(pipelineId);
         PipelineDefinition pipeline = pipelineService.getDefinition(resolvedPipelineId);
 
+        // 创建任务记录，初始状态为 RUNNING，startedAt 记录引擎启动时间
         IngestionTaskDO task = IngestionTaskDO.builder()
                 .pipelineId(resolvedPipelineId)
                 .sourceType(source.getType() == null ? null : source.getType().getValue())
@@ -159,6 +175,7 @@ public class IngestionTaskServiceImpl implements IngestionTaskService {
                 .build();
         taskMapper.insert(task);
 
+        // 构建流水线执行上下文，贯穿所有节点传递状态（rawBytes/mimeType 仅 upload 场景非 null）
         IngestionContext context = IngestionContext.builder()
                 .taskId(String.valueOf(task.getId()))
                 .pipelineId(resolvedPipelineId)
@@ -169,36 +186,58 @@ public class IngestionTaskServiceImpl implements IngestionTaskService {
                 .logs(new ArrayList<>())
                 .build();
 
+        // 同步执行整条流水线（阻塞直至最后一个节点完成或失败）
         IngestionContext result = engine.execute(pipeline, context);
+
+        // 持久化各节点运行日志到 t_ingestion_task_node
         saveNodeLogs(task, pipeline, result.getLogs());
+
+        // 将执行结果（最终状态、chunkCount、错误信息、日志摘要）写回 t_ingestion_task
         updateTaskFromContext(task, result);
+
         return IngestionResult.builder()
                 .taskId(result.getTaskId())
                 .pipelineId(result.getPipelineId())
                 .status(result.getStatus())
                 .chunkCount(result.getChunks() == null ? 0 : result.getChunks().size())
+                // 成功时 message 固定为 "OK"，失败时为异常消息
                 .message(result.getError() == null ? "OK" : result.getError().getMessage())
                 .build();
     }
 
+    /**
+     * 流水线执行完成后，将上下文中的结果回写到任务主记录。
+     * logsJson 存的是去除了 output 的日志摘要（节点详细输出存 t_ingestion_task_node）。
+     */
     private void updateTaskFromContext(IngestionTaskDO task, IngestionContext context) {
+        // status 为 null 表示引擎异常退出，降级为 FAILED
         task.setStatus(context.getStatus() == null ? IngestionStatus.FAILED.getValue() : context.getStatus().getValue());
         task.setChunkCount(context.getChunks() == null ? 0 : context.getChunks().size());
         task.setErrorMessage(context.getError() == null ? null : context.getError().getMessage());
         task.setCompletedAt(new Date());
         task.setUpdatedBy(UserContext.getUsername());
+        // 日志摘要：剔除 output 字段，避免 logs_json 过大
         task.setLogsJson(writeJson(buildLogSummary(context.getLogs())));
+        // 元数据：合并 context.metadata + keywords + questions
         task.setMetadataJson(writeJson(buildTaskMetadata(context)));
         taskMapper.updateById(task);
     }
 
+    /**
+     * 将引擎执行过程中每个节点的运行日志持久化到 t_ingestion_task_node。
+     * nodeOrder 由 buildNodeOrderMap() 根据流水线 nextNodeId 链推算，用于前端排序展示。
+     * outputJson 超过 1MB 时会被截断，防止超出数据库 max_allowed_packet。
+     */
     private void saveNodeLogs(IngestionTaskDO task, PipelineDefinition pipeline, List<NodeLog> logs) {
         if (logs == null || logs.isEmpty()) {
             return;
         }
+        // 预先构建 nodeId → 执行顺序编号的映射
         Map<String, Integer> nodeOrderMap = buildNodeOrderMap(pipeline);
         for (NodeLog log : logs) {
+            // 根据 log.success 和 message 前缀推断节点状态（success/failed/skipped）
             String status = resolveNodeStatus(log);
+            // 截断大尺寸 output，避免超出 DB 字段限制
             String outputJson = truncateOutputJson(log.getOutput());
             IngestionTaskNodeDO nodeDO = IngestionTaskNodeDO.builder()
                     .taskId(task.getId())
@@ -216,11 +255,17 @@ public class IngestionTaskServiceImpl implements IngestionTaskService {
         }
     }
 
+    /**
+     * 根据流水线定义推算每个节点的执行顺序编号（从 1 开始）。
+     * 算法：找到"未被任何节点的 nextNodeId 引用"的节点作为起点，
+     * 沿 nextNodeId 链遍历赋值；最后对孤立节点（若有）补充编号。
+     */
     private Map<String, Integer> buildNodeOrderMap(PipelineDefinition pipeline) {
         Map<String, Integer> orderMap = new HashMap<>();
         if (pipeline == null || pipeline.getNodes() == null || pipeline.getNodes().isEmpty()) {
             return orderMap;
         }
+        // 去重并保留插入顺序
         Map<String, NodeConfig> nodeMap = new LinkedHashMap<>();
         for (NodeConfig node : pipeline.getNodes()) {
             if (node == null || !StringUtils.hasText(node.getNodeId())) {
@@ -231,6 +276,7 @@ public class IngestionTaskServiceImpl implements IngestionTaskService {
         if (nodeMap.isEmpty()) {
             return orderMap;
         }
+        // 收集所有被 nextNodeId 引用过的节点 ID（非起点）
         Set<String> referenced = new HashSet<>();
         for (NodeConfig node : nodeMap.values()) {
             if (StringUtils.hasText(node.getNextNodeId())) {
@@ -239,6 +285,7 @@ public class IngestionTaskServiceImpl implements IngestionTaskService {
         }
         int order = 1;
         Set<String> visited = new HashSet<>();
+        // 从未被引用的节点（即起点）开始沿链赋值顺序编号
         for (String nodeId : nodeMap.keySet()) {
             if (referenced.contains(nodeId)) {
                 continue;
@@ -254,6 +301,7 @@ public class IngestionTaskServiceImpl implements IngestionTaskService {
                 current = config.getNextNodeId();
             }
         }
+        // 处理未被上述链遍历覆盖的孤立节点（正常流水线不应存在）
         for (String nodeId : nodeMap.keySet()) {
             if (!visited.contains(nodeId)) {
                 orderMap.put(nodeId, order++);

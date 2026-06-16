@@ -55,9 +55,11 @@ public class RagTraceQueryServiceImpl implements RagTraceQueryService {
 
     @Override
     public IPage<RagTraceRunVO> pageRuns(RagTraceRunPageRequest request) {
+        // 默认按 startTime 倒序，最新请求排在前面
         LambdaQueryWrapper<RagTraceRunDO> wrapper = Wrappers.lambdaQuery(RagTraceRunDO.class)
                 .orderByDesc(RagTraceRunDO::getStartTime);
 
+        // 以下过滤条件均为精确匹配，空白时不加条件
         if (StrUtil.isNotBlank(request.getTraceId())) {
             wrapper.eq(RagTraceRunDO::getTraceId, request.getTraceId());
         }
@@ -72,12 +74,14 @@ public class RagTraceQueryServiceImpl implements RagTraceQueryService {
         }
 
         IPage<RagTraceRunDO> pageResult = runMapper.selectPage(request, wrapper);
+        // 批量加载本页所有记录的用户名，避免 N+1 查询
         Map<String, String> usernameMap = loadUsernameMap(pageResult.getRecords());
         return pageResult.convert(run -> toRunVO(run, usernameMap));
     }
 
     @Override
     public RagTraceDetailVO detail(String traceId) {
+        // 按 traceId 查运行记录（traceId 唯一，limit 1 防止多条异常数据破坏查询）
         RagTraceRunDO run = runMapper.selectOne(Wrappers.lambdaQuery(RagTraceRunDO.class)
                 .eq(RagTraceRunDO::getTraceId, traceId)
                 .last("limit 1"));
@@ -87,12 +91,15 @@ public class RagTraceQueryServiceImpl implements RagTraceQueryService {
         Map<String, String> usernameMap = loadUsernameMap(List.of(run));
         return RagTraceDetailVO.builder()
                 .run(toRunVO(run, usernameMap))
+                // 复用 listNodes，节点已按 startTime/id 排序
                 .nodes(listNodes(traceId))
                 .build();
     }
 
     @Override
     public List<RagTraceNodeVO> listNodes(String traceId) {
+        // 按 startTime ASC + id ASC 排序，保证节点顺序与实际执行顺序一致
+        // 同一毫秒内启动的节点用 id（雪花 ID，天然有序）兜底排序
         List<RagTraceNodeDO> nodes = nodeMapper.selectList(Wrappers.lambdaQuery(RagTraceNodeDO.class)
                 .eq(RagTraceNodeDO::getTraceId, traceId)
                 .orderByAsc(RagTraceNodeDO::getStartTime)
@@ -100,6 +107,9 @@ public class RagTraceQueryServiceImpl implements RagTraceQueryService {
         return nodes.stream().map(this::toNodeVO).toList();
     }
 
+    /**
+     * DO → RunVO 转换，username 由外部预批量加载的 usernameMap 提供
+     */
     private RagTraceRunVO toRunVO(RagTraceRunDO run, Map<String, String> usernameMap) {
         String username = resolveUsername(run.getUserId(), usernameMap);
         return RagTraceRunVO.builder()
@@ -118,6 +128,12 @@ public class RagTraceQueryServiceImpl implements RagTraceQueryService {
                 .build();
     }
 
+    /**
+     * 批量加载用户名，避免 N+1 查询：
+     * 1. 从 runs 中收集所有非 null 的 userId
+     * 2. IN 查询 t_user 获取 id→username 映射（只 select 两列，减少网络 IO）
+     * 3. 有重复 key 时保留先出现的值（(left, right) -> left）
+     */
     private Map<String, String> loadUsernameMap(List<RagTraceRunDO> runs) {
         if (runs == null || runs.isEmpty()) {
             return Collections.emptyMap();
@@ -145,6 +161,9 @@ public class RagTraceQueryServiceImpl implements RagTraceQueryService {
         ));
     }
 
+    /**
+     * 安全地从 usernameMap 中取用户名：userId 为空或 map 为空时返回 null
+     */
     private String resolveUsername(String userId, Map<String, String> usernameMap) {
         if (StrUtil.isBlank(userId) || usernameMap == null || usernameMap.isEmpty()) {
             return null;
@@ -152,6 +171,9 @@ public class RagTraceQueryServiceImpl implements RagTraceQueryService {
         return usernameMap.get(userId);
     }
 
+    /**
+     * DO → NodeVO 转换（字段一一映射，无业务逻辑）
+     */
     private RagTraceNodeVO toNodeVO(RagTraceNodeDO node) {
         return RagTraceNodeVO.builder()
                 .traceId(node.getTraceId())

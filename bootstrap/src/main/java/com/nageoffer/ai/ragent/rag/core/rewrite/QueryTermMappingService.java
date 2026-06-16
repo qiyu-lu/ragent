@@ -58,30 +58,38 @@ public class QueryTermMappingService {
     /**
      * 对用户问题做术语归一化
      */
+    //对用户输入的查询文本做“术语归一化 / 同义词替换 / 关键词映射”
     public String normalize(String text) {
+        //没有必要处理就直接返回
         if (text == null || text.isEmpty() || cachedMappings.isEmpty()) {
             return text;
         }
+        //用 result 保存处理后的文本
         String result = text;
         for (QueryTermMappingDO mapping : cachedMappings) {
+            //跳过未启用的规则
             if (mapping.getEnabled() == null || mapping.getEnabled() == 0) {
                 continue;
             }
+            //只处理 match_type = 1 的规则 精确匹配
             if (mapping.getMatchType() != null && mapping.getMatchType() != 1) {
                 // 这里只示例 match_type = 1 的简单子串匹配，其他类型可以自己扩展
                 continue;
             }
-            String source = mapping.getSourceTerm();
-            String target = mapping.getTargetTerm();
+            //在用户查询中，把 source 替换或映射成 target。
+            String source = mapping.getSourceTerm();//用户原始短语
+            String target = mapping.getTargetTerm();//归一化后的目标短语
             if (source == null || source.isEmpty() || target == null || target.isEmpty()) {
                 continue;
             }
+            //应用映射规则
             result = QueryTermMappingUtil.applyMapping(result, source, target);
         }
 
         if (!Objects.equals(text, result)) {
+            //如果文本发生变化，打印日志
             log.info("查询归一化：original='{}', normalized='{}'", text, result);
         }
-        return result;
+        return result; //返回归一化结果
     }
 }

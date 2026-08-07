@@ -1,0 +1,54 @@
+{"id": "rule-easy-01", "tier": "easy", "question": "公司的正常工作时间是几点到几点？", "reference_docs": ["公司规章制度"], "reference_anchors": ["9:30–18:30"], "source": "公司规章制度.md 二.1 正常工作时间"}
+{"id": "rule-easy-02", "tier": "easy", "question": "加班需要提前审批吗？", "reference_docs": ["公司规章制度"], "reference_anchors": ["事先说明并取得直属经理同意"], "source": "公司规章制度.md 二.3 加班管理原则"}
+{"id": "rule-hard-01", "tier": "hard", "question": "昨天忙到十一点多才走，今天几点到公司还算正常出勤？", "reference_docs": ["公司规章制度"], "reference_anchors": ["次日最晚可于 10:00 上班"], "source": "公司规章制度.md 二.1 加班后次日弹性"}
+{"id": "rule-hard-02", "tier": "hard", "question": "干到凌晨一点才下班，第二天早上起不来会算迟到吗", "reference_docs": ["公司规章制度"], "reference_anchors": ["次日最晚可于 13:00 上班"], "source": "公司规章制度.md 二.1 加班后次日弹性"}
+{"id": "rule-hard-03", "tier": "hard", "question": "我们组说可以晚点来早点走，这种安排有规定吗", "reference_docs": ["公司规章制度"], "reference_anchors": ["弹性工作制"], "source": "公司规章制度.md 二.2 弹性工作制"}
+{"id": "hr-easy-01", "tier": "easy", "question": "试用期可以提前转正吗？", "reference_docs": ["人事制度"], "reference_anchors": ["提前转正申请"], "source": "人事制度.md 七 FAQ Q1"}
+{"id": "hr-easy-02", "tier": "easy", "question": "绩效不达标是否会被辞退？", "reference_docs": ["人事制度"], "reference_anchors": ["改进计划（PIP）"], "source": "人事制度.md 七 FAQ Q2"}
+{"id": "hr-easy-03", "tier": "easy", "question": "试用期转正流程是什么？", "reference_docs": ["人事制度"], "reference_anchors": ["试用期满前 **15 天**"], "source": "人事制度.md 11.3.1 转正流程"}
+{"id": "hr-hard-01", "tier": "hard", "question": "今年的年假没休完，会不会白白没掉", "reference_docs": ["人事制度"], "reference_anchors": ["逾期清零"], "source": "人事制度.md 11.1.3 清零与结转"}
+{"id": "hr-hard-02", "tier": "hard", "question": "我打算走了，得提前多久跟公司说", "reference_docs": ["人事制度"], "reference_anchors": ["提前 **30 天**提出"], "source": "人事制度.md 11.4.1 提前多久提"}
+{"id": "hr-hard-03", "tier": "hard", "question": "还在试用期就想走，需要提前多长时间", "reference_docs": ["人事制度"], "reference_anchors": ["提前 **3 天**提出"], "source": "人事制度.md 11.4.1 提前多久提"}
+{"id": "hr-hard-04", "tier": "hard", "question": "快转正了，我需要交哪些东西给经理", "reference_docs": ["人事制度"], "reference_anchors": ["试用期工作总结"], "source": "人事制度.md 11.3.2 员工材料清单"}
+{"id": "hr-hard-05", "tier": "hard", "question": "周末被叫回来干活，公司怎么补给我", "reference_docs": ["人事制度"], "reference_anchors": ["优先安排补休"], "source": "人事制度.md 11.2.2 调休规则"}
+{"id": "hr-hard-06", "tier": "hard", "question": "办离职的时候电脑工卡这些怎么处理", "reference_docs": ["人事制度"], "reference_anchors": ["资产归还与权限回收"], "source": "人事制度.md 11.4.2 离职 SOP"}
+{"id": "pay-easy-01", "tier": "easy", "question": "公司给员工缴纳哪些保险？", "reference_docs": ["薪资与福利政策"], "reference_anchors": ["养老保险、医疗保险、失业保险、工伤保险、生育保险"], "source": "薪资与福利政策.md 四.1 五险一金"}
+{"id": "pay-hard-01", "tier": "hard", "question": "涨薪批下来之后，多久能在工资条上看到", "reference_docs": ["薪资与福利政策"], "reference_anchors": ["首个发薪周期中体现"], "source": "薪资与福利政策.md 三.2.5 生效时间与执行"}
+{"id": "pay-hard-02", "tier": "hard", "question": "调薪方案要经过哪些人点头才能生效", "reference_docs": ["薪资与福利政策"], "reference_anchors": ["HRBP 校准与公平性审查", "财务负责人审批"], "source": "薪资与福利政策.md 三.2 调薪流程"}
+{"id": "pay-hard-03", "tier": "hard", "question": "除了法定的那些，公司还额外买了什么保障", "reference_docs": ["薪资与福利政策"], "reference_anchors": ["补充医疗险、重大疾病险、意外险"], "source": "薪资与福利政策.md 四.2 商业保险"}
+{"id": "rec-hard-01", "tier": "hard", "question": "新人来报到，电脑是谁准备的，什么时候能拿到", "reference_docs": ["招聘信息"], "reference_anchors": ["入职前 3 天向 IT 提交设备需求清单", "IT 资产领用确认单"], "source": "招聘信息.md 新员工电脑发放"}
+{"id": "trn-hard-01", "tier": "hard", "question": "我不想带团队，还有往上升的路吗", "reference_docs": ["员工培训"], "reference_anchors": ["专业发展通道", "资深专家"], "source": "员工培训.md 四.1 专业发展通道"}
+{"id": "trn-hard-02", "tier": "hard", "question": "写代码写腻了想转去管人，需要满足什么条件", "reference_docs": ["员工培训"], "reference_anchors": ["通道转换", "胜任力评估"], "source": "员工培训.md 四.3 通道转换机制"}
+{"id": "it-easy-01", "tier": "easy", "question": "我忘记电脑密码，能让同事帮我重置吗？", "reference_docs": ["IT支持"], "reference_anchors": ["本人自助或服务台身份核验"], "source": "IT支持.md 11 FAQ Q4"}
+{"id": "it-easy-02", "tier": "easy", "question": "会议共享屏幕提示无权限？", "reference_docs": ["IT支持"], "reference_anchors": ["屏幕录制权限"], "source": "IT支持.md 11 FAQ Q5"}
+{"id": "it-easy-03", "tier": "easy", "question": "打印机显示正常但不出纸？", "reference_docs": ["IT支持"], "reference_anchors": ["清理本地打印队列"], "source": "IT支持.md 11 FAQ Q3"}
+{"id": "it-hard-01", "tier": "hard", "question": "在家用宽带死活连不上内网，开手机热点反而好了", "reference_docs": ["IT支持"], "reference_anchors": ["家用宽带路由策略"], "source": "IT支持.md 11 FAQ Q1"}
+{"id": "it-hard-02", "tier": "hard", "question": "整个楼的人邮箱都发不出去了，这算什么级别的事故", "reference_docs": ["IT支持"], "reference_anchors": ["邮件基础服务中断"], "source": "IT支持.md 10.1 等级参考 P1"}
+{"id": "it-hard-03", "tier": "hard", "question": "提了工单一直没人管，多久会转给更专业的团队", "reference_docs": ["IT支持"], "reference_anchors": ["15 分钟内无法定位"], "source": "IT支持.md 10.2 升级路径"}
+{"id": "it-hard-04", "tier": "hard", "question": "第一次要远程办公，用之前得先满足什么", "reference_docs": ["IT支持"], "reference_anchors": ["统一身份账号", "终端设备符合安全基线"], "source": "IT支持.md 3.1 VPN 使用前提"}
+{"id": "it-hard-05", "tier": "hard", "question": "密码输错好几次现在登不进去了，是被封了吗", "reference_docs": ["IT支持"], "reference_anchors": ["连续输错密码或触发风控策略"], "source": "IT支持.md 2.1 账号被锁定"}
+{"id": "it-hard-06", "tier": "hard", "question": "改完密码电脑还老是弹窗要我输，是怎么回事", "reference_docs": ["IT支持"], "reference_anchors": ["仍在使用旧缓存凭据"], "source": "IT支持.md 2.1 多端密码不一致"}
+{"id": "it-hard-07", "tier": "hard", "question": "外面客户发的邮件我一直没收到，该怎么排查", "reference_docs": ["IT支持"], "reference_anchors": ["垃圾箱、规则与自动转发设置"], "source": "IT支持.md 11 FAQ Q2"}
+{"id": "fin-easy-01", "tier": "easy", "question": "杭州阿里巴巴健康集团有限公司的纳税人识别号是多少？", "reference_docs": ["开票信息"], "reference_anchors": ["91330108MA9A1B2C3X"], "source": "开票信息.md 阿里巴巴健康集团"}
+{"id": "fin-hard-01", "tier": "hard", "question": "给阿里健康集团付款，钱要打到哪个银行", "reference_docs": ["开票信息"], "reference_anchors": ["中信银行杭州钱江支行 8110001000000000001"], "source": "开票信息.md 阿里巴巴健康集团"}
+{"id": "fin-hard-02", "tier": "hard", "question": "腾讯网络那边开票用的是哪家银行的账户", "reference_docs": ["开票信息"], "reference_anchors": ["建行杭州高新支行 33000000000000001001"], "source": "开票信息.md 腾讯网络"}
+{"id": "sec-easy-01", "tier": "easy", "question": "OA 系统的数据分成几个等级？", "reference_docs": ["OA系统数据安全规范文档"], "reference_anchors": ["L4 高敏"], "source": "OA数据安全 5 数据分类分级"}
+{"id": "sec-hard-01", "tier": "hard", "question": "员工的工资数据和银行卡号属于哪一档，管控上有什么特别要求", "reference_docs": ["OA系统数据安全规范文档"], "reference_anchors": ["薪酬要素、银行账户、证件影像", "双重审批"], "source": "OA数据安全 5 等级建议 L4"}
+{"id": "sec-hard-02", "tier": "hard", "question": "加密用的钥匙放在哪，多久换一次", "reference_docs": ["OA系统数据安全规范文档"], "reference_anchors": ["KMS/HSM", "密钥轮转"], "source": "OA数据安全 8 密钥治理"}
+{"id": "sec-hard-03", "tier": "hard", "question": "敏感字段落库的时候用什么算法加密", "reference_docs": ["OA系统数据安全规范文档"], "reference_anchors": ["AES-256/TDE"], "source": "OA数据安全 8 加密与分层"}
+{"id": "ins-hard-01", "tier": "hard", "question": "理赔场景涉及哪些类型的数据", "reference_docs": ["互联网保险系统数据安全规范"], "reference_anchors": ["医疗单据、诊断信息、结算明细、影像件"], "source": "保险数据安全 3 领域图谱"}
+{"id": "ins-hard-02", "tier": "hard", "question": "保险系统整体的安全架构遵循什么思路", "reference_docs": ["互联网保险系统数据安全规范"], "reference_anchors": ["零信任 + 纵深防御"], "source": "保险数据安全 4 安全架构"}
+{"id": "ins-hard-03", "tier": "hard", "question": "代理人的佣金和业绩数据算敏感信息吗", "reference_docs": ["互联网保险系统数据安全规范"], "reference_anchors": ["渠道/代理人数据"], "source": "保险数据安全 3 领域图谱"}
+{"id": "cross-hard-01", "tier": "hard", "question": "新人入职第一天，HR 和 IT 分别要给他办什么", "reference_docs": ["招聘信息", "IT支持"], "reference_anchors": ["IT 资产领用确认单"], "source": "跨文档：招聘信息 新员工电脑发放 + IT支持 账号开通"}
+{"id": "cross-hard-02", "tier": "hard", "question": "加班这件事，考勤上怎么算、薪资上怎么补，分别是什么规定", "reference_docs": ["公司规章制度", "人事制度"], "reference_anchors": ["事先说明并取得直属经理同意", "优先安排补休"], "source": "跨文档：公司规章制度 加班管理 + 人事制度 调休规则"}
+{"id": "cross-hard-03", "tier": "hard", "question": "离职的时候，工作交接和账号权限回收分别归谁管", "reference_docs": ["人事制度"], "reference_anchors": ["IT 回收账号权限"], "source": "跨文档：人事制度 离职 SOP + IT支持 权限"}
+{"id": "neg-01", "tier": "negative", "question": "公司股票期权的行权价格是怎么计算的？", "reference_docs": [], "reference_anchors": [], "source": "语料无股权激励内容"}
+{"id": "neg-02", "tier": "negative", "question": "公司食堂几点开始供应晚饭？", "reference_docs": [], "reference_anchors": [], "source": "语料无食堂信息"}
+{"id": "neg-03", "tier": "negative", "question": "今年的年会在哪个城市办？", "reference_docs": [], "reference_anchors": [], "source": "语料无年会信息"}
+{"id": "neg-04", "tier": "negative", "question": "员工班车有哪几条线路，末班车几点？", "reference_docs": [], "reference_anchors": [], "source": "语料无班车信息"}
+{"id": "neg-05", "tier": "negative", "question": "怎么申请调岗到公司的海外分公司？", "reference_docs": [], "reference_anchors": [], "source": "语料有调岗但无海外派遣内容"}
+{"id": "neg-06", "tier": "negative", "question": "公司去年的营业收入和净利润是多少？", "reference_docs": [], "reference_anchors": [], "source": "语料无财务经营数据"}
+{"id": "neg-07", "tier": "negative", "question": "内部 GPU 集群怎么申请配额来训练模型？", "reference_docs": [], "reference_anchors": [], "source": "语料无 GPU 算力平台内容"}
+{"id": "neg-08", "tier": "negative", "question": "公司对员工的婚假和产假分别是多少天？", "reference_docs": [], "reference_anchors": [], "source": "语料请假章节未给出婚假产假天数"}
+{"id": "neg-09", "tier": "negative", "question": "研发团队用的代码规范和分支管理策略是什么？", "reference_docs": [], "reference_anchors": [], "source": "语料无研发规范内容"}
+{"id": "neg-10", "tier": "negative", "question": "公司在哪些城市有办公地点？", "reference_docs": [], "reference_anchors": [], "source": "语料无办公地点清单"}

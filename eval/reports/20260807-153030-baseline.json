@@ -1,0 +1,1562 @@
+{
+  "label": "baseline",
+  "timestamp": "20260807-153030",
+  "dataset_size": 54,
+  "failures": [],
+  "summary": {
+    "overall": {
+      "n": 44,
+      "doc_recall": 1.0,
+      "doc_precision": 0.3867424242424243,
+      "anchor_recall": 0.9318181818181818,
+      "anchor_mrr": 0.8143939393939393,
+      "context_precision": 0.12803030303030302,
+      "anchor_hit@1": 0.7272727272727273,
+      "anchor_hit@3": 0.8863636363636364,
+      "anchor_hit@5": 0.9318181818181818,
+      "anchor_hit@10": 0.9318181818181818
+    },
+    "easy": {
+      "n": 11,
+      "doc_recall": 1.0,
+      "doc_precision": 0.4090909090909091,
+      "anchor_recall": 1.0,
+      "anchor_mrr": 0.8409090909090909,
+      "context_precision": 0.1272727272727273,
+      "anchor_hit@1": 0.7272727272727273,
+      "anchor_hit@3": 0.9090909090909091,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0
+    },
+    "hard": {
+      "n": 33,
+      "doc_recall": 1.0,
+      "doc_precision": 0.3792929292929293,
+      "anchor_recall": 0.9090909090909091,
+      "anchor_mrr": 0.8055555555555556,
+      "context_precision": 0.12828282828282833,
+      "anchor_hit@1": 0.7272727272727273,
+      "anchor_hit@3": 0.8787878787878788,
+      "anchor_hit@5": 0.9090909090909091,
+      "anchor_hit@10": 0.9090909090909091
+    },
+    "negative": {
+      "n": 10,
+      "avg_doc_spread": 4.1,
+      "note": "接口未透出分数，无法判定「正确地无答案」，此项仅供人工观察"
+    },
+    "latency": {
+      "mean_ms": 3402,
+      "p50_ms": 2324,
+      "max_ms": 15562
+    }
+  },
+  "details": [
+    {
+      "id": "rule-easy-01",
+      "tier": "easy",
+      "question": "公司的正常工作时间是几点到几点？",
+      "retrieved_docs": [
+        "公司规章制度",
+        "开票信息",
+        "人事制度",
+        "IT支持"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 1846,
+      "wall_ms": 1849,
+      "sub_intents": [
+        "公司正常工作时间"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.25,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 1.0,
+      "anchor_hit@1": 1.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.1
+    },
+    {
+      "id": "rule-easy-02",
+      "tier": "easy",
+      "question": "加班需要提前审批吗？",
+      "retrieved_docs": [
+        "人事制度",
+        "公司规章制度",
+        "IT支持",
+        "OA系统数据安全规范文档"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 13856,
+      "wall_ms": 13859,
+      "sub_intents": [
+        "加班需要提前审批吗"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.25,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 0.5,
+      "anchor_hit@1": 0.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.1
+    },
+    {
+      "id": "rule-hard-01",
+      "tier": "hard",
+      "question": "昨天忙到十一点多才走，今天几点到公司还算正常出勤？",
+      "retrieved_docs": [
+        "公司规章制度",
+        "IT支持",
+        "人事制度",
+        "开票信息"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 2057,
+      "wall_ms": 2061,
+      "sub_intents": [
+        "今天几点到公司算正常出勤"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.25,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 1.0,
+      "anchor_hit@1": 1.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.1
+    },
+    {
+      "id": "rule-hard-02",
+      "tier": "hard",
+      "question": "干到凌晨一点才下班，第二天早上起不来会算迟到吗",
+      "retrieved_docs": [
+        "公司规章制度",
+        "人事制度",
+        "IT支持"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 1730,
+      "wall_ms": 1732,
+      "sub_intents": [
+        "干到凌晨一点才下班，第二天早上起不来会算迟到吗"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.3333333333333333,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 1.0,
+      "anchor_hit@1": 1.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.1
+    },
+    {
+      "id": "rule-hard-03",
+      "tier": "hard",
+      "question": "我们组说可以晚点来早点走，这种安排有规定吗",
+      "retrieved_docs": [
+        "公司规章制度",
+        "人事制度"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 1868,
+      "wall_ms": 1871,
+      "sub_intents": [
+        "我们组可以晚点来早点走的考勤安排有规定吗"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.5,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 1.0,
+      "anchor_hit@1": 1.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.2
+    },
+    {
+      "id": "hr-easy-01",
+      "tier": "easy",
+      "question": "试用期可以提前转正吗？",
+      "retrieved_docs": [
+        "人事制度",
+        "薪资与福利政策"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 1638,
+      "wall_ms": 1642,
+      "sub_intents": [
+        "试用期可以提前转正吗"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.5,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 1.0,
+      "anchor_hit@1": 1.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.1
+    },
+    {
+      "id": "hr-easy-02",
+      "tier": "easy",
+      "question": "绩效不达标是否会被辞退？",
+      "retrieved_docs": [
+        "人事制度",
+        "OA系统数据安全规范文档",
+        "互联网保险系统数据安全规范",
+        "IT支持"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 1661,
+      "wall_ms": 1663,
+      "sub_intents": [
+        "绩效不达标是否会被辞退"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.25,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 1.0,
+      "anchor_hit@1": 1.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.1
+    },
+    {
+      "id": "hr-easy-03",
+      "tier": "easy",
+      "question": "试用期转正流程是什么？",
+      "retrieved_docs": [
+        "人事制度",
+        "薪资与福利政策",
+        "招聘信息"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 12183,
+      "wall_ms": 12187,
+      "sub_intents": [
+        "试用期转正流程"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.3333333333333333,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 1.0,
+      "anchor_hit@1": 1.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.2
+    },
+    {
+      "id": "hr-hard-01",
+      "tier": "hard",
+      "question": "今年的年假没休完，会不会白白没掉",
+      "retrieved_docs": [
+        "人事制度",
+        "开票信息",
+        "OA系统数据安全规范文档",
+        "薪资与福利政策",
+        "公司规章制度"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 2808,
+      "wall_ms": 2812,
+      "sub_intents": [
+        "今年的年假没休完会不会失效"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.2,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 0.3333333333333333,
+      "anchor_hit@1": 0.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.1
+    },
+    {
+      "id": "hr-hard-02",
+      "tier": "hard",
+      "question": "我打算走了，得提前多久跟公司说",
+      "retrieved_docs": [
+        "人事制度",
+        "IT支持",
+        "公司规章制度"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 1359,
+      "wall_ms": 1365,
+      "sub_intents": [
+        "离职需要提前多久跟公司说"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.3333333333333333,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 1.0,
+      "anchor_hit@1": 1.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.1
+    },
+    {
+      "id": "hr-hard-03",
+      "tier": "hard",
+      "question": "还在试用期就想走，需要提前多长时间",
+      "retrieved_docs": [
+        "人事制度",
+        "IT支持",
+        "开票信息",
+        "薪资与福利政策"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 11017,
+      "wall_ms": 11020,
+      "sub_intents": [
+        "试用期提前离职需要提前多长时间"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.25,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 1.0,
+      "anchor_hit@1": 1.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.1
+    },
+    {
+      "id": "hr-hard-04",
+      "tier": "hard",
+      "question": "快转正了，我需要交哪些东西给经理",
+      "retrieved_docs": [
+        "人事制度"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 1745,
+      "wall_ms": 1749,
+      "sub_intents": [
+        "快转正时需要交给经理的材料"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 1.0,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 1.0,
+      "anchor_hit@1": 1.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.4
+    },
+    {
+      "id": "hr-hard-05",
+      "tier": "hard",
+      "question": "周末被叫回来干活，公司怎么补给我",
+      "retrieved_docs": [
+        "薪资与福利政策",
+        "公司规章制度",
+        "人事制度"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 2227,
+      "wall_ms": 2231,
+      "sub_intents": [
+        "周末被叫回来干活，公司怎么补给我"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.3333333333333333,
+      "anchor_recall": 0.0,
+      "missed_anchors": [
+        "优先安排补休"
+      ],
+      "anchor_mrr": 0.0,
+      "anchor_hit@1": 0.0,
+      "anchor_hit@3": 0.0,
+      "anchor_hit@5": 0.0,
+      "anchor_hit@10": 0.0,
+      "context_precision": 0.0
+    },
+    {
+      "id": "hr-hard-06",
+      "tier": "hard",
+      "question": "办离职的时候电脑工卡这些怎么处理",
+      "retrieved_docs": [
+        "人事制度",
+        "公司规章制度",
+        "OA系统数据安全规范文档",
+        "IT支持",
+        "招聘信息"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 1807,
+      "wall_ms": 1811,
+      "sub_intents": [
+        "办离职时电脑工卡的处理方式"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.2,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 1.0,
+      "anchor_hit@1": 1.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.1
+    },
+    {
+      "id": "pay-easy-01",
+      "tier": "easy",
+      "question": "公司给员工缴纳哪些保险？",
+      "retrieved_docs": [
+        "薪资与福利政策",
+        "人事制度",
+        "开票信息",
+        "OA系统数据安全规范文档"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 1620,
+      "wall_ms": 1623,
+      "sub_intents": [
+        "公司给员工缴纳的保险"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.25,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 0.5,
+      "anchor_hit@1": 0.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.1
+    },
+    {
+      "id": "pay-hard-01",
+      "tier": "hard",
+      "question": "涨薪批下来之后，多久能在工资条上看到",
+      "retrieved_docs": [
+        "薪资与福利政策",
+        "开票信息",
+        "互联网保险系统数据安全规范"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 6110,
+      "wall_ms": 6112,
+      "sub_intents": [
+        "涨薪批下来之后在工资条上显示的时间"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.3333333333333333,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 1.0,
+      "anchor_hit@1": 1.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.1
+    },
+    {
+      "id": "pay-hard-02",
+      "tier": "hard",
+      "question": "调薪方案要经过哪些人点头才能生效",
+      "retrieved_docs": [
+        "薪资与福利政策",
+        "招聘信息",
+        "人事制度",
+        "OA系统数据安全规范文档"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 15562,
+      "wall_ms": 15565,
+      "sub_intents": [
+        "调薪方案要经过哪些人点头才能生效"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.25,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 1.0,
+      "anchor_hit@1": 1.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.2
+    },
+    {
+      "id": "pay-hard-03",
+      "tier": "hard",
+      "question": "除了法定的那些，公司还额外买了什么保障",
+      "retrieved_docs": [
+        "薪资与福利政策",
+        "互联网保险系统数据安全规范",
+        "开票信息",
+        "人事制度"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 2940,
+      "wall_ms": 2943,
+      "sub_intents": [
+        "公司除了法定保障外还额外购买了什么保障"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.25,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 1.0,
+      "anchor_hit@1": 1.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.2
+    },
+    {
+      "id": "rec-hard-01",
+      "tier": "hard",
+      "question": "新人来报到，电脑是谁准备的，什么时候能拿到",
+      "retrieved_docs": [
+        "招聘信息",
+        "人事制度",
+        "开票信息",
+        "IT支持"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 4483,
+      "wall_ms": 4487,
+      "sub_intents": [
+        "新人电脑是谁准备的，什么时候能拿到"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.25,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 1.0,
+      "anchor_hit@1": 1.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.1
+    },
+    {
+      "id": "trn-hard-01",
+      "tier": "hard",
+      "question": "我不想带团队，还有往上升的路吗",
+      "retrieved_docs": [
+        "员工培训",
+        "人事制度",
+        "招聘信息",
+        "OA系统数据安全规范文档"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 1832,
+      "wall_ms": 1835,
+      "sub_intents": [
+        "不想带团队的情况下还有晋升路径吗"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.25,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 1.0,
+      "anchor_hit@1": 1.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.2
+    },
+    {
+      "id": "trn-hard-02",
+      "tier": "hard",
+      "question": "写代码写腻了想转去管人，需要满足什么条件",
+      "retrieved_docs": [
+        "人事制度",
+        "IT支持",
+        "开票信息",
+        "员工培训"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 2480,
+      "wall_ms": 2483,
+      "sub_intents": [
+        "转去管人需要满足什么条件"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.25,
+      "anchor_recall": 0.0,
+      "missed_anchors": [
+        "通道转换",
+        "胜任力评估"
+      ],
+      "anchor_mrr": 0.0,
+      "anchor_hit@1": 0.0,
+      "anchor_hit@3": 0.0,
+      "anchor_hit@5": 0.0,
+      "anchor_hit@10": 0.0,
+      "context_precision": 0.0
+    },
+    {
+      "id": "it-easy-01",
+      "tier": "easy",
+      "question": "我忘记电脑密码，能让同事帮我重置吗？",
+      "retrieved_docs": [
+        "IT支持",
+        "OA系统数据安全规范文档",
+        "开票信息"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 4562,
+      "wall_ms": 4565,
+      "sub_intents": [
+        "电脑密码重置能否由同事操作"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.3333333333333333,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 1.0,
+      "anchor_hit@1": 1.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.1
+    },
+    {
+      "id": "it-easy-02",
+      "tier": "easy",
+      "question": "会议共享屏幕提示无权限？",
+      "retrieved_docs": [
+        "IT支持",
+        "互联网保险系统数据安全规范"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 4373,
+      "wall_ms": 4377,
+      "sub_intents": [
+        "会议共享屏幕提示无权限"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.5,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 1.0,
+      "anchor_hit@1": 1.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.2
+    },
+    {
+      "id": "it-easy-03",
+      "tier": "easy",
+      "question": "打印机显示正常但不出纸？",
+      "retrieved_docs": [
+        "IT支持"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 3816,
+      "wall_ms": 3819,
+      "sub_intents": [
+        "打印机显示正常但不出纸"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 1.0,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 1.0,
+      "anchor_hit@1": 1.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.1
+    },
+    {
+      "id": "it-hard-01",
+      "tier": "hard",
+      "question": "在家用宽带死活连不上内网，开手机热点反而好了",
+      "retrieved_docs": [
+        "IT支持",
+        "开票信息"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 4144,
+      "wall_ms": 4147,
+      "sub_intents": [
+        "在家用宽带无法连接内网但手机热点可以连接的原因"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.5,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 0.25,
+      "anchor_hit@1": 0.0,
+      "anchor_hit@3": 0.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.1
+    },
+    {
+      "id": "it-hard-02",
+      "tier": "hard",
+      "question": "整个楼的人邮箱都发不出去了，这算什么级别的事故",
+      "retrieved_docs": [
+        "IT支持",
+        "开票信息"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 1664,
+      "wall_ms": 1667,
+      "sub_intents": [
+        "整个楼的人邮箱都发不出去的事故级别"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.5,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 0.5,
+      "anchor_hit@1": 0.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.1
+    },
+    {
+      "id": "it-hard-03",
+      "tier": "hard",
+      "question": "提了工单一直没人管，多久会转给更专业的团队",
+      "retrieved_docs": [
+        "IT支持",
+        "开票信息",
+        "互联网保险系统数据安全规范"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 5121,
+      "wall_ms": 5124,
+      "sub_intents": [
+        "工单长时间未处理会多久转给更专业的团队"
+      ],
+      "intent_leaf_ids": [
+        "ticket-data"
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.3333333333333333,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 1.0,
+      "anchor_hit@1": 1.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.1
+    },
+    {
+      "id": "it-hard-04",
+      "tier": "hard",
+      "question": "第一次要远程办公，用之前得先满足什么",
+      "retrieved_docs": [
+        "IT支持",
+        "公司规章制度",
+        "招聘信息",
+        "互联网保险系统数据安全规范",
+        "开票信息"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 4359,
+      "wall_ms": 4363,
+      "sub_intents": [
+        "第一次远程办公需要满足的条件"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.2,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 1.0,
+      "anchor_hit@1": 1.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.1
+    },
+    {
+      "id": "it-hard-05",
+      "tier": "hard",
+      "question": "密码输错好几次现在登不进去了，是被封了吗",
+      "retrieved_docs": [
+        "IT支持",
+        "OA系统数据安全规范文档",
+        "互联网保险系统数据安全规范",
+        "开票信息"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 4752,
+      "wall_ms": 4756,
+      "sub_intents": [
+        "密码输错多次后登录失败是否被封"
+      ],
+      "intent_leaf_ids": [
+        "sys-about-bot"
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.25,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 1.0,
+      "anchor_hit@1": 1.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.1
+    },
+    {
+      "id": "it-hard-06",
+      "tier": "hard",
+      "question": "改完密码电脑还老是弹窗要我输，是怎么回事",
+      "retrieved_docs": [
+        "IT支持",
+        "OA系统数据安全规范文档",
+        "互联网保险系统数据安全规范"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 2745,
+      "wall_ms": 2749,
+      "sub_intents": [
+        "改完密码后电脑还频繁弹窗要求输入密码的原因"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.3333333333333333,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 1.0,
+      "anchor_hit@1": 1.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.2
+    },
+    {
+      "id": "it-hard-07",
+      "tier": "hard",
+      "question": "外面客户发的邮件我一直没收到，该怎么排查",
+      "retrieved_docs": [
+        "IT支持",
+        "开票信息"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 2392,
+      "wall_ms": 2396,
+      "sub_intents": [
+        "外面客户发的邮件一直没收到的排查方法"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.5,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 1.0,
+      "anchor_hit@1": 1.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.2
+    },
+    {
+      "id": "fin-easy-01",
+      "tier": "easy",
+      "question": "杭州阿里巴巴健康集团有限公司的纳税人识别号是多少？",
+      "retrieved_docs": [
+        "开票信息",
+        "互联网保险系统数据安全规范",
+        "IT支持"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 2459,
+      "wall_ms": 2463,
+      "sub_intents": [
+        "杭州阿里巴巴健康集团有限公司的纳税人识别号"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.3333333333333333,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 1.0,
+      "anchor_hit@1": 1.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.1
+    },
+    {
+      "id": "fin-hard-01",
+      "tier": "hard",
+      "question": "给阿里健康集团付款，钱要打到哪个银行",
+      "retrieved_docs": [
+        "开票信息",
+        "互联网保险系统数据安全规范",
+        "IT支持"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 3812,
+      "wall_ms": 3814,
+      "sub_intents": [
+        "阿里健康集团付款的收款银行"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.3333333333333333,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 1.0,
+      "anchor_hit@1": 1.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.1
+    },
+    {
+      "id": "fin-hard-02",
+      "tier": "hard",
+      "question": "腾讯网络那边开票用的是哪家银行的账户",
+      "retrieved_docs": [
+        "开票信息",
+        "互联网保险系统数据安全规范",
+        "IT支持",
+        "OA系统数据安全规范文档"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 1763,
+      "wall_ms": 1766,
+      "sub_intents": [
+        "腾讯网络开票使用的银行账户"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.25,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 1.0,
+      "anchor_hit@1": 1.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.1
+    },
+    {
+      "id": "sec-easy-01",
+      "tier": "easy",
+      "question": "OA 系统的数据分成几个等级？",
+      "retrieved_docs": [
+        "OA系统数据安全规范文档",
+        "互联网保险系统数据安全规范"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 2765,
+      "wall_ms": 2768,
+      "sub_intents": [
+        "OA系统的数据分成几个等级"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.5,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 0.25,
+      "anchor_hit@1": 0.0,
+      "anchor_hit@3": 0.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.2
+    },
+    {
+      "id": "sec-hard-01",
+      "tier": "hard",
+      "question": "员工的工资数据和银行卡号属于哪一档，管控上有什么特别要求",
+      "retrieved_docs": [
+        "OA系统数据安全规范文档",
+        "薪资与福利政策",
+        "开票信息",
+        "互联网保险系统数据安全规范"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 2381,
+      "wall_ms": 2384,
+      "sub_intents": [
+        "员工的工资数据和银行卡号属于哪一档，管控上有什么特别要求"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.25,
+      "anchor_recall": 0.0,
+      "missed_anchors": [
+        "薪酬要素、银行账户、证件影像",
+        "双重审批"
+      ],
+      "anchor_mrr": 0.0,
+      "anchor_hit@1": 0.0,
+      "anchor_hit@3": 0.0,
+      "anchor_hit@5": 0.0,
+      "anchor_hit@10": 0.0,
+      "context_precision": 0.0
+    },
+    {
+      "id": "sec-hard-02",
+      "tier": "hard",
+      "question": "加密用的钥匙放在哪，多久换一次",
+      "retrieved_docs": [
+        "互联网保险系统数据安全规范",
+        "OA系统数据安全规范文档",
+        "IT支持"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 2454,
+      "wall_ms": 2457,
+      "sub_intents": [
+        "加密用的钥匙存放位置和更换周期"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.3333333333333333,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 1.0,
+      "anchor_hit@1": 1.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.3
+    },
+    {
+      "id": "sec-hard-03",
+      "tier": "hard",
+      "question": "敏感字段落库的时候用什么算法加密",
+      "retrieved_docs": [
+        "OA系统数据安全规范文档",
+        "互联网保险系统数据安全规范"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 1940,
+      "wall_ms": 1944,
+      "sub_intents": [
+        "敏感字段落库的时候用什么算法加密"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.5,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 1.0,
+      "anchor_hit@1": 1.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.2
+    },
+    {
+      "id": "ins-hard-01",
+      "tier": "hard",
+      "question": "理赔场景涉及哪些类型的数据",
+      "retrieved_docs": [
+        "互联网保险系统数据安全规范"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 1784,
+      "wall_ms": 1787,
+      "sub_intents": [
+        "理赔场景涉及的数据类型"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 1.0,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 1.0,
+      "anchor_hit@1": 1.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.1
+    },
+    {
+      "id": "ins-hard-02",
+      "tier": "hard",
+      "question": "保险系统整体的安全架构遵循什么思路",
+      "retrieved_docs": [
+        "互联网保险系统数据安全规范",
+        "OA系统数据安全规范文档"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 1681,
+      "wall_ms": 1685,
+      "sub_intents": [
+        "保险系统整体的安全架构遵循的思路"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.5,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 0.5,
+      "anchor_hit@1": 0.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.1
+    },
+    {
+      "id": "ins-hard-03",
+      "tier": "hard",
+      "question": "代理人的佣金和业绩数据算敏感信息吗",
+      "retrieved_docs": [
+        "互联网保险系统数据安全规范",
+        "OA系统数据安全规范文档",
+        "开票信息"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 2836,
+      "wall_ms": 2839,
+      "sub_intents": [
+        "代理人的佣金和业绩数据是否属于敏感信息"
+      ],
+      "intent_leaf_ids": [
+        "sys-about-bot"
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.3333333333333333,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 0.5,
+      "anchor_hit@1": 0.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.1
+    },
+    {
+      "id": "cross-hard-01",
+      "tier": "hard",
+      "question": "新人入职第一天，HR 和 IT 分别要给他办什么",
+      "retrieved_docs": [
+        "招聘信息",
+        "员工培训",
+        "IT支持"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 2357,
+      "wall_ms": 2360,
+      "sub_intents": [
+        "新人入职第一天 HR 和 IT 分别要办什么"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.6666666666666666,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 0.5,
+      "anchor_hit@1": 0.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.1
+    },
+    {
+      "id": "cross-hard-02",
+      "tier": "hard",
+      "question": "加班这件事，考勤上怎么算、薪资上怎么补，分别是什么规定",
+      "retrieved_docs": [
+        "人事制度",
+        "公司规章制度",
+        "开票信息",
+        "薪资与福利政策"
+      ],
+      "n_chunks": 15,
+      "latency_ms": 2793,
+      "wall_ms": 2796,
+      "sub_intents": [
+        "加班在考勤上怎么算的规定",
+        "加班在薪资上怎么补的规定"
+      ],
+      "intent_leaf_ids": [
+        null,
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.5,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 1.0,
+      "anchor_hit@1": 1.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.13333333333333333
+    },
+    {
+      "id": "cross-hard-03",
+      "tier": "hard",
+      "question": "离职的时候，工作交接和账号权限回收分别归谁管",
+      "retrieved_docs": [
+        "人事制度",
+        "互联网保险系统数据安全规范",
+        "OA系统数据安全规范文档",
+        "IT支持"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 2220,
+      "wall_ms": 2223,
+      "sub_intents": [
+        "离职时工作交接和账号权限回收分别归谁管"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "doc_recall": 1.0,
+      "doc_precision": 0.25,
+      "anchor_recall": 1.0,
+      "missed_anchors": [],
+      "anchor_mrr": 1.0,
+      "anchor_hit@1": 1.0,
+      "anchor_hit@3": 1.0,
+      "anchor_hit@5": 1.0,
+      "anchor_hit@10": 1.0,
+      "context_precision": 0.1
+    },
+    {
+      "id": "neg-01",
+      "tier": "negative",
+      "question": "公司股票期权的行权价格是怎么计算的？",
+      "retrieved_docs": [
+        "开票信息",
+        "IT支持",
+        "人事制度",
+        "互联网保险系统数据安全规范"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 2200,
+      "wall_ms": 2203,
+      "sub_intents": [
+        "公司股票期权的行权价格计算方式"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "negative_doc_spread": 4
+    },
+    {
+      "id": "neg-02",
+      "tier": "negative",
+      "question": "公司食堂几点开始供应晚饭？",
+      "retrieved_docs": [
+        "开票信息",
+        "公司规章制度",
+        "人事制度",
+        "OA系统数据安全规范文档",
+        "IT支持",
+        "互联网保险系统数据安全规范"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 1780,
+      "wall_ms": 1783,
+      "sub_intents": [
+        "公司食堂供应晚饭的时间"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "negative_doc_spread": 6
+    },
+    {
+      "id": "neg-03",
+      "tier": "negative",
+      "question": "今年的年会在哪个城市办？",
+      "retrieved_docs": [
+        "开票信息",
+        "IT支持"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 1709,
+      "wall_ms": 1711,
+      "sub_intents": [
+        "今年的年会在哪个城市办"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "negative_doc_spread": 2
+    },
+    {
+      "id": "neg-04",
+      "tier": "negative",
+      "question": "员工班车有哪几条线路，末班车几点？",
+      "retrieved_docs": [
+        "开票信息",
+        "IT支持",
+        "薪资与福利政策",
+        "人事制度",
+        "互联网保险系统数据安全规范",
+        "公司规章制度"
+      ],
+      "n_chunks": 15,
+      "latency_ms": 2291,
+      "wall_ms": 2294,
+      "sub_intents": [
+        "员工班车有哪几条线路",
+        "员工班车末班车几点"
+      ],
+      "intent_leaf_ids": [
+        null,
+        null
+      ],
+      "negative_doc_spread": 6
+    },
+    {
+      "id": "neg-05",
+      "tier": "negative",
+      "question": "怎么申请调岗到公司的海外分公司？",
+      "retrieved_docs": [
+        "人事制度",
+        "招聘信息",
+        "IT支持",
+        "员工培训"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 5370,
+      "wall_ms": 5373,
+      "sub_intents": [
+        "申请调岗到公司海外分公司的流程"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "negative_doc_spread": 4
+    },
+    {
+      "id": "neg-06",
+      "tier": "negative",
+      "question": "公司去年的营业收入和净利润是多少？",
+      "retrieved_docs": [
+        "开票信息",
+        "互联网保险系统数据安全规范",
+        "IT支持",
+        "OA系统数据安全规范文档"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 1321,
+      "wall_ms": 1324,
+      "sub_intents": [
+        "公司去年的营业收入和净利润"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "negative_doc_spread": 4
+    },
+    {
+      "id": "neg-07",
+      "tier": "negative",
+      "question": "内部 GPU 集群怎么申请配额来训练模型？",
+      "retrieved_docs": [
+        "IT支持",
+        "开票信息",
+        "OA系统数据安全规范文档",
+        "互联网保险系统数据安全规范"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 1535,
+      "wall_ms": 1539,
+      "sub_intents": [
+        "内部 GPU 集群申请配额训练模型"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "negative_doc_spread": 4
+    },
+    {
+      "id": "neg-08",
+      "tier": "negative",
+      "question": "公司对员工的婚假和产假分别是多少天？",
+      "retrieved_docs": [
+        "人事制度",
+        "开票信息",
+        "IT支持",
+        "薪资与福利政策",
+        "公司规章制度"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 2194,
+      "wall_ms": 2197,
+      "sub_intents": [
+        "公司对员工的婚假和产假天数"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "negative_doc_spread": 5
+    },
+    {
+      "id": "neg-09",
+      "tier": "negative",
+      "question": "研发团队用的代码规范和分支管理策略是什么？",
+      "retrieved_docs": [
+        "OA系统数据安全规范文档",
+        "开票信息",
+        "互联网保险系统数据安全规范",
+        "IT支持"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 1590,
+      "wall_ms": 1592,
+      "sub_intents": [
+        "研发团队的代码规范和分支管理策略"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "negative_doc_spread": 4
+    },
+    {
+      "id": "neg-10",
+      "tier": "negative",
+      "question": "公司在哪些城市有办公地点？",
+      "retrieved_docs": [
+        "开票信息",
+        "IT支持"
+      ],
+      "n_chunks": 10,
+      "latency_ms": 1707,
+      "wall_ms": 1710,
+      "sub_intents": [
+        "公司在哪些城市有办公地点"
+      ],
+      "intent_leaf_ids": [
+        null
+      ],
+      "negative_doc_spread": 2
+    }
+  ]
+}

@@ -31,6 +31,19 @@ public interface RagTraceRecordService {
 
     void finishRun(String traceId, String status, String errorMessage, Date endTime, long durationMs);
 
+    /**
+     * 将指定任务仍处于 RUNNING 的 trace run 收尾为 CANCELLED
+     * <p>
+     * 用户停止请求与 trace run 创建可能发生在不同实例或交错执行，因此停止入口和 run 创建后的取消检查
+     * 都可以按 taskId 幂等调用；只有仍处于 RUNNING 的记录会被更新
+     * </p>
+     *
+     * @param taskId  流式任务 ID
+     * @param endTime 取消发生的时间
+     * @return 是否确实有一行由 RUNNING 翻转为 CANCELLED
+     */
+    boolean cancelRunByTaskId(String taskId, Date endTime);
+
     void startNode(RagTraceNodeDO node);
 
     void finishNode(String traceId, String nodeId, String status, String errorMessage, Date endTime, long durationMs);

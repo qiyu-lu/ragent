@@ -60,7 +60,7 @@ services:
     volumes:
       - rustfs-data:/data
     healthcheck:
-      test: [ "CMD-SHELL", "wget -qO- http://localhost:9000/ >/dev/null || exit 1" ]
+      test: [ "CMD-SHELL", "wget -qO- http://localhost:9000/health | grep -q '\"status\":\"ok\"'" ]
       interval: 10s
       timeout: 5s
       retries: 20
@@ -80,6 +80,15 @@ services:
       retries: 20
     restart: unless-stopped
 
+  rocketmq-store-init:
+    image: apache/rocketmq:5.2.0
+    user: "0:0"
+    entrypoint: [ "/bin/sh", "-c" ]
+    command: [ "chown 3000:3000 /store && chmod 0750 /store" ]
+    volumes:
+      - rocketmq-data:/store
+    restart: "no"
+
   rocketmq-broker:
     image: apache/rocketmq:5.2.0
     environment:
@@ -88,6 +97,8 @@ services:
     depends_on:
       rocketmq-nameserver:
         condition: service_healthy
+      rocketmq-store-init:
+        condition: service_completed_successfully
     command:
       - sh
       - -c
@@ -101,6 +112,7 @@ services:
         brokerRole = ASYNC_MASTER
         flushDiskType = ASYNC_FLUSH
         brokerIP1 = 127.0.0.1
+        diskMaxUsedSpaceRatio = 88
         timerMaxDelaySec = 31622400
         EOF
         exec sh mqbroker --enable-proxy -c /home/rocketmq/rocketmq-5.2.0/conf/broker.conf
@@ -111,6 +123,8 @@ services:
       - "8080:8080"
       - "8081:8081"
       - "8082:8082"
+    volumes:
+      - rocketmq-data:/home/rocketmq/store
     restart: unless-stopped
 
   rocketmq-dashboard:
@@ -132,3 +146,4 @@ volumes:
   postgres-data:
   redis-data:
   rustfs-data:
+  rocketmq-data:

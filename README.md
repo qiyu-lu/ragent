@@ -22,11 +22,12 @@
 > **关于本仓库**
 >
 > 本仓库基于 Ragent `1.1.0`，用于逐阶段开展铁矿检测流程 RAG 课题的复现、评测与改进。
-> 当前已经完成本地基线复现，尚未实施铁矿领域数据模型或机器人控制能力。
+> 当前已实现铁矿 XLSX 检索、精确来源、候选任务审批、版本差异，以及受白名单约束的 ROS1 dry-run 搬运任务 Demo；不连接真实机器人。
+> 第一版 MVP 的本地收尾标签为 `checkpoint/iron-ore-rag-demo-mvp`；页面登录态验收仍按阶段文档保留。
 >
 > - 项目上下文恢复入口：[`docs/iron-ore-rag/README.md`](docs/iron-ore-rag/README.md)
 > - 已实施改动索引：[`docs/iron-ore-rag/changes/README.md`](docs/iron-ore-rag/changes/README.md)
-> - 当前阶段复现说明：[`docs/iron-ore-rag/stages/00-reproduction.md`](docs/iron-ore-rag/stages/00-reproduction.md)
+> - 当前阶段说明：[`docs/iron-ore-rag/stages/03-ros1-robot-mission-demo.md`](docs/iron-ore-rag/stages/03-ros1-robot-mission-demo.md)
 
 ## 🚀 什么是 Ragent AI？
 

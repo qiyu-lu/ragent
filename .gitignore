@@ -50,3 +50,4 @@ docs/temp
 
 ### Local research data and backups ###
 /local-data/
+/resources/docker/dev/.env

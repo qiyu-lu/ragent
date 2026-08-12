@@ -28,6 +28,7 @@
 - 状态：已完成
 - 起始提交：`f64de341452c8998ebf64cd264e60ccad6a31631`
 - 上下文提交：`eddeec0`（`docs: establish iron-ore RAG project context`）
+- 材料隔离提交：`7da3042`（`chore: isolate local iron-ore research data`）
 - 已完成：
   - 保存 1.1.0 源码分析、课题边界和阶段路线；
   - 确认原始 Excel 为 27 MB 本地研究材料，不进入 Git；
@@ -36,8 +37,15 @@
 
 ## 检查点 0B：可重复开发环境
 
-- 状态：未开始
-- 目标：统一管理 PostgreSQL/PGVector、Redis、RustFS 与 RocketMQ，并将连接参数改为环境变量可覆盖。
+- 状态：配置已完成，运行验证转入检查点 0C
+- 已完成：
+  - 新增统一开发 Compose，纳管 PostgreSQL/PGVector、Redis、RustFS、RocketMQ Broker、NameServer 和 Dashboard；
+  - 使用项目名 `ragent-iron-ore-dev` 与项目专属 Volume，避免影响其他 Docker 项目；
+  - PostgreSQL 空卷按 `schema_pg.sql` → `init_data_pg.sql` 自动初始化；
+  - 数据库、Redis、RocketMQ、S3 连接参数支持环境变量覆盖，并保留当前本地默认端口；
+  - 增加开发环境说明和非敏感 `.env.example`，模型 API 密钥仍只由 IDEA 或系统环境变量提供。
+- 静态验证：`docker compose config --quiet` 与 `application.yaml` YAML 解析通过；所需镜像已在删除旧环境前拉取完成。
+- 回滚：回退本检查点提交即可撤销 Compose 和配置变更；中间件数据恢复方式记录在检查点 0C。
 
 ## 检查点 0C：基线验证
 

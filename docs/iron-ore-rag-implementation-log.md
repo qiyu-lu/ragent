@@ -38,6 +38,7 @@
 ## 检查点 0B：可重复开发环境
 
 - 状态：配置已完成，运行验证转入检查点 0C
+- 配置提交：`4962aad`（`chore: add reproducible local middleware stack`）
 - 已完成：
   - 新增统一开发 Compose，纳管 PostgreSQL/PGVector、Redis、RustFS、RocketMQ Broker、NameServer 和 Dashboard；
   - 使用项目名 `ragent-iron-ore-dev` 与项目专属 Volume，避免影响其他 Docker 项目；
@@ -49,5 +50,42 @@
 
 ## 检查点 0C：基线验证
 
-- 状态：未开始
-- 目标：验证全新数据库初始化、后端与前端构建，以及小型样本的上传、分块、检索和来源返回。
+- 状态：已完成；暂停在领域改造之前
+- 中间件修复提交：`b3a6085`（`fix(dev): harden local middleware storage`）
+- 本地检查点标签：`checkpoint/iron-ore-rag-baseline-1.1.0`
+- 旧环境备份：
+  - PostgreSQL：`local-data/backups/20260812-pre-baseline-ragent.dump`，`1105398` bytes，SHA-256 `45e9fd3bf0f5eae024547157d0a76d87b8a60ec82ee7109423b5eb5c8e242fac`；
+  - RustFS：`local-data/backups/20260812-pre-baseline-rustfs-data.tar.gz`，`154528` bytes，SHA-256 `233f0140b61078314ccc1b8ac8c1734b2f08109b5720dc5b4512c0da2314b0c1`；
+  - 两份归档均已通过目录读取验证，且均由 `.gitignore` 排除。
+- 重建边界：
+  - 已删除旧 PostgreSQL `pgdata`、Redis 容器数据和 RocketMQ 容器数据；
+  - 旧 `rustfs-data` 中还包含 `insurance`、`finance`、`productdocs` 等非当前 Ragent 桶，因此没有删除，作为额外恢复副本保留；
+  - 新环境使用 `ragent-iron-ore-dev_postgres-data`、`ragent-iron-ore-dev_redis-data`、`ragent-iron-ore-dev_rustfs-data` 和 `ragent-iron-ore-dev_rocketmq-data` 四个项目专属卷。
+- 中间件验证：
+  - PostgreSQL、Redis、RustFS、RocketMQ NameServer 健康，Broker 与 Dashboard 正常运行；
+  - RustFS 健康检查修正为 `/health`，避免把 S3 根路径的正常 `403 AccessDenied` 误判为故障；
+  - 初次事务消息失败的根因是 Docker 根分区使用率为 91%，触发 RocketMQ 5.2.0 的 90% 硬写保护，Broker 明确记录 `message store is not writeable`；不是模型 API 或业务代码故障；
+  - 按用户要求未使用可能拔除的移动硬盘；曾用于定位的移动硬盘临时目录已解除挂载并完整删除；
+  - 用户清理磁盘后根分区降至 83%（约 148 GiB 可用），最终 RocketMQ 使用本机持久化命名卷；一次性初始化服务只负责设置卷根目录的 UID/GID 和权限；
+  - 普通清理阈值 `diskMaxUsedSpaceRatio` 设为 88%，RocketMQ 实际加载值为 88；5.2.0 的 90% 硬写保护无法通过更大的配置值绕过，因此仍要求 Docker 文件系统保持低于 90%；
+  - PostgreSQL 为 `ragent` 数据库，PGVector `0.8.6`，共 24 张业务表；
+  - 初始化数据为 1 个用户、1 个 Agent Profile、6 个 Agent Prompt，旧文档和旧向量均为 0。
+- 构建与离线测试：
+  - `./mvnw spotless:check` 通过，后端全模块 `package` 通过，Spotless 未产生意外 Java 修改；
+  - Framework 9 项、Infra AI 7 项、Bootstrap 选定测试 90 项，共 106 项通过；
+  - 前端 `npm ci` 和生产构建通过；现有依赖报告 21 个审计漏洞，产物存在大 Chunk 警告，本阶段不擅自升级依赖。
+- 应用冒烟：
+  - 无模型密钥时后端可正常启动，并连接 PostgreSQL、Redis、RocketMQ 和 RustFS；MCP 示例端口 `9099` 未启动时按设计降级跳过；
+  - 登录、当前用户、空知识库列表、临时知识库创建和 Markdown fixture 上传通过；
+  - 在 IDEA 已配置密钥的后端上，`merchant-manual.md` 异步摄取两次均达到 `success`，每次生成 5 个分块；
+  - 提问“资质提交后的审核时效是多少？”后，SSE 回答包含“3 个工作日”和行内引用 `[1](#cite-1)`，`finish` 事件返回来源 `merchant-manual.md`，消息状态为 `NORMAL`；
+  - 另以“创建后事务删除空知识库”验证最终 Broker 可写：事务主题成功创建并写入，知识库进入 `deleted=1`，Broker 未再次出现磁盘写保护；
+  - 临时知识库、文档和问答会话均已通过应用 API 清理；活动知识库、活动文档、活动分块、向量和活动会话计数均为 0；
+  - 验证过程只复用 IDEA 进程已有环境变量，没有读取、复制或写入任何模型 API 密钥。
+- 恢复：PostgreSQL 使用 `pg_restore` 恢复自定义格式备份；RustFS 停止新服务后将 tar 归档恢复到目标空卷。恢复前必须再次核对目标卷。
+
+## 阶段 0 结论与暂停点
+
+Ragent 1.1.0 的本地开发基线已经可重复启动，并通过了从上传、异步摄取、Embedding、向量检索、LLM 生成到来源返回的完整小样本闭环。当前没有实施铁矿领域元数据、文档版本、精确证据锚点、候选任务模板或审核流，也没有摄取 27 MB 原始 Excel。
+
+下一阶段先从原始调研材料中人工选择一个小工作表或有限区域，制作可提交、可复现、必要时脱敏的最小样本与验收问题集；在用户确认前不进入领域数据模型或业务代码改造。

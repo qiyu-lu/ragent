@@ -19,6 +19,15 @@
   <img src="https://img.shields.io/badge/Spring%20AI-2.0-6DB33F?style=flat-square&logo=springboot&logoColor=white" />
 </p>
 
+> **关于本仓库**
+>
+> 本仓库基于 Ragent `1.1.0`，用于逐阶段开展铁矿检测流程 RAG 课题的复现、评测与改进。
+> 当前已经完成本地基线复现，尚未实施铁矿领域数据模型或机器人控制能力。
+>
+> - 项目上下文恢复入口：[`docs/iron-ore-rag/README.md`](docs/iron-ore-rag/README.md)
+> - 已实施改动索引：[`docs/iron-ore-rag/changes/README.md`](docs/iron-ore-rag/changes/README.md)
+> - 当前阶段复现说明：[`docs/iron-ore-rag/stages/00-reproduction.md`](docs/iron-ore-rag/stages/00-reproduction.md)
+
 ## 🚀 什么是 Ragent AI？
 
 Ragent 是一个面向 Agentic RAG 演进的生产级 Java AI 应用平台，覆盖从文档入库到智能问答的完整链路。

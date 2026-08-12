@@ -47,3 +47,6 @@ resources/docker/graphrag/.env
 ### Tmp Out ###
 .output/
 docs/temp
+
+### Local research data and backups ###
+/local-data/

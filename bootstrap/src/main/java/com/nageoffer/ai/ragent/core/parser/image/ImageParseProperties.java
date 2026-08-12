@@ -21,6 +21,9 @@ import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * 图片解析配置（图生文）
  */
@@ -46,4 +49,20 @@ public class ImageParseProperties {
      * 关掉则内嵌图的向量文本回落成一条图片 URL，等于永远召回不到;开着的代价是每张图一次 VLM 调用
      */
     private boolean embeddedDescribeEnabled = true;
+
+    /**
+     * 是否处理 Excel 内嵌图片。默认关闭，由 iron-ore-demo Profile 显式开启。
+     */
+    private boolean excelEmbeddedEnabled = false;
+
+    /**
+     * Excel 图片 Sheet 白名单。空列表表示即使开关打开也不处理任何 Sheet。
+     */
+    private List<String> excelImageSheetAllowlist = new ArrayList<>();
+
+    /**
+     * Excel 设备图片专用提示词：只描述可见事实，不从图片推断规程或安全结论。
+     */
+    private String excelDescriptionPrompt = "请用中文客观描述图片中的设备、容器、工具、摆放关系和可见状态；"
+            + "若图中存在清晰文字，请逐字列出。不要根据图片推断操作步骤、参数、质量结论或安全规则。";
 }

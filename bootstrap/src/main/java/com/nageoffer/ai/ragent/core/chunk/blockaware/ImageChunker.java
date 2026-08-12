@@ -55,6 +55,7 @@ public class ImageChunker implements BlockChunker<ImageBlock> {
                 .outlinePath(ctx.outlinePath())
                 .assets(List.of(asset))
                 .provenance(block.provenance())
+                .blockType("image")
                 .build();
 
         return List.of(ChunkDraft.of(content, hasDescription ? description.strip() : null, metadata));

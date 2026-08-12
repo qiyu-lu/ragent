@@ -90,4 +90,24 @@ public class RetrievedChunk {
      * 检索后由元数据富化补齐 未富化时为 null
      */
     private String docName;
+
+    /**
+     * 文档版本，如 V1.2。
+     */
+    private String documentVersion;
+
+    /**
+     * Excel 来源 Sheet。
+     */
+    private String sheetName;
+
+    /**
+     * Excel 来源单元格范围。
+     */
+    private String cellRange;
+
+    /**
+     * 原始块类型，如 table / image。
+     */
+    private String blockType;
 }

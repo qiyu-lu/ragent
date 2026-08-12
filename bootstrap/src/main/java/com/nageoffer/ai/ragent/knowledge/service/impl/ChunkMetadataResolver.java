@@ -18,6 +18,8 @@
 package com.nageoffer.ai.ragent.knowledge.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nageoffer.ai.ragent.knowledge.dao.entity.KnowledgeChunkDO;
 import com.nageoffer.ai.ragent.knowledge.dao.entity.KnowledgeDocumentDO;
 import com.nageoffer.ai.ragent.knowledge.dao.mapper.KnowledgeChunkMapper;
@@ -46,11 +48,18 @@ public class ChunkMetadataResolver {
 
     private final KnowledgeChunkMapper chunkMapper;
     private final KnowledgeDocumentMapper documentMapper;
+    private final ObjectMapper objectMapper;
 
     /**
      * 分块所属文档的元数据
      */
-    public record ChunkMeta(String docId, Integer chunkIndex, String docName) {
+    public record ChunkMeta(String docId,
+                            Integer chunkIndex,
+                            String docName,
+                            String documentVersion,
+                            String sheetName,
+                            String cellRange,
+                            String blockType) {
     }
 
     /**
@@ -79,20 +88,42 @@ public class ChunkMetadataResolver {
                 .map(KnowledgeChunkDO::getDocId)
                 .filter(docId -> docId != null && !docId.isBlank())
                 .collect(Collectors.toSet());
-        Map<String, String> docNameById = docIds.isEmpty()
+        Map<String, KnowledgeDocumentDO> docsById = docIds.isEmpty()
                 ? Map.of()
                 : documentMapper.selectByIds(docIds).stream()
-                .filter(doc -> doc.getId() != null && doc.getDocName() != null)
-                .collect(Collectors.toMap(KnowledgeDocumentDO::getId, KnowledgeDocumentDO::getDocName, (a, b) -> a));
+                .filter(doc -> doc.getId() != null)
+                .collect(Collectors.toMap(KnowledgeDocumentDO::getId, doc -> doc, (a, b) -> a));
 
         Map<String, ChunkMeta> result = new HashMap<>(chunks.size());
         for (KnowledgeChunkDO chunk : chunks) {
+            KnowledgeDocumentDO doc = docsById.get(chunk.getDocId());
+            Map<String, Object> metadata = readMetadata(chunk.getMetadata());
             result.put(chunk.getId(), new ChunkMeta(
                     chunk.getDocId(),
                     chunk.getChunkIndex(),
-                    docNameById.get(chunk.getDocId())));
+                    doc != null ? doc.getDocName() : null,
+                    doc != null ? doc.getDocumentVersion() : null,
+                    stringValue(metadata.get("sheet_name")),
+                    stringValue(metadata.get("cell_range")),
+                    stringValue(metadata.get("block_type"))));
         }
         return result;
+    }
+
+    private Map<String, Object> readMetadata(String json) {
+        if (json == null || json.isBlank()) {
+            return Map.of();
+        }
+        try {
+            return objectMapper.readValue(json, new TypeReference<>() {
+            });
+        } catch (Exception ignored) {
+            return Map.of();
+        }
+    }
+
+    private static String stringValue(Object value) {
+        return value == null ? null : value.toString();
     }
 
     /**

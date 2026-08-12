@@ -15,6 +15,9 @@ export interface KnowledgeDocument {
   id: string;
   kbId: string;
   docName: string;
+  documentKey?: string | null;
+  documentVersion?: string | null;
+  demoData?: boolean | null;
   sourceType?: string | null;
   sourceLocation?: string | null;
   scheduleEnabled?: number | null;

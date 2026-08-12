@@ -19,15 +19,11 @@ package com.nageoffer.ai.ragent.core.parser.image;
 
 import com.nageoffer.ai.ragent.core.parser.DocumentParser;
 import com.nageoffer.ai.ragent.core.parser.ParserType;
-import com.nageoffer.ai.ragent.core.parser.model.AssetRef;
 import com.nageoffer.ai.ragent.core.parser.model.ImageBlock;
 import com.nageoffer.ai.ragent.core.parser.model.ParsedDocument;
 import com.nageoffer.ai.ragent.core.parser.model.Provenance;
 import com.nageoffer.ai.ragent.core.parser.registry.ParseProfile;
 import com.nageoffer.ai.ragent.framework.exception.ServiceException;
-import com.nageoffer.ai.ragent.infra.vlm.VlmService;
-import com.nageoffer.ai.ragent.rag.dto.StoredFileDTO;
-import com.nageoffer.ai.ragent.rag.service.FileStorageService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.batik.transcoder.TranscoderInput;
 import org.apache.batik.transcoder.TranscoderOutput;
@@ -41,7 +37,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 
 /**
  * 图片文档解析器（PNG / JPG / SVG）：入库期用 VLM 把图片转成「中文描述 + 图中文字 OCR」，产出单个 {@link ImageBlock}
@@ -57,16 +52,10 @@ public class ImageDocumentParser implements DocumentParser {
     public static final String OPT_SOURCE_FILE = "sourceFile";
     public static final String OPT_DOCUMENT_ID = "documentId";
 
-    private final VlmService vlmService;
-    private final FileStorageService fileStorageService;
-    private final ImageParseProperties properties;
+    private final ImageAssetProcessor imageAssetProcessor;
 
-    public ImageDocumentParser(VlmService vlmService,
-                               FileStorageService fileStorageService,
-                               ImageParseProperties properties) {
-        this.vlmService = vlmService;
-        this.fileStorageService = fileStorageService;
-        this.properties = properties;
+    public ImageDocumentParser(ImageAssetProcessor imageAssetProcessor) {
+        this.imageAssetProcessor = imageAssetProcessor;
     }
 
     @Override
@@ -90,7 +79,7 @@ public class ImageDocumentParser implements DocumentParser {
             throw new ServiceException("图片解析输入字节为空");
         }
         String sourceFile = extract(options, OPT_SOURCE_FILE, "");
-        String documentId = extract(options, OPT_DOCUMENT_ID, UUID.randomUUID().toString());
+        String documentId = extract(options, OPT_DOCUMENT_ID, java.util.UUID.randomUUID().toString());
 
         // 0. SVG 归一化：矢量 XML 栅格化成 PNG，此后字节与 mime 与 PNG 路径完全一致
         if (mimeType != null && mimeType.toLowerCase(Locale.ROOT).equals("image/svg+xml")) {
@@ -98,31 +87,16 @@ public class ImageDocumentParser implements DocumentParser {
             mimeType = "image/png";
         }
 
-        // 1. VLM 图生文：整段输出直接作描述，不解析任何分隔符，prompt 措辞可自由调整
-        String description = vlmService.describeImage(
-                content, mimeType, properties.getDescriptionPrompt(), properties.getMaxOutputTokens());
-        description = description == null ? "" : description.strip();
-        // 空描述等同失败：放过去只会产出永远召回不到的纯链接 chunk
-        if (description.isBlank()) {
-            throw new ServiceException("VLM 返回空描述，无法生成可检索文本：file=" + sourceFile);
-        }
-
-        // 2. 原图上传资产桶（public-read），拿匿名可达的公网 URL
-        String ext = extFromMime(mimeType);
-        String filename = "assets/" + documentId + "/" + UUID.randomUUID() + "." + ext;
-        StoredFileDTO stored = fileStorageService.uploadAsset(content, filename, mimeType);
-        String publicUrl = fileStorageService.getPublicUrl(stored.getUrl());
-
-        // 3. 构造 ImageBlock：description 既作展示与答题正文，也作向量文本（ImageChunker 渲染时会去掉 URL 噪声）
+        // 1. 图生文并上传资产：独立图片和 Excel 内嵌图片共用同一处理入口
         String caption = stripExt(sourceFile);
-        AssetRef asset = new AssetRef(publicUrl, mimeType);
-        ImageBlock block = new ImageBlock(Provenance.ofFile(sourceFile), asset, caption, caption, description);
+        ImageBlock block = imageAssetProcessor.process(
+                content, mimeType, documentId, Provenance.ofFile(sourceFile), caption, null);
 
-        log.info("图片图生文完成: file={}, descChars={}, url={}", sourceFile, description.length(), publicUrl);
+        log.info("图片图生文完成: file={}, descChars={}", sourceFile, block.description().length());
         return ParsedDocument.of(List.of(block), Map.of(
                 "parser", getParserType(),
                 "mimeType", mimeType == null ? "" : mimeType,
-                "descriptionChars", description.length()
+                "descriptionChars", block.description().length()
         ));
     }
 
@@ -151,16 +125,6 @@ public class ImageDocumentParser implements DocumentParser {
         } catch (Exception e) {
             throw new ServiceException("SVG 栅格化失败：" + e.getMessage());
         }
-    }
-
-    private static String extFromMime(String mimeType) {
-        if (mimeType == null) {
-            return "png";
-        }
-        return switch (mimeType.toLowerCase(Locale.ROOT)) {
-            case "image/jpeg", "image/jpg" -> "jpg";
-            default -> "png";
-        };
     }
 
     private static String stripExt(String fileName) {

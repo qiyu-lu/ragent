@@ -1,0 +1,18 @@
+string mission_id
+string task_template_id
+string document_version
+string mission_type
+string robot_id
+bool dry_run
+string plan_hash
+iron_ore_robot_demo/RobotSkill[] steps
+---
+bool success
+string status
+string message
+---
+uint32 current_step
+uint32 total_steps
+string status
+string skill_id
+string message

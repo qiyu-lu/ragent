@@ -19,6 +19,7 @@ package com.nageoffer.ai.ragent.rag.core.retrieval.channel;
 
 import cn.hutool.core.collection.CollUtil;
 import com.nageoffer.ai.ragent.rag.config.SearchChannelProperties;
+import com.nageoffer.ai.ragent.rag.config.SearchChannelProperties.FallbackMode;
 import com.nageoffer.ai.ragent.rag.core.intent.NodeScore;
 import com.nageoffer.ai.ragent.rag.core.intent.NodeScoreFilters;
 import com.nageoffer.ai.ragent.rag.dto.SubQuestionIntent;
@@ -57,13 +58,12 @@ public class RetrievalScopeResolver {
         double topScore = kbIntents.stream().mapToDouble(NodeScore::getScore).max().orElse(0.0);
 
         if (kbIntents.isEmpty()) {
-            log.info("未识别出有效 KB 意图，检索走全局作用域");
-            return RetrievalScope.global(topScore, activeCollections);
+            return fallback(topScore, activeCollections, "未识别出有效 KB 意图");
         }
         double threshold = properties.getScope().getConfidenceThreshold();
         if (topScore < threshold) {
-            log.info("KB 意图置信度过低（{} < {}），检索走全局作用域", topScore, threshold);
-            return RetrievalScope.global(topScore, activeCollections);
+            return fallback(topScore, activeCollections,
+                    "KB 意图置信度过低（" + topScore + " < " + threshold + "）");
         }
 
         Set<String> bound = new LinkedHashSet<>(NodeScoreFilters.kbCollections(kbIntents));
@@ -72,8 +72,7 @@ public class RetrievalScopeResolver {
         Set<String> targets = new LinkedHashSet<>(bound);
         targets.retainAll(activeCollections);
         if (targets.isEmpty()) {
-            log.warn("KB 意图绑定的知识库均已失效（{}），检索退化为全局作用域", bound);
-            return RetrievalScope.global(topScore, activeCollections);
+            return fallback(topScore, activeCollections, "KB 意图绑定的知识库均已失效（" + bound + "）");
         }
         if (targets.size() < bound.size()) {
             bound.removeAll(targets);
@@ -84,6 +83,15 @@ public class RetrievalScopeResolver {
                 .toList();
         log.info("KB 意图置信度充足（{}），检索收窄到 {} 个命中库，补充范围 {} 个库", topScore, targets.size(), supplement.size());
         return new RetrievalScope(true, topScore, kbIntents, List.copyOf(targets), supplement);
+    }
+
+    private RetrievalScope fallback(double topScore, List<String> activeCollections, String reason) {
+        if (properties.getScope().getFallbackMode() == FallbackMode.EMPTY) {
+            log.info("{}，检索走空作用域", reason);
+            return RetrievalScope.empty(topScore);
+        }
+        log.info("{}，检索走全局作用域", reason);
+        return RetrievalScope.global(topScore, activeCollections);
     }
 
     /**

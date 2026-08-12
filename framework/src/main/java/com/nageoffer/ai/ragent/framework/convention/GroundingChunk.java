@@ -39,10 +39,20 @@ import lombok.NoArgsConstructor;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class GroundingChunk {
 
+    private String chunkId;
+
+    private String docId;
+
     /**
      * 文档名称 供生成追问时识别证据所属文档
      */
     private String docName;
+
+    private String documentVersion;
+
+    private String sheetName;
+
+    private String cellRange;
 
     /**
      * 片段全文 作为追问 grounding 的证据内容

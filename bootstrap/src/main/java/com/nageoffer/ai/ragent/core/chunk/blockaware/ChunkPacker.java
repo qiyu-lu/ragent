@@ -21,6 +21,7 @@ import com.nageoffer.ai.ragent.core.chunk.model.ChunkBudget;
 import com.nageoffer.ai.ragent.core.chunk.model.ChunkDraft;
 import com.nageoffer.ai.ragent.core.chunk.model.ChunkMetadata;
 import com.nageoffer.ai.ragent.core.parser.model.AssetRef;
+import com.nageoffer.ai.ragent.core.parser.model.Provenance;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -224,10 +225,41 @@ public class ChunkPacker {
         ChunkMetadata merged = ChunkMetadata.builder()
                 .outlinePath(parts.get(0).metadata().outlinePath().subList(0, commonPrefixLength(parts)))
                 .assets(assets)
-                .provenance(parts.get(0).metadata().provenance())
+                // 标题通常排在表格前且没有 cellRange；若直接拿第一块，会把该表第一行的精确锚点抹掉。
+                .provenance(mostSpecificProvenance(parts))
+                .blockType(mergedBlockType(parts))
                 .build();
         return new ChunkDraft(content.toString(), hasExplicitBody ? body.toString() : null,
                 merged, false, heading);
+    }
+
+    private static String mergedBlockType(List<ChunkDraft> parts) {
+        List<String> types = parts.stream()
+                .map(part -> part.metadata().blockType())
+                .filter(StringUtils::hasText)
+                .distinct()
+                .toList();
+        if (types.isEmpty()) {
+            return null;
+        }
+        return types.size() == 1 ? types.get(0) : "mixed";
+    }
+
+    private static Provenance mostSpecificProvenance(List<ChunkDraft> parts) {
+        Provenance fallback = null;
+        for (ChunkDraft part : parts) {
+            Provenance provenance = part.metadata().provenance();
+            if (provenance == null) {
+                continue;
+            }
+            if (fallback == null) {
+                fallback = provenance;
+            }
+            if (StringUtils.hasText(provenance.cellRange())) {
+                return provenance;
+            }
+        }
+        return fallback;
     }
 
     private static int commonPrefixLength(List<ChunkDraft> drafts) {

@@ -2,6 +2,7 @@ import * as React from "react";
 import { Brain, ChevronDown } from "lucide-react";
 
 import { FeedbackButtons } from "@/components/chat/FeedbackButtons";
+import { IronOreTaskSection } from "@/components/chat/IronOreTaskSection";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { RecommendedQuestions } from "@/components/chat/RecommendedQuestions";
 import { RecommendedQuestionsButton } from "@/components/chat/RecommendedQuestionsButton";
@@ -108,6 +109,13 @@ export const MessageItem = React.memo(function MessageItem({ message }: MessageI
           ) : null}
           {message.status === "error" ? (
             <p className="text-xs text-rose-500">生成已中断。</p>
+          ) : null}
+          {message.role === "assistant" &&
+          message.status !== "streaming" &&
+          message.id &&
+          !message.id.startsWith("assistant-") &&
+          (message.sources?.length ?? 0) > 0 ? (
+            <IronOreTaskSection messageId={message.id} sources={message.sources!} />
           ) : null}
           {showFeedback || hasSources || canRecommend ? (
             <div className="flex items-center gap-2">

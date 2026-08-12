@@ -27,6 +27,11 @@ import java.util.List;
 public record TableBlock(
         Provenance provenance,
         List<String> headers,
-        List<List<String>> rows
+        List<List<String>> rows,
+        List<String> rowCellRanges
 ) implements Block {
+
+    public TableBlock(Provenance provenance, List<String> headers, List<List<String>> rows) {
+        this(provenance, headers, rows, List.of());
+    }
 }

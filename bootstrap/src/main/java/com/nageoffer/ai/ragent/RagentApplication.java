@@ -33,6 +33,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         "com.nageoffer.ai.ragent.rag.dao.mapper",
         "com.nageoffer.ai.ragent.ingestion.dao.mapper",
         "com.nageoffer.ai.ragent.knowledge.dao.mapper",
+        "com.nageoffer.ai.ragent.ironore.dao.mapper",
         "com.nageoffer.ai.ragent.user.dao.mapper",
         "com.nageoffer.ai.ragent.audit.dao.mapper"
 })

@@ -36,7 +36,8 @@ import java.util.Map;
  * 回答来源装配器
  * <p>
  * 把检索片段（KB 命中）按文档去重、按相关度赋号，补齐来源类型与外部链接，
- * 产出文档级来源列表。该列表既用于 SSE 下发/面板展示，也作为行内角标的唯一编号源
+ * 产出文档级来源列表，并携带每篇文档最高相关分块的位置。该列表既用于 SSE 下发/面板展示，
+ * 也作为行内角标的唯一编号源
  */
 @Component
 @RequiredArgsConstructor
@@ -98,6 +99,10 @@ public class SourcesAssembler {
                     .fileType(doc != null ? doc.getFileType() : null)
                     .url(resolveUrl(sourceType, doc))
                     .excerpt(StrUtil.maxLength(StrUtil.trim(chunk.getText()), EXCERPT_MAX_LENGTH))
+                    .chunkId(chunk.getId())
+                    .documentVersion(doc != null ? doc.getDocumentVersion() : chunk.getDocumentVersion())
+                    .sheetName(chunk.getSheetName())
+                    .cellRange(chunk.getCellRange())
                     .build());
         }
         return sources;

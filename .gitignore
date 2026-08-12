@@ -44,6 +44,15 @@ dist/
 .env.local
 resources/docker/graphrag/.env
 
+### ROS1 / Python generated ###
+/robot-gateway/ros1_ws/.catkin_workspace
+/robot-gateway/ros1_ws/build/
+/robot-gateway/ros1_ws/devel/
+/robot-gateway/ros1_ws/install/
+/robot-gateway/ros1_ws/logs/
+__pycache__/
+*.py[cod]
+
 ### Tmp Out ###
 .output/
 docs/temp

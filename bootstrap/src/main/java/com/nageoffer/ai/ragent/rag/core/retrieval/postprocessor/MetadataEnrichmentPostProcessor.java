@@ -83,6 +83,10 @@ public class MetadataEnrichmentPostProcessor implements SearchResultPostProcesso
             chunk.setDocId(meta.docId());
             chunk.setChunkIndex(meta.chunkIndex());
             chunk.setDocName(meta.docName());
+            chunk.setDocumentVersion(meta.documentVersion());
+            chunk.setSheetName(meta.sheetName());
+            chunk.setCellRange(meta.cellRange());
+            chunk.setBlockType(meta.blockType());
         }
 
         // 2）按 docId 补标题：图谱证据的 chunk.id 非向量库主键、上一步未命中，但已带归属 docId，

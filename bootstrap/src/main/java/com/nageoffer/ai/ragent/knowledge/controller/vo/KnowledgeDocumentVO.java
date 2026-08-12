@@ -42,6 +42,12 @@ public class KnowledgeDocumentVO {
      */
     private String docName;
 
+    private String documentKey;
+
+    private String documentVersion;
+
+    private Boolean demoData;
+
     /**
      * 来源类型
      */

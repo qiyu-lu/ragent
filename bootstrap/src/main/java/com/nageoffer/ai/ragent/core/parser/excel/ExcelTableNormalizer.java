@@ -65,14 +65,15 @@ public final class ExcelTableNormalizer {
      */
     public record NormalizedTable(
             List<String> headers,
-            List<List<String>> rows
+            List<List<String>> rows,
+            List<String> rowCellRanges
     ) {
         public boolean isEmpty() {
             return headers.isEmpty() && rows.isEmpty();
         }
 
         static NormalizedTable empty() {
-            return new NormalizedTable(List.of(), List.of());
+            return new NormalizedTable(List.of(), List.of(), List.of());
         }
     }
 
@@ -118,10 +119,13 @@ public final class ExcelTableNormalizer {
         // 步骤 4: 前 headerRows 行展平为表头，其余收集为数据行
         int effectiveHeaderRows = Math.min(headerRows, lastRowNum + 1);
         List<String> headers = flattenHeaders(grid, 0, effectiveHeaderRows, cols);
-        List<List<String>> rows = effectiveHeaderRows <= lastRowNum
+        List<NormalizedRow> normalizedRows = effectiveHeaderRows <= lastRowNum
                 ? collectDataRows(grid, effectiveHeaderRows, lastRowNum, cols)
                 : List.of();
-        return new NormalizedTable(headers, rows);
+        return new NormalizedTable(
+                headers,
+                normalizedRows.stream().map(NormalizedRow::values).toList(),
+                normalizedRows.stream().map(NormalizedRow::cellRange).toList());
     }
 
     /**
@@ -259,9 +263,11 @@ public final class ExcelTableNormalizer {
     /**
      * 收集数据行（跳过全空）
      */
-    private static List<List<String>> collectDataRows(String[][] grid, int startRow,
-                                                      int endRow, int[] cols) {
-        List<List<String>> rows = new ArrayList<>();
+    private static List<NormalizedRow> collectDataRows(String[][] grid, int startRow,
+                                                       int endRow, int[] cols) {
+        List<NormalizedRow> rows = new ArrayList<>();
+        int firstCol = cols[0];
+        int lastCol = cols[cols.length - 1];
         for (int r = startRow; r <= endRow; r++) {
             List<String> rowValues = new ArrayList<>(cols.length);
             boolean allEmpty = true;
@@ -273,9 +279,13 @@ public final class ExcelTableNormalizer {
                 rowValues.add(v == null ? "" : v);
             }
             if (!allEmpty) {
-                rows.add(rowValues);
+                String range = new CellRangeAddress(r, r, firstCol, lastCol).formatAsString();
+                rows.add(new NormalizedRow(rowValues, range));
             }
         }
         return rows;
+    }
+
+    private record NormalizedRow(List<String> values, String cellRange) {
     }
 }

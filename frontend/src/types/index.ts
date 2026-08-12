@@ -30,6 +30,135 @@ export interface SourceRef {
   fileType?: string | null;
   url?: string | null;
   excerpt?: string;
+  chunkId?: string;
+  documentVersion?: string;
+  sheetName?: string;
+  cellRange?: string;
+}
+
+export type CandidateTaskStatus = "DRAFT" | "APPROVED" | "SIMULATED";
+
+export interface TaskEvidenceItem {
+  text: string;
+  evidenceChunkIds: string[];
+}
+
+export interface TaskParameter {
+  name: string;
+  value: string;
+  unit?: string | null;
+}
+
+export interface CandidateTaskStep {
+  order: number;
+  action: string;
+  tools: string[];
+  parameters: TaskParameter[];
+  evidenceChunkIds: string[];
+}
+
+export interface TaskTemplatePayload {
+  title: string;
+  procedureName: string;
+  documentVersion?: string | null;
+  prerequisites: TaskEvidenceItem[];
+  steps: CandidateTaskStep[];
+  qualityCriteria: TaskEvidenceItem[];
+  exceptionHandling: TaskEvidenceItem[];
+  safetyConstraints: TaskEvidenceItem[];
+}
+
+export interface TaskEvidenceRef {
+  chunkId: string;
+  docId: string;
+  docName?: string | null;
+  documentVersion?: string | null;
+  sheetName?: string | null;
+  cellRange?: string | null;
+  excerpt?: string | null;
+}
+
+export interface TaskSimulationEvent {
+  sequence: number;
+  type: string;
+  message: string;
+  evidenceChunkIds: string[];
+}
+
+export interface TaskExecution {
+  id: string;
+  taskTemplateId: string;
+  status: string;
+  events: TaskSimulationEvent[];
+  startTime?: string | null;
+  endTime?: string | null;
+}
+
+export interface CandidateTaskTemplate {
+  id: string;
+  conversationId: string;
+  sourceMessageId: string;
+  docId: string;
+  status: CandidateTaskStatus;
+  template: TaskTemplatePayload;
+  evidenceRefs: TaskEvidenceRef[];
+  execution?: TaskExecution | null;
+  approvedBy?: string | null;
+  approvedAt?: string | null;
+  createTime?: string | null;
+}
+
+export type RobotMissionStatus =
+  | "READY"
+  | "DISPATCHED"
+  | "RUNNING"
+  | "SUCCEEDED"
+  | "FAILED"
+  | "CANCELED"
+  | "DISPATCH_FAILED";
+
+export interface RobotSkillStep {
+  order: number;
+  skillId: "NAVIGATE_TO_STATION" | "TRANSPORT_CONTAINER";
+  parameters: Record<string, string>;
+  timeoutSeconds: number;
+}
+
+export interface RobotMissionPayload {
+  missionId: string;
+  taskTemplateId: string;
+  documentVersion?: string | null;
+  missionType: "SAMPLE_TRANSPORT";
+  robotId: string;
+  dryRun: true;
+  scope: string;
+  planHash: string;
+  steps: RobotSkillStep[];
+}
+
+export interface RobotMissionEvent {
+  sequence: number;
+  status: string;
+  skillId?: string | null;
+  message: string;
+  timestamp: string;
+}
+
+export interface RobotMission {
+  id: string;
+  taskTemplateId: string;
+  robotId: string;
+  status: RobotMissionStatus;
+  planHash: string;
+  mission: RobotMissionPayload;
+  currentStep: number;
+  totalSteps: number;
+  currentSkillId?: string | null;
+  message?: string | null;
+  events: RobotMissionEvent[];
+  dispatchedAt?: string | null;
+  completedAt?: string | null;
+  createTime?: string | null;
 }
 
 export interface Message {

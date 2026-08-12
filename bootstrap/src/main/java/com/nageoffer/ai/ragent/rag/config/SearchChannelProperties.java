@@ -130,6 +130,11 @@ public class SearchChannelProperties implements InitializingBean {
     public static class Scope {
 
         /**
+         * 未命中有效 KB 意图时的回退方式。GLOBAL 保持上游兼容；EMPTY 用于强隔离的领域 Demo。
+         */
+        private FallbackMode fallbackMode = FallbackMode.GLOBAL;
+
+        /**
          * 最低意图分数
          * 低于此分数的意图节点会被过滤，不参与「是否收窄作用域」的判定
          * 上游 {@code IntentResolver} 已按 {@link RAGConstant#INTENT_MIN_SCORE} 过滤过一道，
@@ -151,6 +156,11 @@ public class SearchChannelProperties implements InitializingBean {
          * <=0 关闭补充路，退化为纯定向；命中库已覆盖全部有效库时同样不补
          */
         private double supplementRatio = 0.25;
+    }
+
+    public enum FallbackMode {
+        GLOBAL,
+        EMPTY
     }
 
     @Data

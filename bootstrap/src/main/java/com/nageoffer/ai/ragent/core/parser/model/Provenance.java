@@ -24,14 +24,27 @@ package com.nageoffer.ai.ragent.core.parser.model;
  *
  * @param sourceFile 原始文件标识，文件 ID 或文件名
  * @param sheetName  Excel sheet 名，非 Excel 来源为 null
+ * @param cellRange  Excel 原始单元格范围，非 Excel 来源为 null
  */
-public record Provenance(String sourceFile, String sheetName) {
+public record Provenance(String sourceFile, String sheetName, String cellRange) {
+
+    public Provenance(String sourceFile, String sheetName) {
+        this(sourceFile, sheetName, null);
+    }
 
     public static Provenance ofFile(String sourceFile) {
-        return new Provenance(sourceFile, null);
+        return new Provenance(sourceFile, null, null);
     }
 
     public static Provenance ofExcelCell(String sourceFile, String sheetName) {
-        return new Provenance(sourceFile, sheetName);
+        return new Provenance(sourceFile, sheetName, null);
+    }
+
+    public static Provenance ofExcelCell(String sourceFile, String sheetName, String cellRange) {
+        return new Provenance(sourceFile, sheetName, cellRange);
+    }
+
+    public Provenance withCellRange(String range) {
+        return new Provenance(sourceFile, sheetName, range);
     }
 }

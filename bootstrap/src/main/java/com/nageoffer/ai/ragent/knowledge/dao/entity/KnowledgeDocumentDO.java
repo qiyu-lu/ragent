@@ -55,6 +55,21 @@ public class KnowledgeDocumentDO {
     private String docName;
 
     /**
+     * 跨版本稳定文档键，由文件名去扩展名和版本后缀得到。
+     */
+    private String documentKey;
+
+    /**
+     * 文件名中显式声明的版本，如 V1.2 / V1.3-demo。
+     */
+    private String documentVersion;
+
+    /**
+     * 是否为演示构造数据。
+     */
+    private Integer demoData;
+
+    /**
      * 来源类型：file / url
      */
     private String sourceType;

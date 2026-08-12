@@ -183,6 +183,9 @@ CREATE TABLE t_knowledge_document (
     id               VARCHAR(20)        NOT NULL PRIMARY KEY,
     kb_id            VARCHAR(20)        NOT NULL,
     doc_name         VARCHAR(256)  NOT NULL,
+    document_key     VARCHAR(256)  NOT NULL,
+    document_version VARCHAR(32),
+    demo_data        SMALLINT      NOT NULL DEFAULT 0,
     enabled          SMALLINT      NOT NULL DEFAULT 1,
     chunk_count      INTEGER       DEFAULT 0,
     file_url         VARCHAR(1024) NOT NULL,
@@ -216,6 +219,7 @@ CREATE TABLE t_knowledge_chunk (
     char_count     INTEGER,
     token_count    INTEGER,
     embedding_text TEXT,
+    metadata       JSONB        NOT NULL DEFAULT '{}'::jsonb,
     enabled        SMALLINT    NOT NULL DEFAULT 1,
     created_by     VARCHAR(20) NOT NULL,
     updated_by     VARCHAR(20),
@@ -225,6 +229,75 @@ CREATE TABLE t_knowledge_chunk (
 );
 CREATE INDEX idx_doc_id ON t_knowledge_chunk (doc_id);
 COMMENT ON TABLE t_knowledge_chunk IS '知识库文档分块表';
+
+CREATE TABLE t_iron_ore_task_template (
+    id               VARCHAR(20)  NOT NULL PRIMARY KEY,
+    conversation_id  VARCHAR(20)  NOT NULL,
+    source_message_id VARCHAR(20) NOT NULL,
+    doc_id            VARCHAR(20) NOT NULL,
+    owner_user_id     VARCHAR(20) NOT NULL,
+    title             VARCHAR(256) NOT NULL,
+    procedure_name    VARCHAR(256),
+    document_version  VARCHAR(32),
+    status             VARCHAR(16) NOT NULL,
+    template_data      JSONB       NOT NULL,
+    evidence_refs      JSONB       NOT NULL DEFAULT '[]'::jsonb,
+    approved_by        VARCHAR(64),
+    approved_at        TIMESTAMP,
+    created_by         VARCHAR(64),
+    updated_by         VARCHAR(64),
+    create_time        TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time        TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted            SMALLINT    NOT NULL DEFAULT 0
+);
+CREATE UNIQUE INDEX ux_iron_ore_task_source
+    ON t_iron_ore_task_template (source_message_id, doc_id, owner_user_id)
+    WHERE deleted = 0;
+CREATE INDEX idx_iron_ore_task_conversation
+    ON t_iron_ore_task_template (conversation_id, owner_user_id);
+COMMENT ON TABLE t_iron_ore_task_template IS '铁矿演示候选任务模板';
+
+CREATE TABLE t_iron_ore_task_execution (
+    id               VARCHAR(20) NOT NULL PRIMARY KEY,
+    task_template_id VARCHAR(20) NOT NULL,
+    status           VARCHAR(32) NOT NULL,
+    events           JSONB       NOT NULL DEFAULT '[]'::jsonb,
+    start_time       TIMESTAMP,
+    end_time         TIMESTAMP,
+    created_by       VARCHAR(64),
+    create_time      TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE UNIQUE INDEX ux_iron_ore_task_execution
+    ON t_iron_ore_task_execution (task_template_id);
+COMMENT ON TABLE t_iron_ore_task_execution IS '铁矿候选任务模拟执行记录';
+
+CREATE TABLE t_iron_ore_robot_mission (
+    id               VARCHAR(20)  NOT NULL PRIMARY KEY,
+    task_template_id VARCHAR(20)  NOT NULL,
+    owner_user_id    VARCHAR(20)  NOT NULL,
+    robot_id          VARCHAR(64)  NOT NULL,
+    status            VARCHAR(32)  NOT NULL,
+    plan_hash         VARCHAR(64)  NOT NULL,
+    mission_data      JSONB        NOT NULL,
+    gateway_state     JSONB        NOT NULL DEFAULT '{}'::jsonb,
+    current_step      INTEGER      NOT NULL DEFAULT 0,
+    total_steps       INTEGER      NOT NULL DEFAULT 0,
+    current_skill_id  VARCHAR(64),
+    status_message    VARCHAR(512),
+    dispatched_at     TIMESTAMP,
+    completed_at      TIMESTAMP,
+    created_by        VARCHAR(64),
+    updated_by        VARCHAR(64),
+    create_time       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted           SMALLINT     NOT NULL DEFAULT 0
+);
+CREATE UNIQUE INDEX ux_iron_ore_robot_mission_task
+    ON t_iron_ore_robot_mission (task_template_id)
+    WHERE deleted = 0;
+CREATE INDEX idx_iron_ore_robot_mission_owner
+    ON t_iron_ore_robot_mission (owner_user_id, create_time DESC);
+COMMENT ON TABLE t_iron_ore_robot_mission IS '已批准候选任务编译出的 ROS1 机器人任务及反馈快照';
 
 CREATE TABLE t_knowledge_document_chunk_log (
     id                 VARCHAR(20)      NOT NULL PRIMARY KEY,
@@ -593,6 +666,9 @@ COMMENT ON COLUMN t_knowledge_base.deleted IS '是否删除 0：正常 1：删�
 COMMENT ON COLUMN t_knowledge_document.id IS 'ID';
 COMMENT ON COLUMN t_knowledge_document.kb_id IS '知识库ID';
 COMMENT ON COLUMN t_knowledge_document.doc_name IS '文档名称';
+COMMENT ON COLUMN t_knowledge_document.document_key IS '跨版本稳定文档键';
+COMMENT ON COLUMN t_knowledge_document.document_version IS '文件名中声明的文档版本';
+COMMENT ON COLUMN t_knowledge_document.demo_data IS '是否为演示构造数据';
 COMMENT ON COLUMN t_knowledge_document.enabled IS '是否启用 1：启用 0：禁用';
 COMMENT ON COLUMN t_knowledge_document.chunk_count IS '分块数量';
 COMMENT ON COLUMN t_knowledge_document.file_url IS '文件存储路径';
@@ -623,6 +699,7 @@ COMMENT ON COLUMN t_knowledge_chunk.content_hash IS '内容哈希';
 COMMENT ON COLUMN t_knowledge_chunk.char_count IS '字符数';
 COMMENT ON COLUMN t_knowledge_chunk.token_count IS 'Token数';
 COMMENT ON COLUMN t_knowledge_chunk.embedding_text IS '向量文本';
+COMMENT ON COLUMN t_knowledge_chunk.metadata IS '分块来源元数据，包括工作表和单元格范围';
 COMMENT ON COLUMN t_knowledge_chunk.enabled IS '是否启用';
 COMMENT ON COLUMN t_knowledge_chunk.created_by IS '创建人';
 COMMENT ON COLUMN t_knowledge_chunk.updated_by IS '修改人';

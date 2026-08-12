@@ -1,0 +1,29 @@
+spring:
+  config:
+    activate:
+      on-profile: iron-ore-demo
+
+iron-ore:
+  robot:
+    gateway:
+      enabled: true
+      base-url: http://127.0.0.1:18081
+      timeout-ms: 3000
+
+rag:
+  context:
+    enrich:
+      enabled: true
+  citation:
+    enabled: true
+  image-parse:
+    excel-embedded-enabled: true
+    excel-image-sheet-allowlist:
+      - 浓度检测（双场景）
+    excel-description-prompt: >-
+      请用中文客观描述图片中的设备、容器、工具、摆放关系和可见状态；若图中存在清晰文字，请逐字列出。
+      不要根据图片推断操作步骤、参数、质量结论或安全规则。
+  search:
+    scope:
+      fallback-mode: empty
+      supplement-ratio: 0

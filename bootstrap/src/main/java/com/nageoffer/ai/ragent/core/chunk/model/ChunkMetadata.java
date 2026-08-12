@@ -35,6 +35,7 @@ import java.util.Map;
  *
  * @param outlinePath 章节层级路径，Excel 的 sheet 名亦走这里
  * @param provenance  原始来源（文件、sheet）
+ * @param blockType   原始块类型，如 table / image
  * @param extras      开放扩展位：块级加工产出（摘要、关键词）与调用方注入的文档级元数据
  */
 @Builder
@@ -42,12 +43,15 @@ public record ChunkMetadata(
         List<String> outlinePath,
         List<AssetRef> assets,
         Provenance provenance,
+        String blockType,
         Map<String, Object> extras
 ) {
 
     public static final String KEY_ASSETS = "assets";
     public static final String KEY_SOURCE_FILE = "source_file";
     public static final String KEY_SHEET_NAME = "sheet_name";
+    public static final String KEY_CELL_RANGE = "cell_range";
+    public static final String KEY_BLOCK_TYPE = "block_type";
 
     public ChunkMetadata {
         outlinePath = immutableCopy(outlinePath);
@@ -59,7 +63,7 @@ public record ChunkMetadata(
      * 空元数据：仅用于测试与确实没有任何结构信息的场景
      */
     public static ChunkMetadata empty() {
-        return new ChunkMetadata(List.of(), List.of(), null, Map.of());
+        return new ChunkMetadata(List.of(), List.of(), null, null, Map.of());
     }
 
     /**
@@ -71,7 +75,7 @@ public record ChunkMetadata(
         }
         Map<String, Object> merged = new LinkedHashMap<>(extras);
         merged.putAll(additional);
-        return new ChunkMetadata(outlinePath, assets, provenance, merged);
+        return new ChunkMetadata(outlinePath, assets, provenance, blockType, merged);
     }
 
     /**
@@ -94,7 +98,9 @@ public record ChunkMetadata(
         if (provenance != null) {
             putIfPresent(map, KEY_SOURCE_FILE, provenance.sourceFile());
             putIfPresent(map, KEY_SHEET_NAME, provenance.sheetName());
+            putIfPresent(map, KEY_CELL_RANGE, provenance.cellRange());
         }
+        putIfPresent(map, KEY_BLOCK_TYPE, blockType);
         return map;
     }
 

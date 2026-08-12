@@ -75,6 +75,7 @@ import com.nageoffer.ai.ragent.knowledge.service.KnowledgeChunkService;
 import com.nageoffer.ai.ragent.knowledge.service.KnowledgeDocumentScheduleService;
 import com.nageoffer.ai.ragent.knowledge.service.KnowledgeDocumentService;
 import com.nageoffer.ai.ragent.knowledge.support.IngestionSpecCodec;
+import com.nageoffer.ai.ragent.knowledge.support.DocumentIdentityResolver;
 import com.nageoffer.ai.ragent.knowledge.support.VectorTargetResolver;
 import com.nageoffer.ai.ragent.rag.core.vector.VectorSpaceId;
 import com.nageoffer.ai.ragent.rag.core.vector.VectorStoreService;
@@ -157,9 +158,15 @@ public class KnowledgeDocumentServiceImpl implements KnowledgeDocumentService {
             throw new ClientException("暂不支持的文件类型：" + stored.getDetectedType());
         }
 
+        DocumentIdentityResolver.DocumentIdentity documentIdentity =
+                DocumentIdentityResolver.resolve(stored.getOriginalFilename());
+
         KnowledgeDocumentDO documentDO = KnowledgeDocumentDO.builder()
                 .kbId(kbId)
                 .docName(stored.getOriginalFilename())
+                .documentKey(documentIdentity.documentKey())
+                .documentVersion(documentIdentity.documentVersion())
+                .demoData(documentIdentity.demoData() ? 1 : 0)
                 .enabled(1)
                 .chunkCount(0)
                 .fileUrl(stored.getUrl())
@@ -598,6 +605,7 @@ public class KnowledgeDocumentServiceImpl implements KnowledgeDocumentService {
      */
     private KnowledgeDocumentVO toVO(KnowledgeDocumentDO documentDO) {
         KnowledgeDocumentVO vo = BeanUtil.toBean(documentDO, KnowledgeDocumentVO.class);
+        vo.setDemoData(Integer.valueOf(1).equals(documentDO.getDemoData()));
         if (StringUtils.hasText(documentDO.getIngestionSpec())) {
             vo.setIngestionSpec(ingestionSpecCodec.write(ingestionSpecCodec.read(documentDO.getIngestionSpec())));
         }

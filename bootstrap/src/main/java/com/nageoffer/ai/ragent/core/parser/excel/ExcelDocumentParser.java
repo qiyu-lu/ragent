@@ -20,6 +20,8 @@ package com.nageoffer.ai.ragent.core.parser.excel;
 import com.nageoffer.ai.ragent.core.parser.DocumentParser;
 import com.nageoffer.ai.ragent.core.parser.ParserType;
 import com.nageoffer.ai.ragent.core.parser.excel.ExcelTableNormalizer.NormalizedTable;
+import com.nageoffer.ai.ragent.core.parser.image.ImageAssetProcessor;
+import com.nageoffer.ai.ragent.core.parser.image.ImageParseProperties;
 import com.nageoffer.ai.ragent.core.parser.model.Block;
 import com.nageoffer.ai.ragent.core.parser.model.HeadingBlock;
 import com.nageoffer.ai.ragent.core.parser.model.ParsedDocument;
@@ -33,6 +35,12 @@ import org.apache.poi.ss.usermodel.FormulaEvaluator;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.ss.util.CellRangeAddress;
+import org.apache.poi.xssf.usermodel.XSSFClientAnchor;
+import org.apache.poi.xssf.usermodel.XSSFDrawing;
+import org.apache.poi.xssf.usermodel.XSSFPicture;
+import org.apache.poi.xssf.usermodel.XSSFPictureData;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayInputStream;
@@ -52,9 +60,19 @@ import java.util.Set;
 public class ExcelDocumentParser implements DocumentParser {
 
     public static final String OPT_SOURCE_FILE = "sourceFile";
+    public static final String OPT_DOCUMENT_ID = "documentId";
     public static final String OPT_HEADER_ROWS = "headerRows";
 
     private static final int DEFAULT_HEADER_ROWS = 1;
+
+    private final ImageAssetProcessor imageAssetProcessor;
+    private final ImageParseProperties imageParseProperties;
+
+    public ExcelDocumentParser(ImageAssetProcessor imageAssetProcessor,
+                               ImageParseProperties imageParseProperties) {
+        this.imageAssetProcessor = imageAssetProcessor;
+        this.imageParseProperties = imageParseProperties;
+    }
 
     @Override
     public String getParserType() {
@@ -82,6 +100,7 @@ public class ExcelDocumentParser implements DocumentParser {
         }
 
         String sourceFile = extractString(options);
+        String documentId = extractString(options, OPT_DOCUMENT_ID);
         int headerRows = extractInt(options);
 
         List<Block> blocks = new ArrayList<>();
@@ -101,6 +120,7 @@ public class ExcelDocumentParser implements DocumentParser {
                 }
                 Sheet sheet = workbook.getSheetAt(i);
                 blocks.addAll(buildSheetBlocks(sheet, sourceFile, headerRows, formatter, evaluator));
+                blocks.addAll(buildEmbeddedImageBlocks(sheet, sourceFile, documentId));
             }
         } catch (Exception e) {
             log.error("Excel 解析失败，MIME 类型: {}, 文件大小: {} bytes", mimeType, content.length, e);
@@ -113,8 +133,60 @@ public class ExcelDocumentParser implements DocumentParser {
                 "totalSheets", totalSheets,
                 // 只数表格：每个 sheet 还额外产一个承载 sheet 名的 HeadingBlock
                 "parsedTables", blocks.stream().filter(TableBlock.class::isInstance).count(),
+                "parsedImages", blocks.stream().filter(com.nageoffer.ai.ragent.core.parser.model.ImageBlock.class::isInstance).count(),
                 "headerRows", headerRows
         ));
+    }
+
+    private List<Block> buildEmbeddedImageBlocks(Sheet sheet, String sourceFile, String documentId) {
+        if (!imageParseProperties.isExcelEmbeddedEnabled()
+                || !imageParseProperties.getExcelImageSheetAllowlist().contains(sheet.getSheetName())
+                || !(sheet instanceof XSSFSheet xssfSheet)) {
+            return List.of();
+        }
+        XSSFDrawing drawing = xssfSheet.getDrawingPatriarch();
+        if (drawing == null) {
+            return List.of();
+        }
+
+        List<Block> blocks = new ArrayList<>();
+        int pictureIndex = 0;
+        for (var shape : drawing.getShapes()) {
+            if (!(shape instanceof XSSFPicture picture)) {
+                continue;
+            }
+            pictureIndex++;
+            XSSFPictureData data = picture.getPictureData();
+            XSSFClientAnchor anchor = picture.getClientAnchor();
+            String cellRange = formatAnchor(anchor);
+            String caption = sheet.getSheetName() + " 图片" + pictureIndex + "（" + cellRange + "）";
+            try {
+                blocks.add(imageAssetProcessor.process(
+                        data.getData(),
+                        data.getMimeType(),
+                        documentId,
+                        Provenance.ofExcelCell(sourceFile, sheet.getSheetName(), cellRange),
+                        caption,
+                        imageParseProperties.getExcelDescriptionPrompt()));
+            } catch (Exception e) {
+                log.warn("Excel 内嵌图片处理失败，跳过图片但保留表格文本: file={}, sheet={}, range={}, reason={}",
+                        sourceFile, sheet.getSheetName(), cellRange, e.getMessage());
+            }
+        }
+        log.info("Excel 内嵌图片处理完成: file={}, sheet={}, discovered={}, processed={}",
+                sourceFile, sheet.getSheetName(), pictureIndex, blocks.size());
+        return blocks;
+    }
+
+    private static String formatAnchor(XSSFClientAnchor anchor) {
+        if (anchor == null) {
+            return "";
+        }
+        int firstRow = Math.max(0, anchor.getRow1());
+        int lastRow = Math.max(firstRow, anchor.getRow2());
+        int firstCol = Math.max(0, anchor.getCol1());
+        int lastCol = Math.max(firstCol, anchor.getCol2());
+        return new CellRangeAddress(firstRow, lastRow, firstCol, lastCol).formatAsString();
     }
 
     /**
@@ -134,15 +206,19 @@ public class ExcelDocumentParser implements DocumentParser {
         Provenance prov = Provenance.ofExcelCell(sourceFile, sheet.getSheetName());
         return List.of(
                 new HeadingBlock(prov, 1, sheet.getSheetName()),
-                new TableBlock(prov, table.headers(), table.rows())
+                new TableBlock(prov, table.headers(), table.rows(), table.rowCellRanges())
         );
     }
 
     private static String extractString(Map<String, Object> options) {
+        return extractString(options, ExcelDocumentParser.OPT_SOURCE_FILE);
+    }
+
+    private static String extractString(Map<String, Object> options, String key) {
         if (options == null) {
             return "";
         }
-        Object v = options.get(ExcelDocumentParser.OPT_SOURCE_FILE);
+        Object v = options.get(key);
         return v == null ? "" : v.toString();
     }
 

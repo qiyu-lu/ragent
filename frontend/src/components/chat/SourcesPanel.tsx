@@ -17,8 +17,7 @@ export function SourcesPanel() {
 
   const open = openedSourceMessageId != null;
   // 来源以 messages 为唯一数据源 按打开的消息 ID 派生 不再单独存一份副本
-  const sources =
-    messages.find((message) => message.id === openedSourceMessageId)?.sources ?? [];
+  const sources = messages.find((message) => message.id === openedSourceMessageId)?.sources ?? [];
 
   // 收起动画期间保留上一次内容 避免瞬间清空闪烁
   const lastSourcesRef = React.useRef(sources);
@@ -49,7 +48,9 @@ export function SourcesPanel() {
     >
       <div className="flex h-full w-[380px] flex-col bg-white">
         <div className="flex items-center justify-between border-b border-[#F0F0F0] px-5 py-4">
-          <span className="text-[15px] font-semibold text-[#1A1A1A]">参考来源 ({shownSources.length})</span>
+          <span className="text-[15px] font-semibold text-[#1A1A1A]">
+            参考来源 ({shownSources.length})
+          </span>
           <button
             type="button"
             onClick={closeSourcesPanel}
@@ -84,6 +85,25 @@ export function SourcesPanel() {
                         </span>
                         <span className="truncate">{sourceSite(source)}</span>
                       </div>
+                      {source.documentVersion || source.sheetName || source.cellRange ? (
+                        <div className="mt-1.5 flex flex-wrap gap-1 text-[11px] text-[#526176]">
+                          {source.documentVersion ? (
+                            <span className="rounded bg-[#EEF2FF] px-1.5 py-0.5">
+                              {source.documentVersion}
+                            </span>
+                          ) : null}
+                          {source.sheetName ? (
+                            <span className="rounded bg-[#F1F5F9] px-1.5 py-0.5">
+                              {source.sheetName}
+                            </span>
+                          ) : null}
+                          {source.cellRange ? (
+                            <span className="rounded bg-[#F1F5F9] px-1.5 py-0.5">
+                              {source.cellRange}
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : null}
                       {source.excerpt ? (
                         <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-[#8A8F94]">
                           {source.excerpt}

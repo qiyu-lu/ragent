@@ -19,7 +19,9 @@ package com.nageoffer.ai.ragent.core.chunk.blockaware;
 
 import com.nageoffer.ai.ragent.core.chunk.model.ChunkDraft;
 import com.nageoffer.ai.ragent.core.chunk.model.ChunkMetadata;
+import com.nageoffer.ai.ragent.core.parser.model.Provenance;
 import com.nageoffer.ai.ragent.core.parser.model.TableBlock;
+import org.apache.poi.ss.util.CellRangeAddress;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -48,6 +50,7 @@ public class TableChunker implements BlockChunker<TableBlock> {
         }
         List<String> headers = block.headers() == null ? List.of() : block.headers();
         List<List<String>> rows = block.rows() == null ? List.of() : block.rows();
+        List<String> rowCellRanges = block.rowCellRanges() == null ? List.of() : block.rowCellRanges();
         if (headers.isEmpty() && rows.isEmpty()) {
             return List.of();
         }
@@ -64,36 +67,62 @@ public class TableChunker implements BlockChunker<TableBlock> {
         List<ChunkDraft> result = new ArrayList<>();
 
         if (rows.isEmpty()) {
-            result.add(buildDraft(block, ctx, headers, List.of()));
+            result.add(buildDraft(block, ctx, headers, List.of(), List.of()));
             return result;
         }
 
         // 贪心累加：超硬上限或（非空且加入下一行会超预算）则先落块
         List<List<String>> group = new ArrayList<>();
+        List<String> groupRanges = new ArrayList<>();
         int groupCost = 0;
-        for (List<String> row : rows) {
+        for (int rowIndex = 0; rowIndex < rows.size(); rowIndex++) {
+            List<String> row = rows.get(rowIndex);
             int rowCost = renderKeyValueRow(headers, row).length();
             boolean overCap = group.size() >= maxRows;
             boolean overBudget = !group.isEmpty() && groupCost + rowCost > budget;
             if (overCap || overBudget) {
-                result.add(buildDraft(block, ctx, headers, group));
+                result.add(buildDraft(block, ctx, headers, group, groupRanges));
                 group = new ArrayList<>();
+                groupRanges = new ArrayList<>();
                 groupCost = 0;
             }
             group.add(row);
+            if (rowIndex < rowCellRanges.size()) {
+                groupRanges.add(rowCellRanges.get(rowIndex));
+            }
             groupCost += rowCost;
         }
-        result.add(buildDraft(block, ctx, headers, group));
+        result.add(buildDraft(block, ctx, headers, group, groupRanges));
         return ChunkDraft.pieces(result);
     }
 
-    private ChunkDraft buildDraft(TableBlock block, ChunkContext ctx, List<String> headers, List<List<String>> rows) {
+    private ChunkDraft buildDraft(TableBlock block, ChunkContext ctx, List<String> headers, List<List<String>> rows,
+                                  List<String> rowRanges) {
         ChunkMetadata metadata = ChunkMetadata.builder()
                 .outlinePath(ctx.outlinePath())
-                .provenance(block.provenance())
+                .provenance(withCellRange(block.provenance(), rowRanges))
+                .blockType("table")
                 .build();
         // 章节路径由装配器统一拼进向量文本，此处只给 key-value 正文，避免重复前缀
         return ChunkDraft.of(renderMarkdownTable(headers, rows), renderKeyValueRows(headers, rows), metadata);
+    }
+
+    private Provenance withCellRange(Provenance provenance, List<String> rowRanges) {
+        if (provenance == null || rowRanges == null || rowRanges.isEmpty()) {
+            return provenance;
+        }
+        try {
+            CellRangeAddress first = CellRangeAddress.valueOf(rowRanges.get(0));
+            CellRangeAddress last = CellRangeAddress.valueOf(rowRanges.get(rowRanges.size() - 1));
+            CellRangeAddress combined = new CellRangeAddress(
+                    Math.min(first.getFirstRow(), last.getFirstRow()),
+                    Math.max(first.getLastRow(), last.getLastRow()),
+                    Math.min(first.getFirstColumn(), last.getFirstColumn()),
+                    Math.max(first.getLastColumn(), last.getLastColumn()));
+            return provenance.withCellRange(combined.formatAsString());
+        } catch (IllegalArgumentException ignored) {
+            return provenance.withCellRange(String.join(",", rowRanges));
+        }
     }
 
     private String renderKeyValueRows(List<String> headers, List<List<String>> rows) {

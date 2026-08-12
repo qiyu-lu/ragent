@@ -37,7 +37,7 @@ import java.util.Date;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("t_knowledge_chunk")
+@TableName(value = "t_knowledge_chunk", autoResultMap = true)
 public class KnowledgeChunkDO {
 
     /**
@@ -88,6 +88,12 @@ public class KnowledgeChunkDO {
      * 渲染、图片去 URL 后的描述）只存在于这一列，用 content 重算会静默丢掉它们
      */
     private String embeddingText;
+
+    /**
+     * 解析与分块产生的来源元数据（sheet、cell range、block type、assets）。
+     */
+    @TableField(typeHandler = com.nageoffer.ai.ragent.knowledge.dao.handler.JsonbTypeHandler.class)
+    private String metadata;
 
     /**
      * 是否启用 0：禁用 1：启用

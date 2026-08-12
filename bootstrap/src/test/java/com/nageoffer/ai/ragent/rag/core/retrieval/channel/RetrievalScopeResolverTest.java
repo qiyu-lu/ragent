@@ -18,6 +18,7 @@
 package com.nageoffer.ai.ragent.rag.core.retrieval.channel;
 
 import com.nageoffer.ai.ragent.rag.config.SearchChannelProperties;
+import com.nageoffer.ai.ragent.rag.config.SearchChannelProperties.FallbackMode;
 import com.nageoffer.ai.ragent.rag.core.intent.IntentNode;
 import com.nageoffer.ai.ragent.rag.core.intent.NodeScore;
 import com.nageoffer.ai.ragent.rag.dto.SubQuestionIntent;
@@ -83,6 +84,21 @@ class RetrievalScopeResolverTest {
 
         assertFalse(scope.directed());
         assertEquals(ACTIVE, scope.targetCollections());
+    }
+
+    @Test
+    @DisplayName("严格模式下无有效意图返回空作用域，不污染其他知识库")
+    void noIntentUsesEmptyScopeInStrictMode() {
+        SearchChannelProperties properties = new SearchChannelProperties();
+        properties.getScope().setFallbackMode(FallbackMode.EMPTY);
+        KbCollectionProvider provider = mock(KbCollectionProvider.class);
+        when(provider.listActiveCollections()).thenReturn(ACTIVE);
+
+        RetrievalScope scope = new RetrievalScopeResolver(properties, provider).resolve(List.of());
+
+        assertFalse(scope.directed());
+        assertTrue(scope.targetCollections().isEmpty());
+        assertTrue(scope.supplementCollections().isEmpty());
     }
 
     @Test

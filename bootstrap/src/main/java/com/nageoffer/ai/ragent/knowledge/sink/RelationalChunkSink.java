@@ -19,6 +19,8 @@ package com.nageoffer.ai.ragent.knowledge.sink;
 
 import cn.hutool.crypto.SecureUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nageoffer.ai.ragent.core.chunk.model.EmbeddedChunk;
 import com.nageoffer.ai.ragent.core.ingest.DocumentRef;
 import com.nageoffer.ai.ragent.core.ingest.VectorTarget;
@@ -51,6 +53,7 @@ public class RelationalChunkSink implements ChunkSink {
 
     private final KnowledgeChunkMapper chunkMapper;
     private final TokenCounterService tokenCounterService;
+    private final ObjectMapper objectMapper;
 
     @Override
     public void replaceDocument(VectorTarget target, DocumentRef doc, List<EmbeddedChunk> chunks) {
@@ -72,6 +75,7 @@ public class RelationalChunkSink implements ChunkSink {
                     .charCount(content.length())
                     .tokenCount(StringUtils.hasText(content) ? tokenCounterService.countTokens(content) : 0)
                     .embeddingText(chunk.embeddingText())
+                    .metadata(writeMetadata(chunk))
                     .enabled(1)
                     .createdBy(username)
                     .updatedBy(username)
@@ -79,6 +83,14 @@ public class RelationalChunkSink implements ChunkSink {
         }
         chunkMapper.insert(rows);
         log.debug("关系库块写入完成 docId={} 块数={}", doc.docId(), rows.size());
+    }
+
+    private String writeMetadata(EmbeddedChunk chunk) {
+        try {
+            return objectMapper.writeValueAsString(chunk.metadata().toMap());
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("分块元数据序列化失败: chunkId=" + chunk.chunkId(), e);
+        }
     }
 
     @Override

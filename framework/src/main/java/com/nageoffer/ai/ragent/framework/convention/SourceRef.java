@@ -24,9 +24,10 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * 回答来源引用（文档级）
+ * 回答来源引用（文档级，并附带该文档最高相关分块的精确位置）
  * <p>
- * 由检索片段按文档去重、赋号后得到，同时用于：SSE 下发、消息落库、前端来源面板与预览
+ * 由检索片段按文档去重、赋号后得到，同时用于：SSE 下发、消息落库、前端来源面板与预览。
+ * {@code sheetName/cellRange} 指向用于摘录的最高相关分块，不代表整篇文档只有这一处证据。
  */
 @Data
 @NoArgsConstructor
@@ -69,4 +70,15 @@ public class SourceRef {
      * 摘录 取该文档最相关片段的截断文本
      */
     private String excerpt;
+
+    /**
+     * 本来源对应的最高相关分块 ID。
+     */
+    private String chunkId;
+
+    private String documentVersion;
+
+    private String sheetName;
+
+    private String cellRange;
 }

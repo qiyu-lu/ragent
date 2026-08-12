@@ -65,4 +65,11 @@ public record RetrievalScope(boolean directed,
     public static RetrievalScope global(double topScore, List<String> activeCollections) {
         return new RetrievalScope(false, topScore, List.of(), activeCollections, List.of());
     }
+
+    /**
+     * 空作用域：不查询任何知识库。用于领域 Demo 防止无意图或低置信问题污染其他知识库。
+     */
+    public static RetrievalScope empty(double topScore) {
+        return new RetrievalScope(false, topScore, List.of(), List.of(), List.of());
+    }
 }

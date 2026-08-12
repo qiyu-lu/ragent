@@ -82,12 +82,11 @@ public class StreamTaskManager {
 
     public void register(String taskId, SseEmitterSender sender, Supplier<CompletionPayload> onCancelSupplier) {
         StreamTaskInfo taskInfo = getOrCreate(taskId);
-        taskInfo.sender = sender;
         taskInfo.onCancelSupplier = onCancelSupplier;
+        taskInfo.sender = sender;
         if (isTaskCancelledInRedis(taskId, taskInfo)) {
-            CompletionPayload payload = taskInfo.onCancelSupplier.get();
-            sendCancelAndDone(sender, payload);
-            sender.complete();
+            reportTraceRunCancelled(taskId);
+            completeCancelledTask(taskId, taskInfo);
         }
     }
 
@@ -95,7 +94,7 @@ public class StreamTaskManager {
         StreamTaskInfo taskInfo = getOrCreate(taskId);
         taskInfo.handle = handle;
         if (taskInfo.cancelled.get() && handle != null) {
-            handle.cancel();
+            cancelHandleQuietly(taskId, handle);
         }
     }
 
@@ -108,6 +107,9 @@ public class StreamTaskManager {
         // 先设置 Redis 标记，再发布消息
         RBucket<Boolean> bucket = redissonClient.getBucket(cancelKey(taskId));
         bucket.set(Boolean.TRUE, CANCEL_TTL);
+
+        // stopTask 的入口不依赖本地任务缓存：请求可能落到另一个实例，或恰好早于本地注册
+        reportTraceRunCancelled(taskId);
 
         // 发布消息通知所有节点（包括本地）
         // 本地节点也通过监听器统一处理，避免重复调用 cancelLocal
@@ -143,27 +145,21 @@ public class StreamTaskManager {
             return;
         }
 
-        if (taskInfo.handle != null) {
-            taskInfo.handle.cancel();
-        }
-
-        // 在取消时执行回调，保存已累积的内容
-        if (taskInfo.sender != null) {
-            CompletionPayload payload = taskInfo.onCancelSupplier.get();
-            sendCancelAndDone(taskInfo.sender, payload);
-            taskInfo.sender.complete();
-        }
-
+        // trace 是旁路观测，必须先于 provider / SSE 清理；后两者抛异常也不能留下 RUNNING
         reportTraceRunCancelled(taskId);
+
+        if (taskInfo.handle != null) {
+            cancelHandleQuietly(taskId, taskInfo.handle);
+        }
+
+        completeCancelledTask(taskId, taskInfo);
     }
 
     /**
      * 上报 run 级取消终态
      * <p>
-     * 取消信号在 provider client 层就被 {@code ForwardingStreamCallback} 拦截了（对外部取消不透传 delegate，
-     * 否则流式 failover 切换候选时会终止用户 SSE），run 级终态无法由回调链驱动。
-     * 而 {@code cancelLocal} 的 CAS 成功分支是全链路唯一能确定「这是用户主动取消」而非「failover 内部取消」的位置，
-     * 因此在这里上报
+     * stop 入口、本地 Pub/Sub 消费和取消后补注册都可能到达这里。数据库更新只允许 RUNNING → CANCELLED，
+     * 因此多次调用是安全的，并且不会把正常终态改写为取消
      * </p>
      */
     private void reportTraceRunCancelled(String taskId) {
@@ -172,6 +168,46 @@ public class StreamTaskManager {
         } catch (Exception e) {
             // trace 是旁路观测，失败不能影响取消本身
             log.warn("上报 trace run 取消状态失败，任务ID：{}", taskId, e);
+        }
+    }
+
+    private void cancelHandleQuietly(String taskId, StreamCancellationHandle handle) {
+        try {
+            handle.cancel();
+        } catch (Exception e) {
+            log.warn("取消 provider 流失败，任务ID：{}", taskId, e);
+        }
+    }
+
+    /**
+     * 发送取消终态并完成 SSE。注册与 Pub/Sub 取消可能并发进入，使用 CAS 保证只发送一次。
+     */
+    private void completeCancelledTask(String taskId, StreamTaskInfo taskInfo) {
+        SseEmitterSender sender = taskInfo.sender;
+        if (sender == null || !taskInfo.cancelCompletionStarted.compareAndSet(false, true)) {
+            return;
+        }
+
+        CompletionPayload payload = null;
+        try {
+            Supplier<CompletionPayload> supplier = taskInfo.onCancelSupplier;
+            if (supplier != null) {
+                payload = supplier.get();
+            }
+        } catch (Exception e) {
+            log.warn("构造取消完成载荷失败，任务ID：{}", taskId, e);
+        }
+
+        try {
+            sendCancelAndDone(sender, payload);
+        } catch (Exception e) {
+            log.warn("发送取消 SSE 事件失败，任务ID：{}", taskId, e);
+        } finally {
+            try {
+                sender.complete();
+            } catch (Exception e) {
+                log.debug("完成取消 SSE 连接失败，任务ID：{}", taskId, e);
+            }
         }
     }
 
@@ -200,6 +236,7 @@ public class StreamTaskManager {
 
     private static final class StreamTaskInfo {
         private final AtomicBoolean cancelled = new AtomicBoolean(false);
+        private final AtomicBoolean cancelCompletionStarted = new AtomicBoolean(false);
         private volatile StreamCancellationHandle handle;
         private volatile SseEmitterSender sender;
         private volatile Supplier<CompletionPayload> onCancelSupplier;

@@ -55,7 +55,9 @@ public class RagTraceRecordServiceImpl implements RagTraceRecordService {
                 .durationMs(durationMs)
                 .build();
         runMapper.update(update, Wrappers.lambdaUpdate(RagTraceRunDO.class)
-                .eq(RagTraceRunDO::getTraceId, traceId));
+                .eq(RagTraceRunDO::getTraceId, traceId)
+                // SUCCESS / ERROR / CANCELLED 都是终态，先到者获胜，后续回调不得覆盖
+                .eq(RagTraceRunDO::getStatus, STATUS_RUNNING));
     }
 
     @Override
@@ -69,10 +71,13 @@ public class RagTraceRecordServiceImpl implements RagTraceRecordService {
             return false;
         }
 
+        long durationMs = running.getStartTime() == null
+                ? 0L
+                : Math.max(0, endTime.getTime() - running.getStartTime().getTime());
         RagTraceRunDO update = RagTraceRunDO.builder()
                 .status(STATUS_CANCELLED)
                 .endTime(endTime)
-                .durationMs(Math.max(0, endTime.getTime() - running.getStartTime().getTime()))
+                .durationMs(durationMs)
                 .build();
         // 带 status 的条件更新：与正常终态（onComplete / onError）竞争时只有一方能生效
         return runMapper.update(update, Wrappers.lambdaUpdate(RagTraceRunDO.class)

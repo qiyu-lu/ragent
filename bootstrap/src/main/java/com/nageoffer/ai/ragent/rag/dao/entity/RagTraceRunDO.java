@@ -65,7 +65,7 @@ public class RagTraceRunDO {
     private String userId;
 
     /**
-     * RUNNING / SUCCESS / ERROR
+     * RUNNING / SUCCESS / ERROR / CANCELLED
      */
     private String status;
 

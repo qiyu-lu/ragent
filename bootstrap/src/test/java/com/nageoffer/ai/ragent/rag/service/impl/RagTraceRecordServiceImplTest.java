@@ -89,6 +89,32 @@ class RagTraceRecordServiceImplTest {
     }
 
     @Test
+    void normalFinishOnlyUpdatesRunStillInRunningState() {
+        service.finishRun(TRACE_ID, "SUCCESS", null, new Date(), 500L);
+
+        ArgumentCaptor<Wrapper<RagTraceRunDO>> captor = ArgumentCaptor.forClass(Wrapper.class);
+        verify(runMapper).update(any(), captor.capture());
+        assertTrue(captor.getValue().getTargetSql().contains("status"),
+                "正常完成也必须带 RUNNING 条件，不能覆盖已经写入的 CANCELLED");
+    }
+
+    @Test
+    void cancelsLegacyRunningRunWithoutStartTime() {
+        when(runMapper.selectOne(any())).thenReturn(RagTraceRunDO.builder()
+                .traceId(TRACE_ID)
+                .taskId(TASK_ID)
+                .status("RUNNING")
+                .build());
+        when(runMapper.update(any(), any())).thenReturn(1);
+
+        assertTrue(service.cancelRunByTaskId(TASK_ID, new Date()));
+
+        ArgumentCaptor<RagTraceRunDO> captor = ArgumentCaptor.forClass(RagTraceRunDO.class);
+        verify(runMapper).update(captor.capture(), any());
+        assertEquals(0L, captor.getValue().getDurationMs());
+    }
+
+    @Test
     void constrainsUpdateToRowsStillRunning() {
         when(runMapper.selectOne(any())).thenReturn(RagTraceRunDO.builder()
                 .traceId(TRACE_ID)

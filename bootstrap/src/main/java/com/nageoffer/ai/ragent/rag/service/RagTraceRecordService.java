@@ -34,8 +34,8 @@ public interface RagTraceRecordService {
     /**
      * 将指定任务仍处于 RUNNING 的 trace run 收尾为 CANCELLED
      * <p>
-     * 取消信号在 provider client 层被拦截（{@code ForwardingStreamCallback} 对外部取消不透传 delegate，
-     * 否则流式 failover 切换候选时会终止用户 SSE），run 级终态无法由回调链驱动，只能按 taskId 单独上报
+     * 用户停止请求与 trace run 创建可能发生在不同实例或交错执行，因此停止入口和 run 创建后的取消检查
+     * 都可以按 taskId 幂等调用；只有仍处于 RUNNING 的记录会被更新
      * </p>
      *
      * @param taskId  流式任务 ID

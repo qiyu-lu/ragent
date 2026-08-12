@@ -28,6 +28,7 @@ import com.nageoffer.ai.ragent.rag.config.RagTraceProperties;
 import com.nageoffer.ai.ragent.rag.dao.entity.RagTraceNodeDO;
 import com.nageoffer.ai.ragent.rag.dao.entity.RagTraceRunDO;
 import com.nageoffer.ai.ragent.rag.service.RagTraceRecordService;
+import com.nageoffer.ai.ragent.rag.service.handler.StreamTaskManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -48,11 +49,13 @@ public class StreamChatTraceRunner {
     private static final String STATUS_RUNNING = "RUNNING";
     private static final String STATUS_SUCCESS = "SUCCESS";
     private static final String STATUS_ERROR = "ERROR";
+    private static final String STATUS_CANCELLED = "CANCELLED";
     private static final String USER_TTFT_NODE_NAME = "user-first-packet";
     private static final String USER_TTFT_NODE_TYPE = "USER_TTFT";
 
     private final RagTraceProperties traceProperties;
     private final RagTraceRecordService traceRecordService;
+    private final StreamTaskManager taskManager;
 
     /**
      * @param businessLogic 接收 trace 增强后的 callback：onComplete / onError 会触发 finishRun
@@ -85,6 +88,13 @@ public class StreamChatTraceRunner {
                         .toString())
                 .build());
 
+        // META 会在排队和 run 插入前发送，用户可能已点击停止。run 插入后再检查一次，
+        // 与 stopTask 入口的按 taskId 更新形成握手，封住“先取消、后插入 RUNNING”的竞态。
+        if (taskManager.isCancelled(taskId)) {
+            finishCancelledRun(traceId, startMillis);
+            return;
+        }
+
         Date runStartTime = new Date(startMillis);
         StreamCallback traceAwareCallback = new ForwardingStreamCallback(callback) {
             @Override
@@ -94,7 +104,11 @@ public class StreamChatTraceRunner {
 
             @Override
             protected void onFinish(boolean success, Throwable error) {
-                finishRun(traceId, success, error, startMillis);
+                if (taskManager.isCancelled(taskId)) {
+                    finishCancelledRun(traceId, startMillis);
+                } else {
+                    finishRun(traceId, success, error, startMillis);
+                }
             }
         };
 
@@ -152,6 +166,21 @@ public class StreamChatTraceRunner {
             );
         } catch (Exception e) {
             log.warn("finishRun 失败，traceId：{}", traceId, e);
+        }
+    }
+
+    private void finishCancelledRun(String traceId, long startMillis) {
+        try {
+            long now = System.currentTimeMillis();
+            traceRecordService.finishRun(
+                    traceId,
+                    STATUS_CANCELLED,
+                    null,
+                    new Date(now),
+                    Math.max(0, now - startMillis)
+            );
+        } catch (Exception e) {
+            log.warn("取消路径 finishRun 失败，traceId：{}", traceId, e);
         }
     }
 

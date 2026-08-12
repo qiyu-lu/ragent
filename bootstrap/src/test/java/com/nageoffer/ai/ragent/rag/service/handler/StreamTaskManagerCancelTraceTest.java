@@ -21,6 +21,7 @@ import com.nageoffer.ai.ragent.infra.chat.StreamCancellationHandle;
 import com.nageoffer.ai.ragent.rag.service.RagTraceRecordService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.redisson.api.RBucket;
 import org.mockito.ArgumentCaptor;
 import org.redisson.api.RTopic;
 import org.redisson.api.RedissonClient;
@@ -28,6 +29,7 @@ import org.redisson.api.listener.MessageListener;
 
 import java.util.Date;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -51,6 +53,7 @@ class StreamTaskManagerCancelTraceTest {
 
     private RedissonClient redissonClient;
     private RTopic topic;
+    private RBucket<Boolean> cancelBucket;
     private RagTraceRecordService traceRecordService;
     private StreamTaskManager taskManager;
     private StreamCancellationHandle handle;
@@ -60,9 +63,11 @@ class StreamTaskManagerCancelTraceTest {
     void setUp() {
         redissonClient = mock(RedissonClient.class);
         topic = mock(RTopic.class);
+        cancelBucket = mock(RBucket.class);
         traceRecordService = mock(RagTraceRecordService.class);
         handle = mock(StreamCancellationHandle.class);
         when(redissonClient.getTopic(any(String.class))).thenReturn(topic);
+        when(redissonClient.<Boolean>getBucket(any(String.class))).thenReturn(cancelBucket);
 
         taskManager = new StreamTaskManager(redissonClient, traceRecordService);
     }
@@ -76,6 +81,14 @@ class StreamTaskManagerCancelTraceTest {
 
         verify(handle).cancel();
         verify(traceRecordService).cancelRunByTaskId(eq(TASK_ID), any(Date.class));
+    }
+
+    @Test
+    void reportsCancelledTraceRunAtStopEntryEvenWithoutLocalTask() {
+        taskManager.cancel(TASK_ID);
+
+        verify(traceRecordService).cancelRunByTaskId(eq(TASK_ID), any(Date.class));
+        verify(topic).publish(TASK_ID);
     }
 
     @Test
@@ -108,6 +121,17 @@ class StreamTaskManagerCancelTraceTest {
         listener.onMessage("channel", TASK_ID);
 
         verify(handle).cancel();
+    }
+
+    @Test
+    void stillReportsTraceWhenHandleCancellationFails() {
+        MessageListener<String> listener = subscribeAndCaptureListener();
+        taskManager.bindHandle(TASK_ID, handle);
+        doThrow(new RuntimeException("provider cancel 失败")).when(handle).cancel();
+
+        assertDoesNotThrow(() -> listener.onMessage("channel", TASK_ID));
+
+        verify(traceRecordService).cancelRunByTaskId(eq(TASK_ID), any(Date.class));
     }
 
     @SuppressWarnings("unchecked")

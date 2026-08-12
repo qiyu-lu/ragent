@@ -75,7 +75,7 @@ public class RagTraceNodeDO {
     private String methodName;
 
     /**
-     * RUNNING / SUCCESS / ERROR
+     * RUNNING / SUCCESS / ERROR / CANCELLED
      */
     private String status;
 

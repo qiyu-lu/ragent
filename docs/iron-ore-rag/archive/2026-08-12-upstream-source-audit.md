@@ -1,5 +1,7 @@
 # 面向铁矿检测流程的人形机器人：RAG 改造项目上下文
 
+> **归档说明：**本文是 `2026-08-12` 对 Ragent 1.1.0 原始基线的源码审计与课题规划快照，文中的“尚未实现”“下一阶段”不代表当前分支状态。当前能力以[项目文档入口](../README.md)和[改动索引](../changes/README.md)为准。
+
 ## 文档定位
 
 本文记录两类已经确认的信息：
@@ -7,7 +9,7 @@
 1. 课题目标、现实条件、系统边界和阶段路线；
 2. 对 Ragent 1.1.0 源码的只读架构分析，以及它与目标需求的映射。
 
-本文是课题背景和源码分析参考，不是完整系统设计，也不是实现承诺。新会话应先从[项目文档入口](iron-ore-rag/README.md)确认当前阶段，再按需阅读本文。凡是机器人接口、真实设备能力、文档规模或业务规则尚未确认的地方，均按“不确定”处理，不能从本文推导出已经具备相关能力。
+本文是课题背景和源码分析参考，不是完整系统设计，也不是实现承诺。新会话应先从[项目文档入口](../README.md)确认当前阶段，再按需阅读本文。凡是机器人接口、真实设备能力、文档规模或业务规则尚未确认的地方，均按“不确定”处理，不能从本文推导出已经具备相关能力。
 
 分析基线如下：
 
@@ -332,7 +334,7 @@ URL 来源支持定时检查，按 ETag → Last-Modified → SHA-256 判断是�
 - 闭环追踪文档摄取与问答链路；
 - 核对数据库、缓存、消息队列、来源、状态、元数据和治理缺口；
 - 区分可复用、需改造、需新增和远期外部集成。
-- 建立项目专属本地中间件栈，并用小型 Markdown fixture 验证上传、异步摄取、检索问答和来源返回；简要复现步骤见[阶段 0 文档](iron-ore-rag/stages/00-reproduction.md)，详细证据见 [`iron-ore-rag-implementation-log.md`](iron-ore-rag-implementation-log.md)。
+- 建立项目专属本地中间件栈，并用小型 Markdown fixture 验证上传、异步摄取、检索问答和来源返回；简要复现步骤见[阶段 0 文档](../stages/00-reproduction.md)，详细证据见[阶段 0 实施记录](2026-08-12-stage-0-implementation-log.md)。
 
 ### 阶段 1：最小样本与改造分析
 
@@ -412,34 +414,34 @@ URL 来源支持定时检查，按 ETag → Last-Modified → SHA-256 判断是�
 
 ### 构建、启动与配置
 
-- [`../pom.xml`](../pom.xml)
-- [`../bootstrap/src/main/java/com/nageoffer/ai/ragent/RagentApplication.java`](../bootstrap/src/main/java/com/nageoffer/ai/ragent/RagentApplication.java)
-- [`../bootstrap/src/main/resources/application.yaml`](../bootstrap/src/main/resources/application.yaml)
-- [`../frontend/package.json`](../frontend/package.json)
+- [`pom.xml`](../../../pom.xml)
+- [`RagentApplication.java`](../../../bootstrap/src/main/java/com/nageoffer/ai/ragent/RagentApplication.java)
+- [`application.yaml`](../../../bootstrap/src/main/resources/application.yaml)
+- [`frontend/package.json`](../../../frontend/package.json)
 
 ### 文档摄取
 
-- [`../bootstrap/src/main/java/com/nageoffer/ai/ragent/knowledge/controller/KnowledgeDocumentController.java`](../bootstrap/src/main/java/com/nageoffer/ai/ragent/knowledge/controller/KnowledgeDocumentController.java)
-- [`../bootstrap/src/main/java/com/nageoffer/ai/ragent/knowledge/service/impl/KnowledgeDocumentServiceImpl.java`](../bootstrap/src/main/java/com/nageoffer/ai/ragent/knowledge/service/impl/KnowledgeDocumentServiceImpl.java)
-- [`../bootstrap/src/main/java/com/nageoffer/ai/ragent/knowledge/mq/KnowledgeDocumentChunkConsumer.java`](../bootstrap/src/main/java/com/nageoffer/ai/ragent/knowledge/mq/KnowledgeDocumentChunkConsumer.java)
-- [`../bootstrap/src/main/java/com/nageoffer/ai/ragent/core/ingest/DefaultIngestionKernel.java`](../bootstrap/src/main/java/com/nageoffer/ai/ragent/core/ingest/DefaultIngestionKernel.java)
-- [`../bootstrap/src/main/java/com/nageoffer/ai/ragent/core/parser/registry/ParserRegistry.java`](../bootstrap/src/main/java/com/nageoffer/ai/ragent/core/parser/registry/ParserRegistry.java)
-- [`../bootstrap/src/main/java/com/nageoffer/ai/ragent/core/chunk/ChunkingService.java`](../bootstrap/src/main/java/com/nageoffer/ai/ragent/core/chunk/ChunkingService.java)
-- [`../bootstrap/src/main/java/com/nageoffer/ai/ragent/core/ingest/embed/ChunkEmbeddingService.java`](../bootstrap/src/main/java/com/nageoffer/ai/ragent/core/ingest/embed/ChunkEmbeddingService.java)
-- [`../bootstrap/src/main/java/com/nageoffer/ai/ragent/core/ingest/sink/ChunkIndexWriter.java`](../bootstrap/src/main/java/com/nageoffer/ai/ragent/core/ingest/sink/ChunkIndexWriter.java)
+- [`KnowledgeDocumentController.java`](../../../bootstrap/src/main/java/com/nageoffer/ai/ragent/knowledge/controller/KnowledgeDocumentController.java)
+- [`KnowledgeDocumentServiceImpl.java`](../../../bootstrap/src/main/java/com/nageoffer/ai/ragent/knowledge/service/impl/KnowledgeDocumentServiceImpl.java)
+- [`KnowledgeDocumentChunkConsumer.java`](../../../bootstrap/src/main/java/com/nageoffer/ai/ragent/knowledge/mq/KnowledgeDocumentChunkConsumer.java)
+- [`DefaultIngestionKernel.java`](../../../bootstrap/src/main/java/com/nageoffer/ai/ragent/core/ingest/DefaultIngestionKernel.java)
+- [`ParserRegistry.java`](../../../bootstrap/src/main/java/com/nageoffer/ai/ragent/core/parser/registry/ParserRegistry.java)
+- [`ChunkingService.java`](../../../bootstrap/src/main/java/com/nageoffer/ai/ragent/core/chunk/ChunkingService.java)
+- [`ChunkEmbeddingService.java`](../../../bootstrap/src/main/java/com/nageoffer/ai/ragent/core/ingest/embed/ChunkEmbeddingService.java)
+- [`ChunkIndexWriter.java`](../../../bootstrap/src/main/java/com/nageoffer/ai/ragent/core/ingest/sink/ChunkIndexWriter.java)
 
 ### 检索、生成与引用
 
-- [`../bootstrap/src/main/java/com/nageoffer/ai/ragent/rag/controller/RAGChatController.java`](../bootstrap/src/main/java/com/nageoffer/ai/ragent/rag/controller/RAGChatController.java)
-- [`../bootstrap/src/main/java/com/nageoffer/ai/ragent/rag/service/pipeline/StreamChatPipeline.java`](../bootstrap/src/main/java/com/nageoffer/ai/ragent/rag/service/pipeline/StreamChatPipeline.java)
-- [`../bootstrap/src/main/java/com/nageoffer/ai/ragent/rag/core/retrieval/RetrievalEngine.java`](../bootstrap/src/main/java/com/nageoffer/ai/ragent/rag/core/retrieval/RetrievalEngine.java)
-- [`../bootstrap/src/main/java/com/nageoffer/ai/ragent/rag/core/retrieval/MultiChannelRetrievalEngine.java`](../bootstrap/src/main/java/com/nageoffer/ai/ragent/rag/core/retrieval/MultiChannelRetrievalEngine.java)
-- [`../bootstrap/src/main/java/com/nageoffer/ai/ragent/rag/core/source/SourcesAssembler.java`](../bootstrap/src/main/java/com/nageoffer/ai/ragent/rag/core/source/SourcesAssembler.java)
-- [`../framework/src/main/java/com/nageoffer/ai/ragent/framework/convention/SourceRef.java`](../framework/src/main/java/com/nageoffer/ai/ragent/framework/convention/SourceRef.java)
+- [`RAGChatController.java`](../../../bootstrap/src/main/java/com/nageoffer/ai/ragent/rag/controller/RAGChatController.java)
+- [`StreamChatPipeline.java`](../../../bootstrap/src/main/java/com/nageoffer/ai/ragent/rag/service/pipeline/StreamChatPipeline.java)
+- [`RetrievalEngine.java`](../../../bootstrap/src/main/java/com/nageoffer/ai/ragent/rag/core/retrieval/RetrievalEngine.java)
+- [`MultiChannelRetrievalEngine.java`](../../../bootstrap/src/main/java/com/nageoffer/ai/ragent/rag/core/retrieval/MultiChannelRetrievalEngine.java)
+- [`SourcesAssembler.java`](../../../bootstrap/src/main/java/com/nageoffer/ai/ragent/rag/core/source/SourcesAssembler.java)
+- [`SourceRef.java`](../../../framework/src/main/java/com/nageoffer/ai/ragent/framework/convention/SourceRef.java)
 
 ### 状态、版本与治理核对
 
-- [`../bootstrap/src/main/java/com/nageoffer/ai/ragent/knowledge/dao/entity/KnowledgeDocumentDO.java`](../bootstrap/src/main/java/com/nageoffer/ai/ragent/knowledge/dao/entity/KnowledgeDocumentDO.java)
-- [`../bootstrap/src/main/java/com/nageoffer/ai/ragent/knowledge/schedule/ScheduleRefreshProcessor.java`](../bootstrap/src/main/java/com/nageoffer/ai/ragent/knowledge/schedule/ScheduleRefreshProcessor.java)
-- [`../bootstrap/src/main/java/com/nageoffer/ai/ragent/audit/dao/entity/BizChangeLogDO.java`](../bootstrap/src/main/java/com/nageoffer/ai/ragent/audit/dao/entity/BizChangeLogDO.java)
-- [`../resources/database/schema_pg.sql`](../resources/database/schema_pg.sql)
+- [`KnowledgeDocumentDO.java`](../../../bootstrap/src/main/java/com/nageoffer/ai/ragent/knowledge/dao/entity/KnowledgeDocumentDO.java)
+- [`ScheduleRefreshProcessor.java`](../../../bootstrap/src/main/java/com/nageoffer/ai/ragent/knowledge/schedule/ScheduleRefreshProcessor.java)
+- [`BizChangeLogDO.java`](../../../bootstrap/src/main/java/com/nageoffer/ai/ragent/audit/dao/entity/BizChangeLogDO.java)
+- [`schema_pg.sql`](../../../resources/database/schema_pg.sql)

@@ -6,16 +6,19 @@
 
 | 日期 | 阶段 | 改动 | Git 检查点 | 详情 |
 | --- | --- | --- | --- | --- |
-| 2026-08-12 | 0 | 固定 Ragent 1.1.0 项目上下文并隔离本地调研材料 | `eddeec0`、`7da3042` | [阶段 0 归档记录](../../iron-ore-rag-implementation-log.md) |
-| 2026-08-12 | 0 | 建立项目专属 PostgreSQL、Redis、RustFS、RocketMQ 开发栈并完成基线验证 | `4962aad`、`b3a6085`、`bcfba62` | [阶段 0 归档记录](../../iron-ore-rag-implementation-log.md) |
+| 2026-08-12 | 0 | 固定 Ragent 1.1.0 项目上下文并隔离本地调研材料 | `eddeec0`、`7da3042` | [阶段 0 归档记录](../archive/2026-08-12-stage-0-implementation-log.md) |
+| 2026-08-12 | 0 | 建立项目专属 PostgreSQL、Redis、RustFS、RocketMQ 开发栈并完成基线验证 | `4962aad`、`b3a6085`、`bcfba62` | [阶段 0 归档记录](../archive/2026-08-12-stage-0-implementation-log.md) |
 | 2026-08-12 | 0 / 工程修复 | 用户取消生成后，trace run 可能永久停留在 `RUNNING` | `24bd7f8`、`e0d0871`，合并点 `c7e8da8` | [取消后 trace run 悬挂修复](2026-08-12-cancel-trace-run-hang.md) |
+| 2026-08-12 | 1 | 建立脱敏 XLSX/Markdown 固定样本和 8 题 A/B，验证表格结构化摄取与精确来源 | `a016f01` | [阶段 1：表格样本评测](../stages/01-table-sample-evaluation.md) |
 | 2026-08-12 | 2 | XLSX 精确来源、严格检索、候选任务、模拟执行与确定性版本差异 Demo | `a016f01` | [工业知识闭环 Demo](2026-08-12-industrial-knowledge-demo.md) |
 | 2026-08-12 | 3 | 已批准候选任务确定性编译并通过 ROS1 Action 派发、反馈与取消 dry-run 搬运任务 | `a016f01` | [ROS1 机器人任务 Demo](2026-08-12-ros1-robot-mission-demo.md) |
 | 2026-08-13 | 评测 | 3 类文档、24 题的冻结基线/当前版评测、OCR/意图诊断、盲评与数据库快照工具 | `318e1f3` | [小型系统评测工具](2026-08-13-system-evaluation-harness.md) |
-| 2026-08-13 | 评测后优化 | 修复 XLSX 合并单元格膨胀、重复续行、双文本预算失真和跨工作表回并 | `ed2590e` | [XLSX 结构感知分块与去重](2026-08-13-xlsx-structure-aware-chunking.md) |
-| 2026-08-13 | 评测后优化 | 恢复请求级 TopK 契约，执行 `should_split`，并让文档名与结构化文本进入 rerank | `fd538a8` | [请求级检索预算与结构化重排](2026-08-13-request-level-retrieval-purity.md) |
+| 2026-08-13 | 评测后优化 | 修复 XLSX 合并单元格膨胀、重复续行、双文本预算失真和跨工作表回并 | 代码 `ed2590e`；D1 证据 `03a89db` | [XLSX 结构感知分块与去重](2026-08-13-xlsx-structure-aware-chunking.md) |
+| 2026-08-13 | 评测后优化 | 恢复请求级 TopK 契约，执行 `should_split`，并让文档名与结构化文本进入 rerank | 代码 `fd538a8`；D0/D1 证据 `03a89db` | [请求级检索预算与结构化重排](2026-08-13-request-level-retrieval-purity.md) |
 
 通用教程意图节点仍只是复现参考；铁矿 Demo 使用单独的幂等脚本 [`resources/database/examples/iron_ore_demo_intents.sql`](../../../resources/database/examples/iron_ore_demo_intents.sql)。
+
+本阶段已经收尾：根 README 只展示项目与精选结果，本索引只列改动，`stages/` 保存复现/验收步骤，历史基线分析统一放入 `archive/`。详细实验数据不再复制到多个入口页。
 
 ## 后续如何记录
 

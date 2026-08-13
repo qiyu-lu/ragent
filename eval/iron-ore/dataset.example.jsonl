@@ -1,0 +1,1 @@
+{"id":"example-direct-01","tier":"direct","family":"xlsx","question":"示例问题，不包含真实评测内容","answerable":true,"reference_docs":["示例文档"],"reference_anchors":["示例锚点"],"source":"示例定位","expected_facts":["示例事实"],"forbidden_claims":["示例禁止结论"],"expected_kbs":["iron"],"expected_intent_ids":["eval-iron-ore"],"intent_scored":true,"routing_scored":true}

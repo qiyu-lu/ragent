@@ -11,6 +11,7 @@
 | 2026-08-12 | 0 / 工程修复 | 用户取消生成后，trace run 可能永久停留在 `RUNNING` | `24bd7f8`、`e0d0871`，合并点 `c7e8da8` | [取消后 trace run 悬挂修复](2026-08-12-cancel-trace-run-hang.md) |
 | 2026-08-12 | 2 | XLSX 精确来源、严格检索、候选任务、模拟执行与确定性版本差异 Demo | `a016f01` | [工业知识闭环 Demo](2026-08-12-industrial-knowledge-demo.md) |
 | 2026-08-12 | 3 | 已批准候选任务确定性编译并通过 ROS1 Action 派发、反馈与取消 dry-run 搬运任务 | `a016f01` | [ROS1 机器人任务 Demo](2026-08-12-ros1-robot-mission-demo.md) |
+| 2026-08-13 | 评测 | 3 类文档、24 题的冻结基线/当前版评测、OCR/意图诊断、盲评与数据库快照工具 | 本次评测检查点 | [小型系统评测工具](2026-08-13-system-evaluation-harness.md) |
 
 通用教程意图节点仍只是复现参考；铁矿 Demo 使用单独的幂等脚本 [`resources/database/examples/iron_ore_demo_intents.sql`](../../../resources/database/examples/iron_ore_demo_intents.sql)。
 

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Iron-ore RAG evaluation row",
+  "type": "object",
+  "required": [
+    "id",
+    "tier",
+    "family",
+    "question",
+    "answerable",
+    "reference_docs",
+    "reference_anchors",
+    "source",
+    "expected_facts",
+    "forbidden_claims",
+    "expected_kbs",
+    "expected_intent_ids",
+    "intent_scored",
+    "routing_scored"
+  ],
+  "properties": {
+    "id": {"type": "string"},
+    "tier": {"enum": ["direct", "hard", "scope_trap", "unanswerable"]},
+    "family": {"enum": ["xlsx", "native_pdf", "scan_pdf", "cross_domain", "negative"]},
+    "question": {"type": "string", "minLength": 1},
+    "answerable": {"type": "boolean"},
+    "reference_docs": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "reference_anchors": {"type": "array", "items": {"type": "string"}},
+    "source": {"type": "string"},
+    "expected_facts": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+    "forbidden_claims": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+    "expected_kbs": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "expected_intent_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "intent_scored": {"type": "boolean"},
+    "routing_scored": {"type": "boolean"}
+  },
+  "additionalProperties": false
+}

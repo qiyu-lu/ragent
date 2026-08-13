@@ -27,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ChunkPackerProvenanceTest {
 
@@ -50,5 +51,54 @@ class ChunkPackerProvenanceTest {
 
         assertEquals(1, packed.size());
         assertEquals("B17:F17", packed.get(0).metadata().provenance().cellRange());
+    }
+
+    @Test
+    void blockPiecesMustNotBeMergedBackWithinTolerance() {
+        ChunkMetadata metadata = ChunkMetadata.builder()
+                .outlinePath(List.of("流程表"))
+                .provenance(Provenance.ofExcelCell("demo.xlsx", "流程表"))
+                .blockType("table")
+                .build();
+        ChunkDraft heading = ChunkDraft.ofHeading("# 流程表", "流程表", metadata);
+        List<ChunkDraft> pieces = ChunkDraft.pieces(List.of(
+                ChunkDraft.of("甲".repeat(600), metadata),
+                ChunkDraft.of("乙".repeat(600), metadata)));
+
+        List<ChunkDraft> packed = new ChunkPacker().pack(
+                List.of(heading, pieces.get(0), pieces.get(1)), ChunkBudget.defaults());
+
+        assertEquals(2, packed.size());
+        assertTrue(packed.stream().allMatch(draft -> draft.content().length() <= 1024));
+    }
+
+    @Test
+    void topLevelOutlinesMustRemainSeparateEvenWhenBothAreSmall() {
+        ChunkDraft firstHeading = heading("甲表");
+        ChunkDraft firstRow = row("甲表", "甲记录");
+        ChunkDraft secondHeading = heading("乙表");
+        ChunkDraft secondRow = row("乙表", "乙记录");
+
+        List<ChunkDraft> packed = new ChunkPacker().pack(
+                List.of(firstHeading, firstRow, secondHeading, secondRow), ChunkBudget.defaults());
+
+        assertEquals(2, packed.size());
+        assertEquals(List.of("甲表"), packed.get(0).metadata().outlinePath());
+        assertEquals(List.of("乙表"), packed.get(1).metadata().outlinePath());
+    }
+
+    private static ChunkDraft heading(String sheet) {
+        return ChunkDraft.ofHeading("# " + sheet, sheet, ChunkMetadata.builder()
+                .outlinePath(List.of(sheet))
+                .provenance(Provenance.ofExcelCell("demo.xlsx", sheet))
+                .build());
+    }
+
+    private static ChunkDraft row(String sheet, String text) {
+        return ChunkDraft.of(text, ChunkMetadata.builder()
+                .outlinePath(List.of(sheet))
+                .provenance(Provenance.ofExcelCell("demo.xlsx", sheet, "B2:C2"))
+                .blockType("table")
+                .build());
     }
 }

@@ -67,8 +67,15 @@ public class ChunkPacker {
         List<ChunkDraft> buffer = new ArrayList<>();
 
         for (List<ChunkDraft> section : splitSections(drafts)) {
+            // H1 / sheet 是来源作用域边界。小节尾巴可以在同一顶级章节内合并，但不能为了凑最小体量把
+            // 两个 sheet 混进同一块，否则精确来源与检索作用域都会失真。
+            if (!buffer.isEmpty() && !sameTopLevel(buffer, section)) {
+                flush(buffer, result, budget, minChars);
+                buffer = new ArrayList<>();
+            }
             int sectionLen = totalLength(section);
-            if (sectionLen > budget.toleranceChars()) {
+            // piece 是 BlockChunker 已经作出的结构切分决定，即使整节尚未撑破容忍上限也不得合回去。
+            if (sectionLen > budget.toleranceChars() || section.stream().anyMatch(ChunkDraft::piece)) {
                 buffer = packWithin(buffer, section, budget, minChars, result);
                 continue;
             }
@@ -170,7 +177,7 @@ public class ChunkPacker {
             taken = next;
             from--;
         }
-        if (from == buffer.size() || contentLength(target) + taken > budget.toleranceChars()) {
+        if (from == buffer.size() || contentLength(target) + taken > budget.maxChars()) {
             return List.of();
         }
         List<ChunkDraft> leadIn = new ArrayList<>(buffer.subList(from, buffer.size()));
@@ -192,7 +199,8 @@ public class ChunkPacker {
         ChunkDraft packed = buffer.size() == 1 ? buffer.get(0) : merge(buffer);
         if (!result.isEmpty() && contentLength(packed) < minChars) {
             ChunkDraft previous = result.get(result.size() - 1);
-            if (contentLength(previous) + SEPARATOR.length() + contentLength(packed) <= budget.toleranceChars()) {
+            if (sameTopLevel(previous, packed)
+                    && contentLength(previous) + SEPARATOR.length() + contentLength(packed) <= budget.maxChars()) {
                 result.set(result.size() - 1, merge(List.of(previous, packed)));
                 return;
             }
@@ -278,6 +286,22 @@ public class ChunkPacker {
             i++;
         }
         return i;
+    }
+
+    private static boolean sameTopLevel(List<ChunkDraft> left, List<ChunkDraft> right) {
+        if (left.isEmpty() || right.isEmpty()) {
+            return true;
+        }
+        return sameTopLevel(left.get(0), right.get(0));
+    }
+
+    private static boolean sameTopLevel(ChunkDraft left, ChunkDraft right) {
+        return Objects.equals(topLevel(left), topLevel(right));
+    }
+
+    private static String topLevel(ChunkDraft draft) {
+        List<String> path = draft.metadata().outlinePath();
+        return path.isEmpty() ? null : path.get(0);
     }
 
     private static void appendPart(StringBuilder sb, String part) {

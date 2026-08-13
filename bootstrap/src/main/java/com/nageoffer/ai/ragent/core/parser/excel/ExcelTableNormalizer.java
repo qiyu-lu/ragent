@@ -32,7 +32,8 @@ import java.util.List;
  * <p>
  * 把一个 POI Sheet 转为单个干净的 (headers, rows) 二维结构，只处理「规整单表」的通用清洗：
  * <ul>
- *   <li>合并单元格展开：合并区域的左上角值复制到该区域每个 cell（行级 chunk 自包含友好）</li>
+ *   <li>合并单元格展开：表头区域横向展开以保留层级，数据区域只按行携带一次值，避免同值跨列膨胀</li>
+ *   <li>合并续行折叠：仅折叠原始为空、由纵向合并展开形成的连续同值行</li>
  *   <li>多行表头展平：前 N 行合并成单行表头，列名用分隔符拼接（如 "财务|收入"）</li>
  *   <li>超链接保留：cell 文字外包 {@code [text](url)}</li>
  *   <li>公式回退：通过 {@link ExcelValueFormatter}</li>
@@ -107,8 +108,13 @@ public final class ExcelTableNormalizer {
         // 步骤 1: 读取 sheet 到二维 grid（已应用 hyperlink wrap 与公式回退）
         String[][] grid = readGrid(sheet, lastRowNum, maxCol, formatter, evaluator);
 
-        // 步骤 2: 展开合并单元格（grid 上原地填充）
-        expandMergedRegions(grid, sheet.getMergedRegions(), lastRowNum, maxCol);
+        // 后续折叠只允许作用于原始空行；先于合并展开记录，避免误删用户主动录入的重复记录
+        boolean[] rowsWithSourceValues = rowsWithValues(grid);
+
+        int effectiveHeaderRows = Math.min(headerRows, lastRowNum + 1);
+
+        // 步骤 2: 结构感知展开合并单元格（grid 上原地填充）
+        expandMergedRegions(grid, sheet.getMergedRegions(), lastRowNum, maxCol, effectiveHeaderRows);
 
         // 步骤 3: 丢弃全空列（表头与数据全程为空的列，含中间与尾部）
         int[] cols = selectNonEmptyColumns(grid, 0, lastRowNum, maxCol);
@@ -117,15 +123,16 @@ public final class ExcelTableNormalizer {
         }
 
         // 步骤 4: 前 headerRows 行展平为表头，其余收集为数据行
-        int effectiveHeaderRows = Math.min(headerRows, lastRowNum + 1);
         List<String> headers = flattenHeaders(grid, 0, effectiveHeaderRows, cols);
         List<NormalizedRow> normalizedRows = effectiveHeaderRows <= lastRowNum
-                ? collectDataRows(grid, effectiveHeaderRows, lastRowNum, cols)
+                ? collectDataRows(grid, effectiveHeaderRows, lastRowNum, cols, rowsWithSourceValues)
                 : List.of();
         return new NormalizedTable(
                 headers,
                 normalizedRows.stream().map(NormalizedRow::values).toList(),
-                normalizedRows.stream().map(NormalizedRow::cellRange).toList());
+                normalizedRows.stream()
+                        .map(row -> row.cellRange(cols[0], cols[cols.length - 1]))
+                        .toList());
     }
 
     /**
@@ -205,11 +212,16 @@ public final class ExcelTableNormalizer {
     }
 
     /**
-     * 把合并区域的左上角值复制到区域内所有 cell 位置
+     * 结构感知地展开合并区域。
+     * <p>
+     * 表头合并需要横向复制，下一行的子表头才能分别得到同一个父级；数据行则只把值放在合并区域的
+     * 第一列，并在纵向范围内逐行携带。数据区横向复制会让一个长说明在每一列重复一次，既虚增块长度，
+     * 也让向量文本被同一句话支配。
      */
     private static void expandMergedRegions(String[][] grid,
                                             List<CellRangeAddress> mergedRegions,
-                                            int lastRowNum, int maxCol) {
+                                            int lastRowNum, int maxCol,
+                                            int effectiveHeaderRows) {
         if (mergedRegions == null || mergedRegions.isEmpty()) {
             return;
         }
@@ -226,11 +238,28 @@ public final class ExcelTableNormalizer {
             int rEnd = Math.min(region.getLastRow(), lastRowNum);
             int cEnd = Math.min(region.getLastColumn(), maxCol - 1);
             for (int r = firstRow; r <= rEnd; r++) {
-                for (int c = firstCol; c <= cEnd; c++) {
-                    grid[r][c] = value;
+                if (r < effectiveHeaderRows) {
+                    for (int c = firstCol; c <= cEnd; c++) {
+                        grid[r][c] = value;
+                    }
+                } else {
+                    grid[r][firstCol] = value;
                 }
             }
         }
+    }
+
+    private static boolean[] rowsWithValues(String[][] grid) {
+        boolean[] result = new boolean[grid.length];
+        for (int r = 0; r < grid.length; r++) {
+            for (String value : grid[r]) {
+                if (value != null && !value.isEmpty()) {
+                    result[r] = true;
+                    break;
+                }
+            }
+        }
+        return result;
     }
 
     /**
@@ -261,10 +290,14 @@ public final class ExcelTableNormalizer {
     }
 
     /**
-     * 收集数据行（跳过全空）
+     * 收集数据行（跳过全空），并折叠由纵向合并区域制造的连续重复续行。
+     * <p>
+     * 用户主动录入的相同行保留；只有源工作表中整行没有值、合并展开后又与上一行完全一致时才折叠，
+     * 同时把来源范围扩展到完整纵向区域。
      */
     private static List<NormalizedRow> collectDataRows(String[][] grid, int startRow,
-                                                       int endRow, int[] cols) {
+                                                       int endRow, int[] cols,
+                                                       boolean[] rowsWithSourceValues) {
         List<NormalizedRow> rows = new ArrayList<>();
         int firstCol = cols[0];
         int lastCol = cols[cols.length - 1];
@@ -279,13 +312,22 @@ public final class ExcelTableNormalizer {
                 rowValues.add(v == null ? "" : v);
             }
             if (!allEmpty) {
-                String range = new CellRangeAddress(r, r, firstCol, lastCol).formatAsString();
-                rows.add(new NormalizedRow(rowValues, range));
+                if (!rowsWithSourceValues[r] && !rows.isEmpty()
+                        && rows.get(rows.size() - 1).values().equals(rowValues)) {
+                    NormalizedRow previous = rows.get(rows.size() - 1);
+                    rows.set(rows.size() - 1, new NormalizedRow(previous.values(), previous.firstRow(), r));
+                } else {
+                    rows.add(new NormalizedRow(rowValues, r, r));
+                }
             }
         }
         return rows;
     }
 
-    private record NormalizedRow(List<String> values, String cellRange) {
+    private record NormalizedRow(List<String> values, int firstRow, int lastRow) {
+
+        private String cellRange(int firstCol, int lastCol) {
+            return new CellRangeAddress(firstRow, lastRow, firstCol, lastCol).formatAsString();
+        }
     }
 }

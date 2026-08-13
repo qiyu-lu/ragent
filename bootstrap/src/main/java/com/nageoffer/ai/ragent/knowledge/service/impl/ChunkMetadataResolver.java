@@ -59,7 +59,8 @@ public class ChunkMetadataResolver {
                             String documentVersion,
                             String sheetName,
                             String cellRange,
-                            String blockType) {
+                            String blockType,
+                            String embeddingText) {
     }
 
     /**
@@ -105,7 +106,8 @@ public class ChunkMetadataResolver {
                     doc != null ? doc.getDocumentVersion() : null,
                     stringValue(metadata.get("sheet_name")),
                     stringValue(metadata.get("cell_range")),
-                    stringValue(metadata.get("block_type"))));
+                    stringValue(metadata.get("block_type")),
+                    chunk.getEmbeddingText()));
         }
         return result;
     }

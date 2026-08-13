@@ -30,11 +30,14 @@ import com.nageoffer.ai.ragent.rag.core.prompt.PromptTemplateLoader;
 import com.nageoffer.ai.ragent.rag.dto.RetrievalContext;
 import com.nageoffer.ai.ragent.rag.dto.SubQuestionIntent;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.core.io.DefaultResourceLoader;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.nageoffer.ai.ragent.rag.constant.RAGConstant.MULTI_CHANNEL_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -44,6 +47,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -165,6 +169,38 @@ class RetrievalEngineTest {
         ));
 
         assertEquals(Set.of("A"), result.getEligibleIntentIds());
+    }
+
+    @Test
+    void multiQuestionSharesOneRequestLevelContextBudget() {
+        MultiChannelRetrievalEngine multiChannel = mock(MultiChannelRetrievalEngine.class);
+        ContextFormatter contextFormatter = mock(ContextFormatter.class);
+        AtomicInteger callIndex = new AtomicInteger();
+        when(multiChannel.retrieveKnowledgeChannels(
+                any(SubQuestionIntent.class), any(RetrievalBudget.class)))
+                .thenAnswer(invocation -> {
+                    RetrievalBudget budget = invocation.getArgument(1);
+                    int prefix = callIndex.getAndIncrement();
+                    List<RetrievedChunk> chunks = new ArrayList<>(budget.contextTopK());
+                    for (int i = 0; i < budget.contextTopK(); i++) {
+                        chunks.add(chunk(prefix + "-" + i, "资料" + prefix + "-" + i));
+                    }
+                    return new KnowledgeRetrievalResult(chunks, Map.of(), Set.of());
+                });
+
+        RetrievalContext result = engine(multiChannel, contextFormatter).retrieve(List.of(
+                new SubQuestionIntent("问题一", List.of()),
+                new SubQuestionIntent("问题二", List.of()),
+                new SubQuestionIntent("问题三", List.of())
+        ));
+
+        ArgumentCaptor<RetrievalBudget> budgets = ArgumentCaptor.forClass(RetrievalBudget.class);
+        verify(multiChannel, times(3)).retrieveKnowledgeChannels(
+                any(SubQuestionIntent.class), budgets.capture());
+        assertEquals(List.of(4, 3, 3),
+                budgets.getAllValues().stream().map(RetrievalBudget::contextTopK).toList());
+        assertEquals(10, result.getIntentChunks().get(MULTI_CHANNEL_KEY).size(),
+                "拆成三个子问题后，最终证据总数仍不得超过请求级 TopK");
     }
 
     private Set<String> eligibleAfterTwoQuestions(KnowledgeRetrievalResult first,

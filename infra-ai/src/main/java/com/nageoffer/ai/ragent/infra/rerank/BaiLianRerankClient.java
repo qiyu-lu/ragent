@@ -95,7 +95,8 @@ public class BaiLianRerankClient implements RerankClient {
 
         JsonArray documentsArray = new JsonArray();
         for (RetrievedChunk each : candidates) {
-            documentsArray.add(each.getText() == null ? "" : each.getText());
+            String rankingText = each.textForRanking();
+            documentsArray.add(rankingText == null ? "" : rankingText);
         }
         input.add("documents", documentsArray);
 

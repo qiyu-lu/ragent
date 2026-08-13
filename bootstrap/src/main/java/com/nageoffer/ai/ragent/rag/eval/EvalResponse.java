@@ -51,6 +51,26 @@ public class EvalResponse {
     private List<String> retrievedContextDocIds;
 
     /**
+     * 与 retrievedContexts 一一对应的知识库 collection，供定位跨库混入。
+     */
+    private List<String> retrievedContextCollections;
+
+    /**
+     * 与 retrievedContexts 一一对应的最终相关性分数，供观察 Rerank 分布；无分通道保留 null。
+     */
+    private List<Float> retrievedContextScores;
+
+    /**
+     * 与 retrievedContexts 一一对应的 Excel sheet；非 Excel 或缺元数据时为 null。
+     */
+    private List<String> retrievedContextSheets;
+
+    /**
+     * 与 retrievedContexts 一一对应的 Excel 单元格范围；非 Excel 或缺元数据时为 null。
+     */
+    private List<String> retrievedContextCellRanges;
+
+    /**
      * MCP 工具调用结果（无 MCP 分支时为空字符串）
      */
     private String mcpContext;

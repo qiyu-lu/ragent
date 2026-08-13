@@ -62,6 +62,14 @@ public class RetrievedChunk {
     private String text;
 
     /**
+     * 仅供检索精排使用的结构化文本。
+     * <p>
+     * 可包含文档名、章节路径和表格键值等检索信号；最终上下文、引用和前端预览仍只使用 {@link #text}，
+     * 避免为了帮助 Rerank 而把合成前缀泄漏到用户可见正文。
+     */
+    private String rankingText;
+
+    /**
      * 命中得分
      * 数值越大表示与查询的相关性越高
      */
@@ -110,4 +118,11 @@ public class RetrievedChunk {
      * 原始块类型，如 table / image。
      */
     private String blockType;
+
+    /**
+     * 精排输入文本：有结构化检索文本时优先使用，否则兼容旧索引与非知识库通道，回落展示正文。
+     */
+    public String textForRanking() {
+        return rankingText == null || rankingText.isBlank() ? text : rankingText;
+    }
 }

@@ -34,10 +34,11 @@ import java.util.Map;
 /**
  * 元数据富化后置处理器
  * <p>
- * 处于处理链末端（Rerank 之后），对最终 Top-K 结果按 chunkId 回表补齐文档归属信息
- * （文档ID、文档内序号、文档标题），供上下文组装时按文档聚合与标注来源
+ * 处于融合之后、Rerank 之前，对候选池按 chunkId 回表补齐文档归属和结构化检索文本。
+ * Rerank 使用「文档名 + embedding_text」判断相关性，最终上下文仍使用原始正文；这样 PDF 的标准名、
+ * Excel 的 sheet/键值信号能参与精排，又不会污染引用和前端预览。
  * <p>
- * 只富化、不重排：保持进入时的相关性顺序不变
+ * 只富化、不重排：保持进入时的融合顺序不变。候选池由 candidateLimit 限制，回表规模有上界。
  */
 @Slf4j
 @Component
@@ -54,7 +55,7 @@ public class MetadataEnrichmentPostProcessor implements SearchResultPostProcesso
 
     @Override
     public int getOrder() {
-        return 20;  // Rerank(10) 之后，链末执行
+        return 8;  // Fusion(5) 之后、Rerank(10) 之前
     }
 
     @Override
@@ -87,6 +88,7 @@ public class MetadataEnrichmentPostProcessor implements SearchResultPostProcesso
             chunk.setSheetName(meta.sheetName());
             chunk.setCellRange(meta.cellRange());
             chunk.setBlockType(meta.blockType());
+            chunk.setRankingText(composeRankingText(meta.docName(), meta.embeddingText(), chunk.getText()));
         }
 
         // 2）按 docId 补标题：图谱证据的 chunk.id 非向量库主键、上一步未命中，但已带归属 docId，
@@ -115,8 +117,31 @@ public class MetadataEnrichmentPostProcessor implements SearchResultPostProcesso
                 String docName = docNameById.get(chunk.getDocId());
                 if (StrUtil.isNotBlank(docName)) {
                     chunk.setDocName(docName);
+                    if (StrUtil.isBlank(chunk.getRankingText())) {
+                        chunk.setRankingText(composeRankingText(docName, null, chunk.getText()));
+                    }
                 }
             }
         }
+    }
+
+    private static String composeRankingText(String docName, String embeddingText, String displayText) {
+        String body = StrUtil.isNotBlank(embeddingText) ? embeddingText.trim() : StrUtil.trim(displayText);
+        String documentIdentity = stripExtension(StrUtil.trim(docName));
+        if (StrUtil.isBlank(documentIdentity)) {
+            return body;
+        }
+        if (StrUtil.isBlank(body)) {
+            return documentIdentity;
+        }
+        return body.contains(documentIdentity) ? body : documentIdentity + "\n" + body;
+    }
+
+    private static String stripExtension(String name) {
+        if (StrUtil.isBlank(name)) {
+            return name;
+        }
+        int dot = name.lastIndexOf('.');
+        return dot > 0 && dot < name.length() - 1 ? name.substring(0, dot) : name;
     }
 }

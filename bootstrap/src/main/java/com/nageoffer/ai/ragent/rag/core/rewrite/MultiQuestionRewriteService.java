@@ -155,7 +155,7 @@ public class MultiQuestionRewriteService implements QueryRewriteService {
     }
 
 
-    private RewriteResult parseRewriteAndSplit(String raw) {
+    RewriteResult parseRewriteAndSplit(String raw) {
         try {
             // 移除可能存在的 Markdown 代码块标记
             String cleaned = LLMResponseCleaner.stripMarkdownCodeFence(raw);
@@ -181,7 +181,14 @@ public class MultiQuestionRewriteService implements QueryRewriteService {
             if (StrUtil.isBlank(rewrite)) {
                 return null;
             }
-            if (CollUtil.isEmpty(subs)) {
+            // should_split 是提示词协议的一部分，旧实现却完全忽略它：模型即使明确判定不拆，数组里偶发的
+            // 多条内容仍会触发多次检索。这里以布尔判定为准并去重，避免重复问题瓜分
+            // 请求级上下文额度；旧模型若没返回该字段则按数组条数兼容推断。
+            boolean shouldSplit = obj.has("should_split") && obj.get("should_split").isJsonPrimitive()
+                    ? obj.get("should_split").getAsBoolean()
+                    : subs.size() > 1;
+            subs = shouldSplit ? normalizeSubQuestions(subs) : List.of(rewrite);
+            if (subs.isEmpty()) {
                 subs = List.of(rewrite);
             }
             return new RewriteResult(rewrite, subs);
@@ -201,8 +208,19 @@ public class MultiQuestionRewriteService implements QueryRewriteService {
         if (CollUtil.isEmpty(parts)) {
             return List.of(question);
         }
-        return parts.stream()
+        return normalizeSubQuestions(parts.stream()
                 .map(s -> s.endsWith("？") || s.endsWith("?") ? s : s + "？")
+                .toList());
+    }
+
+    private List<String> normalizeSubQuestions(List<String> questions) {
+        if (CollUtil.isEmpty(questions)) {
+            return List.of();
+        }
+        return questions.stream()
+                .map(String::trim)
+                .filter(StrUtil::isNotBlank)
+                .distinct()
                 .toList();
     }
 }

@@ -86,30 +86,35 @@ public class RetrievalEngine {
                     .build();
         }
 
-        // 一次算好检索预算：全 subquestion 共用。最终条数即配置的 default-top-k（启动已校验 >0），是 contextTopK 段唯一真源，
-        // 不再被 max(意图节点 topK) 抬高（node.topK 只覆盖向量定向路的召回深度，见 VectorSearchChannel.resolveDirectedBudget）
+        // 一次算好请求级检索预算。recall/candidate 是每个子问题的候选质量预算；contextTopK 是整次请求最终
+        // 进入 LLM 的总额度，必须在子问题之间分摊。旧实现给每个子问题各发一份 TopK，2~3 个子问题会把
+        // 配置的 10 条膨胀到 20~30 条，Context Precision 和 token 成本都随拆分次数恶化。
         int contextTopK = searchProperties.getDefaultTopK();
-        RetrievalBudget budget = new RetrievalBudget(
+        RetrievalBudget requestBudget = new RetrievalBudget(
                 searchProperties.resolveRecallBudget(contextTopK),
                 searchProperties.getFusion().getRerankCandidateLimit(),
                 contextTopK
         );
-        List<CompletableFuture<SubQuestionContext>> tasks = subIntents.stream()
-                .map(si -> CompletableFuture.supplyAsync(
+        List<RetrievalBudget> questionBudgets = allocateQuestionBudgets(requestBudget, subIntents.size());
+        List<CompletableFuture<SubQuestionContext>> tasks = new ArrayList<>(subIntents.size());
+        for (int i = 0; i < subIntents.size(); i++) {
+            SubQuestionIntent subIntent = subIntents.get(i);
+            RetrievalBudget questionBudget = questionBudgets.get(i);
+            tasks.add(CompletableFuture.supplyAsync(
                         () -> {
                             try {
-                                return buildSubQuestionContext(si, budget);
+                                return buildSubQuestionContext(subIntent, questionBudget);
                             } catch (Exception e) {
-                                log.error("子问题上下文构建失败，降级为空上下文，question：{}", si.subQuestion(), e);
+                                log.error("子问题上下文构建失败，降级为空上下文，question：{}", subIntent.subQuestion(), e);
                                 return new SubQuestionContext(
-                                        si.subQuestion(), "", "", Map.of(),
+                                        subIntent.subQuestion(), "", "", Map.of(),
                                         KnowledgeRetrievalResult.empty().eligibleIntentIds(
-                                                NodeScoreFilters.kb(si.nodeScores())));
+                                                NodeScoreFilters.kb(subIntent.nodeScores())));
                             }
                         },
                         ragContextExecutor
-                ))
-                .toList();
+                ));
+        }
         List<SubQuestionContext> contexts = tasks.stream()
                 .map(CompletableFuture::join)
                 .toList();
@@ -206,6 +211,10 @@ public class RetrievalEngine {
     }
 
     private KbResult retrieveAndRerank(SubQuestionIntent intent, List<NodeScore> kbIntents, RetrievalBudget budget) {
+        if (budget.contextTopK() <= 0) {
+            log.warn("子问题超出请求级上下文额度，跳过 KB 检索，question={}", intent.subQuestion());
+            return new KbResult("", Map.of(), Set.of());
+        }
         // 使用多通道检索引擎（是否启用全局检索由置信度阈值决定）
         KnowledgeRetrievalResult retrievalResult =
                 multiChannelRetrievalEngine.retrieveKnowledgeChannels(intent, budget);
@@ -221,6 +230,34 @@ public class RetrievalEngine {
         String groupedContext = contextFormatter.formatKbContext(
                 kbIntents, eligibleIntentIds, chunks, budget.contextTopK());
         return new KbResult(groupedContext, intentChunks, eligibleIntentIds);
+    }
+
+    /**
+     * 把请求级最终上下文额度近似均分给各子问题，余数按原顺序每题多分一条。
+     * <p>
+     * 候选召回和 Rerank 池不缩：每个子问题仍有完整候选竞争空间，只收窄最终输出。若极端情况下子问题数
+     * 超过 contextTopK，后面的子问题获得 0 条 KB 配额并显式告警，保证总额度这一产品契约不被突破。
+     */
+    private List<RetrievalBudget> allocateQuestionBudgets(RetrievalBudget requestBudget, int questionCount) {
+        if (questionCount <= 0) {
+            return List.of();
+        }
+        int base = requestBudget.contextTopK() / questionCount;
+        int remainder = requestBudget.contextTopK() % questionCount;
+        List<RetrievalBudget> budgets = new ArrayList<>(questionCount);
+        for (int i = 0; i < questionCount; i++) {
+            int questionTopK = base + (i < remainder ? 1 : 0);
+            budgets.add(new RetrievalBudget(
+                    requestBudget.recallBudget(),
+                    requestBudget.candidateLimit(),
+                    questionTopK));
+        }
+        if (questionCount > 1) {
+            log.info("多子问题共享请求级上下文额度 - 子问题数: {}, 总 TopK: {}, 分配: {}",
+                    questionCount, requestBudget.contextTopK(),
+                    budgets.stream().map(RetrievalBudget::contextTopK).toList());
+        }
+        return budgets;
     }
 
     /**

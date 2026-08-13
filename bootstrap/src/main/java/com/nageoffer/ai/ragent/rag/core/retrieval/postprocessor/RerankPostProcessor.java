@@ -35,7 +35,7 @@ import java.util.Set;
  * Rerank 后置处理器
  * <p>
  * 使用 Rerank 模型对结果进行重排序
- * 这是最后一个处理器，输出最终的 Top-K 结果
+ * 这是最后一个相关性重排处理器，输出 Top-K 后再由无模型的最终条数守卫兜底
  */
 @Slf4j
 @Component
@@ -52,7 +52,7 @@ public class RerankPostProcessor implements SearchResultPostProcessor {
 
     @Override
     public int getOrder() {
-        return 10;  // 最后执行
+        return 10;  // 元数据/精排文本富化之后、最终 TopK 守卫之前
     }
 
     @Override

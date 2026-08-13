@@ -8,7 +8,7 @@
 | 所属阶段 | 独立系统评测，不改变阶段 2/3 产品能力 |
 | 状态 | B0/B1/B2、C0/C1/C2/C-final 与 48 条回答人工盲评均已完成并归档 |
 | 分支 | `research/iron-ore-rag` |
-| Git 提交 | 本次评测检查点 |
+| Git 提交 | `318e1f3` |
 
 ## 问题与边界
 
@@ -92,7 +92,7 @@ C-final 24 个完整回答全部完成，数据库对应 24 个会话、48 条�
 
 原始结果位于 `local-data/eval/runs/B0`、`B1`、`B2`；干净 seed、B0 和 B2 均有不可覆盖的 manifest 与 PostgreSQL custom-format dump。最终已把 `ragent_eval_baseline` 恢复至 B0：2 库、3 文档、141 块/向量、0 意图、24 条成功 trace，Redis DB14 已清空且 9091 已停止。
 
-当前版原始结果位于 `local-data/eval/runs/C0`、`C1`、`C2`、`C-final`；人工得分与脱敏摘要位于 `local-data/eval/review/score-v1.json` 和 `evidence-summary-v1.md`。current seed、C0、C2、C-final 均有不可覆盖的 manifest 与 PostgreSQL custom-format dump。最终 `ragent_eval_current` 停留在 C-final：2 库、3 文档、141 块/向量、0 意图、24 条成功 trace，9092 已停止。
+当前版原始结果位于 `local-data/eval/runs/C0`、`C1`、`C2`、`C-final`；人工得分与脱敏摘要位于 `local-data/eval/review/score-v1.json` 和 `evidence-summary-v1.md`。current seed、C0、C2、C-final 均有不可覆盖的 manifest 与 PostgreSQL custom-format dump。冻结评测结束时 `ragent_eval_current` 停留在 C-final；后续优化另建 D0/D1 结果并将运行态数据库保存为 D1 快照，没有覆盖这里的 C-final 文件和 dump，详见[请求级检索预算与结构化重排](2026-08-13-request-level-retrieval-purity.md)。
 
 ## 数据与兼容性
 

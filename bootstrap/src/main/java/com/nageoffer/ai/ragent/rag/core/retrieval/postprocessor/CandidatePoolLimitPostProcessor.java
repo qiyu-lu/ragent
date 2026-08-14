@@ -25,22 +25,23 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 /**
- * 检索链末端的最终条数守卫。
+ * 融合后的候选池成本守卫。
  * <p>
- * Rerank 开启时通常已经返回 TopK；关闭或异常跳过时，融合池仍可能有 candidateLimit 条。本处理器让
- * {@code contextTopK} 始终是实际输出契约，而不是依赖某个可关闭处理器的副作用。
+ * 正常 RRF 路径已按 candidateLimit 截断；本处理器放在 Metadata/Rerank 之前，为关闭融合或融合失败的
+ * 路径提供同一成本上限，避免先完成回表和模型调用再截断。它不执行最终 {@code contextTopK}；请求最终
+ * 条数由上层统一决定。
  */
 @Component
-public class FinalTopKPostProcessor implements SearchResultPostProcessor {
+public class CandidatePoolLimitPostProcessor implements SearchResultPostProcessor {
 
     @Override
     public String getName() {
-        return "FinalTopK";
+        return "CandidatePoolLimit";
     }
 
     @Override
     public int getOrder() {
-        return 15;
+        return 6;
     }
 
     @Override
@@ -52,10 +53,10 @@ public class FinalTopKPostProcessor implements SearchResultPostProcessor {
     public List<RetrievedChunk> process(List<RetrievedChunk> chunks,
                                         List<SearchChannelResult> results,
                                         SearchContext context) {
-        int topK = context.getBudget().contextTopK();
-        if (topK <= 0) {
-            return List.of();
+        int limit = context.getBudget().candidateLimit();
+        if (limit <= 0 || chunks.size() <= limit) {
+            return chunks;
         }
-        return chunks.size() > topK ? List.copyOf(chunks.subList(0, topK)) : chunks;
+        return List.copyOf(chunks.subList(0, limit));
     }
 }

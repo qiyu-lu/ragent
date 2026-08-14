@@ -18,6 +18,7 @@
 package com.nageoffer.ai.ragent.rag.core.retrieval.postprocessor;
 
 import com.nageoffer.ai.ragent.framework.convention.RetrievedChunk;
+import com.nageoffer.ai.ragent.framework.convention.RetrievedChunkKey;
 import com.nageoffer.ai.ragent.infra.rerank.RerankService;
 import com.nageoffer.ai.ragent.rag.config.RAGConfigProperties;
 import com.nageoffer.ai.ragent.rag.core.retrieval.channel.SearchChannelResult;
@@ -27,6 +28,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -34,8 +37,10 @@ import java.util.Set;
 /**
  * Rerank 后置处理器
  * <p>
- * 使用 Rerank 模型对结果进行重排序
- * 这是最后一个相关性重排处理器，输出 Top-K 后再由无模型的最终条数守卫兜底
+ * 使用 Rerank 模型对候选结果进行重排序。
+ * <p>
+ * 模型返回的 Top-K 作为候选池头部，未进入头部的融合候选按原顺序追加为回填尾部。请求级最终 Top-K
+ * 由上层在多子问题全局去重后统一选择，避免各子问题提前截断后无法利用剩余额度。
  */
 @Slf4j
 @Component
@@ -52,7 +57,7 @@ public class RerankPostProcessor implements SearchResultPostProcessor {
 
     @Override
     public int getOrder() {
-        return 10;  // 元数据/精排文本富化之后、最终 TopK 守卫之前
+        return 10;  // 元数据/精排文本富化之后、候选池规模守卫之前
     }
 
     @Override
@@ -69,14 +74,40 @@ public class RerankPostProcessor implements SearchResultPostProcessor {
             return chunks;
         }
 
-        List<RetrievedChunk> reranked = rerankService.rerank(
+        List<RetrievedChunk> rerankedHead = rerankService.rerank(
                 context.getMainQuestion(),
                 chunks,
                 context.getBudget().contextTopK()
         );
+        List<RetrievedChunk> safeRerankedHead = rerankedHead == null ? List.of() : rerankedHead;
 
-        logAttribution(chunks, reranked, results);
-        return reranked;
+        List<RetrievedChunk> candidatePool = appendFusionTail(safeRerankedHead, chunks);
+        logAttribution(chunks, safeRerankedHead, results);
+        log.info("Rerank 候选池完成 - 模型头部: {}, 融合尾部回填后: {}",
+                safeRerankedHead.size(), candidatePool.size());
+        return candidatePool;
+    }
+
+    /**
+     * 先保留 Rerank 返回对象（含新的相关性分数），再按融合顺序追加未命中的候选。
+     * 身份规则与通道去重、融合保持一致；同一 key 以 Rerank 头部对象为准。
+     */
+    private List<RetrievedChunk> appendFusionTail(List<RetrievedChunk> rerankedHead,
+                                                  List<RetrievedChunk> fusionCandidates) {
+        Map<String, RetrievedChunk> ordered = new LinkedHashMap<>();
+        if (rerankedHead != null) {
+            for (RetrievedChunk chunk : rerankedHead) {
+                if (chunk != null) {
+                    ordered.putIfAbsent(RetrievedChunkKey.of(chunk), chunk);
+                }
+            }
+        }
+        for (RetrievedChunk chunk : fusionCandidates) {
+            if (chunk != null) {
+                ordered.putIfAbsent(RetrievedChunkKey.of(chunk), chunk);
+            }
+        }
+        return new ArrayList<>(ordered.values());
     }
 
     /**

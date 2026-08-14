@@ -17,6 +17,7 @@
 
 package com.nageoffer.ai.ragent.rag.service.pipeline;
 
+import com.nageoffer.ai.ragent.framework.convention.RetrievedChunk;
 import com.nageoffer.ai.ragent.infra.chat.LLMService;
 import com.nageoffer.ai.ragent.infra.chat.StreamCallback;
 import com.nageoffer.ai.ragent.rag.core.guidance.GuidanceDecision;
@@ -50,6 +51,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -90,9 +92,12 @@ class StreamChatPipelineTest {
         RewriteResult rewriteResult = new RewriteResult("改写问题", List.of("改写问题"));
         List<SubQuestionIntent> subIntents = List.of(new SubQuestionIntent("改写问题", List.of()));
         Set<String> eligibleIntentIds = Set.of("intent-1");
+        RetrievedChunk finalChunk = RetrievedChunk.builder().id("final").text("最终资料").build();
+        RetrievedChunk staleChunk = RetrievedChunk.builder().id("stale").text("候选池尾部").build();
         RetrievalContext retrievalContext = RetrievalContext.builder()
                 .kbContext("<content>资料</content>")
-                .intentChunks(Map.of())
+                .kbChunks(List.of(finalChunk))
+                .intentChunks(Map.of("intent-1", List.of(staleChunk)))
                 .eligibleIntentIds(eligibleIntentIds)
                 .build();
 
@@ -118,6 +123,8 @@ class StreamChatPipelineTest {
 
         ArgumentCaptor<PromptContext> promptContext = ArgumentCaptor.forClass(PromptContext.class);
         verify(promptBuilder).buildStructuredMessages(promptContext.capture(), anyList(), any(), anyList());
+        verify(sourcesAssembler).assemble(eq(List.of(finalChunk)));
+        verify(groundingChunksAssembler).assemble(eq(List.of(finalChunk)));
         assertEquals(eligibleIntentIds, promptContext.getValue().getEligibleIntentIds());
     }
 }

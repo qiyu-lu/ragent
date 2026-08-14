@@ -49,6 +49,14 @@ public class SearchChannelProperties implements InitializingBean {
     private int recallBudget = 20;
 
     /**
+     * 是否在多子问题场景中对请求级上下文做全局去重和公平回填。
+     * <p>
+     * 关闭时保留旧版「每个子问题先截断、最后直接拼接」行为，主要用于固定索引上的因果对照和快速回滚；
+     * 开启时最终 {@link #defaultTopK} 只在请求级收口，重复项留下的额度会从各题候选池中确定性补齐。
+     */
+    private boolean requestLevelRefillEnabled = false;
+
+    /**
      * 检索作用域配置
      * 决定「本次请求该看哪些知识库」，与用什么模态检索无关，故与 channels 平级、由各通道共读
      */

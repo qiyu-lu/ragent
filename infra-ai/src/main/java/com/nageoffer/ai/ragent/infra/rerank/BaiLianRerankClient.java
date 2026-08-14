@@ -22,6 +22,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.nageoffer.ai.ragent.framework.convention.RetrievedChunk;
+import com.nageoffer.ai.ragent.framework.convention.RetrievedChunkKey;
 import com.nageoffer.ai.ragent.infra.config.AIModelProperties;
 import com.nageoffer.ai.ragent.infra.enums.ModelCapability;
 import com.nageoffer.ai.ragent.infra.enums.ModelProvider;
@@ -68,16 +69,21 @@ public class BaiLianRerankClient implements RerankClient {
         List<RetrievedChunk> dedup = new ArrayList<>(candidates.size());
         Set<String> seen = new HashSet<>();
         for (RetrievedChunk rc : candidates) {
-            if (seen.add(rc.getId())) {
+            if (rc != null && seen.add(RetrievedChunkKey.of(rc))) {
                 dedup.add(rc);
             }
         }
 
-        if (topN <= 0 || dedup.size() <= topN) {
+        if (topN <= 0 || dedup.isEmpty()) {
+            return List.of();
+        }
+        if (dedup.size() == 1) {
             return dedup;
         }
 
-        return doRerank(query, dedup, topN, target);
+        // 即使候选数不超过 topN 也必须调用模型：多子问题请求会先为每题建立候选池，随后只从每题
+        // 取初始配额或公平回填。此时“全部候选最终都会保留”已不成立，候选内部顺序仍决定进入上下文的块。
+        return doRerank(query, dedup, Math.min(topN, dedup.size()), target);
     }
 
     private List<RetrievedChunk> doRerank(String query, List<RetrievedChunk> candidates, int topN, ModelTarget target) {
@@ -137,7 +143,7 @@ public class BaiLianRerankClient implements RerankClient {
         }
 
         List<RetrievedChunk> reranked = new ArrayList<>();
-        Set<String> addedIds = new HashSet<>();
+        Set<String> addedKeys = new HashSet<>();
 
         for (JsonElement elem : results) {
             if (!elem.isJsonObject()) {
@@ -168,7 +174,7 @@ public class BaiLianRerankClient implements RerankClient {
                     .build()
                     : src;
             reranked.add(hit);
-            addedIds.add(src.getId());
+            addedKeys.add(RetrievedChunkKey.of(src));
 
             if (reranked.size() >= topN) {
                 break;
@@ -177,7 +183,7 @@ public class BaiLianRerankClient implements RerankClient {
 
         if (reranked.size() < topN) {
             for (RetrievedChunk c : candidates) {
-                if (addedIds.add(c.getId())) {
+                if (addedKeys.add(RetrievedChunkKey.of(c))) {
                     reranked.add(c);
                 }
                 if (reranked.size() >= topN) {

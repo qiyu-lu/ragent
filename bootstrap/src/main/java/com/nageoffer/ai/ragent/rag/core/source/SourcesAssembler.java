@@ -64,11 +64,23 @@ public class SourcesAssembler {
             return List.of();
         }
 
-        // 按 docId 归并 保留最高分片段（作为摘录与排序依据）
-        Map<String, RetrievedChunk> bestByDoc = new LinkedHashMap<>();
-        intentChunks.values().stream()
+        return assemble(intentChunks.values().stream()
                 .filter(CollUtil::isNotEmpty)
                 .flatMap(List::stream)
+                .toList());
+    }
+
+    /**
+     * 由请求级最终分片列表装配来源，避免再从意图分组反推实际进入 Prompt 的证据集合。
+     */
+    public List<SourceRef> assemble(List<RetrievedChunk> chunks) {
+        if (CollUtil.isEmpty(chunks)) {
+            return List.of();
+        }
+
+        // 按 docId 归并 保留最高分片段（作为摘录与排序依据）
+        Map<String, RetrievedChunk> bestByDoc = new LinkedHashMap<>();
+        chunks.stream()
                 .filter(chunk -> chunk != null && StrUtil.isNotBlank(chunk.getDocId()))
                 .forEach(chunk -> bestByDoc.merge(chunk.getDocId(), chunk,
                         (existing, candidate) -> score(candidate) > score(existing) ? candidate : existing));

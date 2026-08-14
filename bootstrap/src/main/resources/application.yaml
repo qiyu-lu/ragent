@@ -135,6 +135,7 @@ rag:
     # 检索漏斗三段预算，各自独立、单调收窄，启动时校验 recall-budget ≥ default-top-k 且 rerank-candidate-limit ≥ default-top-k
     default-top-k: 10           # ③ 最终进 LLM 的条数（产品语义的 topK）
     recall-budget: 20           # ① 每通道召回条数（绝对值，向量意图路/关键词/图谱共用）；须 ≥ default-top-k，0=回退 default-top-k
+    request-level-refill-enabled: false # 多子问题请求级去重与公平回填；重复评测通过门槛后再默认开启
     # 检索作用域：本次请求该看哪些知识库，与用什么模态检索无关，故与 channels 平级、三条通道共读
     # 判定只看 KB 意图最高分，不看意图个数；关掉任一通道都不影响其余通道的作用域
     scope:

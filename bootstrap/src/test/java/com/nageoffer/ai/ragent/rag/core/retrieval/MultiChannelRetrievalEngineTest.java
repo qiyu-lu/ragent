@@ -28,9 +28,11 @@ import com.nageoffer.ai.ragent.rag.core.retrieval.channel.SearchChannel;
 import com.nageoffer.ai.ragent.rag.core.retrieval.channel.SearchChannelResult;
 import com.nageoffer.ai.ragent.rag.core.retrieval.channel.SearchChannelType;
 import com.nageoffer.ai.ragent.rag.core.retrieval.channel.SearchContext;
+import com.nageoffer.ai.ragent.rag.core.retrieval.postprocessor.CandidatePoolLimitPostProcessor;
 import com.nageoffer.ai.ragent.rag.core.retrieval.postprocessor.SearchResultPostProcessor;
 import com.nageoffer.ai.ragent.rag.dto.SubQuestionIntent;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.util.List;
 import java.util.Map;
@@ -115,6 +117,40 @@ class MultiChannelRetrievalEngineTest {
         assertTrue(result.intentIdsByChunkKey().isEmpty());
         assertTrue(result.directedIntentIds().isEmpty());
         assertEquals(List.of(globalChunk), result.groupByIntent("multi_channel").get("multi_channel"));
+    }
+
+    @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    void candidateGuardRunsBeforeRerankWhenFusionIsDisabled() {
+        List<RetrievedChunk> candidates = List.of(
+                chunk("1", "一", 0.9F),
+                chunk("2", "二", 0.8F),
+                chunk("3", "三", 0.7F),
+                chunk("4", "四", 0.6F),
+                chunk("5", "五", 0.5F));
+        SearchChannel vector = channel("vector", SearchChannelType.VECTOR,
+                SearchChannelResult.builder()
+                        .channelType(SearchChannelType.VECTOR)
+                        .channelName("vector")
+                        .chunks(candidates)
+                        .build());
+        SearchResultPostProcessor rerank = mock(SearchResultPostProcessor.class);
+        when(rerank.getOrder()).thenReturn(10);
+        when(rerank.isEnabled(any(SearchContext.class))).thenReturn(true);
+        when(rerank.process(anyList(), anyList(), any(SearchContext.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        engine(List.of(vector), List.of(rerank, new CandidatePoolLimitPostProcessor()),
+                RetrievalScope.global(0.3, List.of("kb-a")))
+                .retrieveKnowledgeChannels(
+                        new SubQuestionIntent("问题", List.of()),
+                        new RetrievalBudget(20, 3, 2));
+
+        ArgumentCaptor<List<RetrievedChunk>> input = ArgumentCaptor.forClass((Class) List.class);
+        verify(rerank).process(input.capture(), anyList(), any(SearchContext.class));
+        assertEquals(List.of("1", "2", "3"),
+                input.getValue().stream().map(RetrievedChunk::getId).toList(),
+                "融合关闭时也必须先限制候选池，再调用 Rerank");
     }
 
     @Test

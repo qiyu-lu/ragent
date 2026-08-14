@@ -26,22 +26,43 @@ import java.util.List;
 import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
-class FinalTopKPostProcessorTest {
+class CandidatePoolLimitPostProcessorTest {
 
     @Test
-    void capsResultsEvenWhenRerankIsDisabled() {
-        List<RetrievedChunk> candidates = IntStream.range(0, 12)
-                .mapToObj(index -> RetrievedChunk.builder().id(String.valueOf(index)).build())
-                .toList();
+    void capsCandidatePoolWithoutApplyingContextTopK() {
+        List<RetrievedChunk> candidates = chunks(12);
         SearchContext context = SearchContext.builder()
-                .budget(new RetrievalBudget(20, 40, 4))
+                .budget(new RetrievalBudget(20, 4, 2))
                 .build();
 
-        List<RetrievedChunk> result = new FinalTopKPostProcessor()
+        List<RetrievedChunk> result = new CandidatePoolLimitPostProcessor()
                 .process(candidates, List.of(), context);
 
-        assertEquals(List.of("0", "1", "2", "3"),
-                result.stream().map(RetrievedChunk::getId).toList());
+        assertEquals(List.of("0", "1", "2", "3"), ids(result));
+    }
+
+    @Test
+    void nonPositiveCandidateLimitKeepsWholePool() {
+        List<RetrievedChunk> candidates = chunks(5);
+        SearchContext context = SearchContext.builder()
+                .budget(new RetrievalBudget(20, 0, 2))
+                .build();
+
+        List<RetrievedChunk> result = new CandidatePoolLimitPostProcessor()
+                .process(candidates, List.of(), context);
+
+        assertSame(candidates, result);
+    }
+
+    private List<RetrievedChunk> chunks(int count) {
+        return IntStream.range(0, count)
+                .mapToObj(index -> RetrievedChunk.builder().id(String.valueOf(index)).build())
+                .toList();
+    }
+
+    private List<String> ids(List<RetrievedChunk> chunks) {
+        return chunks.stream().map(RetrievedChunk::getId).toList();
     }
 }

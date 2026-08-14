@@ -34,6 +34,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.core.io.DefaultResourceLoader;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -203,6 +204,102 @@ class RetrievalEngineTest {
                 "拆成三个子问题后，最终证据总数仍不得超过请求级 TopK");
     }
 
+    @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    void fairRefillKeepsCandidatePoolsAndFillsDuplicateGaps() {
+        RetrievedChunk shared = chunk("shared", "共享资料");
+        List<RetrievedChunk> first = List.of(
+                shared,
+                chunk("a1", "A1"),
+                chunk("a2", "A2"),
+                chunk("a3", "A3"),
+                chunk("a4", "A4"),
+                chunk("a5", "A5"),
+                chunk("a6", "A6"),
+                chunk("a7", "A7"));
+        List<RetrievedChunk> second = List.of(
+                shared,
+                chunk("b1", "B1"),
+                chunk("b2", "B2"));
+        MultiChannelRetrievalEngine multiChannel = mock(MultiChannelRetrievalEngine.class);
+        ContextFormatter contextFormatter = mock(ContextFormatter.class);
+        when(multiChannel.retrieveKnowledgeChannels(
+                any(SubQuestionIntent.class), any(RetrievalBudget.class)))
+                .thenReturn(
+                        new KnowledgeRetrievalResult(first, Map.of(), Set.of()),
+                        new KnowledgeRetrievalResult(second, Map.of(), Set.of()));
+        SearchChannelProperties properties = new SearchChannelProperties();
+        properties.setRequestLevelRefillEnabled(true);
+
+        RetrievalContext result = engine(properties, multiChannel, contextFormatter).retrieve(List.of(
+                new SubQuestionIntent("问题一", List.of()),
+                new SubQuestionIntent("问题二", List.of())
+        ));
+
+        ArgumentCaptor<RetrievalBudget> budgets = ArgumentCaptor.forClass(RetrievalBudget.class);
+        verify(multiChannel, times(2)).retrieveKnowledgeChannels(
+                any(SubQuestionIntent.class), budgets.capture());
+        assertEquals(List.of(10, 10),
+                budgets.getAllValues().stream().map(RetrievalBudget::contextTopK).toList());
+        assertEquals(10, result.getKbChunks().size());
+        assertEquals(10, new LinkedHashSet<>(result.getKbChunks().stream().map(RetrievedChunk::getId).toList()).size());
+        assertEquals(7, result.getRetrievalDiagnostics().uniqueBeforeRefill());
+        assertEquals(3, result.getRetrievalDiagnostics().refillAdded());
+        assertEquals(0, result.getRetrievalDiagnostics().unfilledSlots());
+        assertEquals(List.of("shared", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "b1", "b2"),
+                result.getKbChunks().stream().map(RetrievedChunk::getId).toList(),
+                "canonical 顺序应与按子问题分组渲染的 Prompt 顺序一致");
+
+        ArgumentCaptor<List<RetrievedChunk>> formatted = ArgumentCaptor.forClass((Class) List.class);
+        verify(contextFormatter, times(2)).formatKbContext(
+                anyList(), any(), formatted.capture(), anyInt());
+        Set<String> formattedIds = formatted.getAllValues().stream()
+                .flatMap(List::stream)
+                .map(RetrievedChunk::getId)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        assertEquals(result.getKbChunks().stream().map(RetrievedChunk::getId)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new)), formattedIds);
+        assertEquals(result.getKbChunks(), result.getIntentChunks().get(MULTI_CHANNEL_KEY));
+    }
+
+    @Test
+    void disabledRefillKeepsLegacyPrefixesAndDuplicateGap() {
+        RetrievedChunk shared = chunk("shared", "共享资料");
+        List<RetrievedChunk> first = List.of(
+                shared,
+                chunk("a1", "A1"),
+                chunk("a2", "A2"),
+                chunk("a3", "A3"),
+                chunk("a4", "A4"),
+                chunk("a5", "A5"));
+        List<RetrievedChunk> second = List.of(
+                shared,
+                chunk("b1", "B1"),
+                chunk("b2", "B2"),
+                chunk("b3", "B3"),
+                chunk("b4", "B4"),
+                chunk("b5", "B5"));
+        MultiChannelRetrievalEngine multiChannel = mock(MultiChannelRetrievalEngine.class);
+        ContextFormatter contextFormatter = mock(ContextFormatter.class);
+        when(multiChannel.retrieveKnowledgeChannels(
+                any(SubQuestionIntent.class), any(RetrievalBudget.class)))
+                .thenReturn(
+                        new KnowledgeRetrievalResult(first, Map.of(), Set.of()),
+                        new KnowledgeRetrievalResult(second, Map.of(), Set.of()));
+
+        RetrievalContext result = engine(multiChannel, contextFormatter).retrieve(List.of(
+                new SubQuestionIntent("问题一", List.of()),
+                new SubQuestionIntent("问题二", List.of())
+        ));
+
+        assertEquals(List.of("shared", "a1", "a2", "a3", "a4", "b1", "b2", "b3", "b4"),
+                result.getKbChunks().stream().map(RetrievedChunk::getId).toList());
+        assertEquals(9, result.getRetrievalDiagnostics().uniqueBeforeRefill());
+        assertEquals(0, result.getRetrievalDiagnostics().refillAdded());
+        assertEquals(9, result.getRetrievalDiagnostics().finalUniqueCount());
+        assertEquals(1, result.getRetrievalDiagnostics().unfilledSlots());
+    }
+
     private Set<String> eligibleAfterTwoQuestions(KnowledgeRetrievalResult first,
                                                    KnowledgeRetrievalResult second) {
         MultiChannelRetrievalEngine multiChannel = mock(MultiChannelRetrievalEngine.class);
@@ -218,8 +315,14 @@ class RetrievalEngineTest {
     }
 
     private RetrievalEngine engine(MultiChannelRetrievalEngine multiChannel, ContextFormatter contextFormatter) {
+        return engine(new SearchChannelProperties(), multiChannel, contextFormatter);
+    }
+
+    private RetrievalEngine engine(SearchChannelProperties properties,
+                                   MultiChannelRetrievalEngine multiChannel,
+                                   ContextFormatter contextFormatter) {
         return new RetrievalEngine(
-                new SearchChannelProperties(),
+                properties,
                 contextFormatter,
                 mock(PromptTemplateLoader.class),
                 mock(McpParameterExtractor.class),

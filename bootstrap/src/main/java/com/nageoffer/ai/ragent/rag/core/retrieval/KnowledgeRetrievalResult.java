@@ -49,6 +49,32 @@ public record KnowledgeRetrievalResult(List<RetrievedChunk> chunks,
         return new KnowledgeRetrievalResult(List.of(), Map.of(), Set.of());
     }
 
+    /**
+     * 只保留请求级最终选中的分片及其归因。
+     * <p>
+     * eligible intent 必须由真正进入上下文的证据决定，候选池尾部不能继续激活回答规则。
+     */
+    public KnowledgeRetrievalResult retainChunks(List<RetrievedChunk> selectedChunks) {
+        if (selectedChunks == null || selectedChunks.isEmpty()) {
+            return new KnowledgeRetrievalResult(List.of(), Map.of(), directedIntentIds);
+        }
+        Set<String> selectedKeys = selectedChunks.stream()
+                .filter(Objects::nonNull)
+                .map(RetrievedChunkKey::of)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        Map<String, Set<String>> selectedAttribution = new LinkedHashMap<>();
+        intentIdsByChunkKey.forEach((key, intentIds) -> {
+            if (selectedKeys.contains(key) && intentIds != null && !intentIds.isEmpty()) {
+                selectedAttribution.put(key, Set.copyOf(intentIds));
+            }
+        });
+        List<RetrievedChunk> retained = selectedChunks.stream()
+                .filter(Objects::nonNull)
+                .filter(chunk -> selectedKeys.contains(RetrievedChunkKey.of(chunk)))
+                .toList();
+        return new KnowledgeRetrievalResult(retained, selectedAttribution, directedIntentIds);
+    }
+
     public Set<String> retrievedIntentIds() {
         Set<String> intentIds = new LinkedHashSet<>();
         intentIdsByChunkKey.values().stream()

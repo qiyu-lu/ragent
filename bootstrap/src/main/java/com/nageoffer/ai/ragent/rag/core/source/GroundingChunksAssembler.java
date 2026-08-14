@@ -59,12 +59,24 @@ public class GroundingChunksAssembler {
             return List.of();
         }
 
+        return assemble(intentChunks.values().stream()
+                .filter(CollUtil::isNotEmpty)
+                .flatMap(List::stream)
+                .toList());
+    }
+
+    /**
+     * 由请求级最终分片列表装配 grounding，确保未入选的候选池尾部不会进入后续生成。
+     */
+    public List<GroundingChunk> assemble(List<RetrievedChunk> chunks) {
+        if (CollUtil.isEmpty(chunks)) {
+            return List.of();
+        }
+
         // 按 chunkId 去重并保留全部相关片段。候选任务生成必须看到同一规程的连续多个步骤，
         // 不能沿用“每篇文档只留一个块”的推荐问题策略。
         Map<String, RetrievedChunk> distinctChunks = new LinkedHashMap<>();
-        intentChunks.values().stream()
-                .filter(CollUtil::isNotEmpty)
-                .flatMap(List::stream)
+        chunks.stream()
                 .filter(chunk -> chunk != null
                         && StrUtil.isNotBlank(chunk.getId())
                         && StrUtil.isNotBlank(chunk.getDocId())

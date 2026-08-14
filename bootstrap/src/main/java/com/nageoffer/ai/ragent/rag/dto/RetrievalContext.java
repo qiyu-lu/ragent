@@ -23,6 +23,7 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
@@ -49,6 +50,19 @@ public class RetrievalContext {
     private Map<String, List<RetrievedChunk>> intentChunks;
 
     /**
+     * 最终进入请求上下文的 KB 分片，按请求级选择顺序保存。
+     * <p>
+     * 这是 Prompt、来源、grounding 和评测共同使用的 canonical 列表；intentChunks 只保留归因关系。
+     */
+    @Builder.Default
+    private List<RetrievedChunk> kbChunks = List.of();
+
+    /**
+     * 请求级候选选择诊断，仅描述检索选择过程，不参与 Prompt。
+     */
+    private RetrievalSelectionDiagnostics retrievalDiagnostics;
+
+    /**
      * 允许参与模板选择和规则注入的意图 ID
      */
     @Builder.Default
@@ -73,5 +87,25 @@ public class RetrievalContext {
      */
     public boolean isEmpty() {
         return !hasMcp() && !hasKb();
+    }
+
+    /**
+     * 兼容旧调用方手工构造的 RetrievalContext；新检索链始终直接填写 kbChunks。
+     */
+    public List<RetrievedChunk> effectiveKbChunks() {
+        if (kbChunks != null && !kbChunks.isEmpty()) {
+            return kbChunks;
+        }
+        if (intentChunks == null || intentChunks.isEmpty()) {
+            return List.of();
+        }
+        Map<String, RetrievedChunk> distinct = new LinkedHashMap<>();
+        intentChunks.values().stream()
+                .filter(chunks -> chunks != null && !chunks.isEmpty())
+                .flatMap(List::stream)
+                .filter(chunk -> chunk != null)
+                .forEach(chunk -> distinct.putIfAbsent(
+                        com.nageoffer.ai.ragent.framework.convention.RetrievedChunkKey.of(chunk), chunk));
+        return List.copyOf(distinct.values());
     }
 }

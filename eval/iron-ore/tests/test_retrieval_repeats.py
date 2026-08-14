@@ -272,7 +272,48 @@ class RetrievalRepeatTest(unittest.TestCase):
             self.assertIn("xlsx_hard_06_missing_anchor_recovered", gate["failed_criteria"])
             self.assertIn("overall_anchor_recall_gain", gate["failed_criteria"])
             recovery = gate["criteria"]["xlsx_hard_06_missing_anchor_recovered"]
-            self.assertEqual(recovery["observed"]["on_recovery_count"], 1)
+            self.assertEqual(recovery["observed"]["paired_recovery_count"], 1)
+
+    def test_gate_does_not_call_an_existing_baseline_hit_a_recovery(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            off_paths = []
+            on_paths = []
+            for mode, paths in (("off", off_paths), ("on", on_paths)):
+                for repeat_index in (1, 2, 3):
+                    report = self.repeat_report(mode, repeat_index)
+                    if mode == "off":
+                        target = report["details"][0]
+                        target["score"]["anchor_recall"] = 1.0
+                        target["score"]["anchor_hit@5_all"] = 1.0
+                        target["score"]["missed_anchors"] = []
+                        for metric in (
+                            "anchor_hit@5_any",
+                            "anchor_hit@5_all",
+                            "anchor_recall",
+                            "context_precision",
+                            "doc_recall",
+                            "routing_purity",
+                        ):
+                            report["summary"]["overall_answerable"][metric] = sum(
+                                detail["score"][metric] for detail in report["details"]
+                            ) / len(report["details"])
+                    path = tmp / f"{mode}-{repeat_index}.json"
+                    self.write_json(path, report)
+                    paths.append(path)
+
+            comparison = build_comparison(
+                organize(off_paths, "off"), organize(on_paths, "on")
+            )
+            recovery = comparison["gate"]["criteria"][
+                "xlsx_hard_06_missing_anchor_recovered"
+            ]
+            self.assertFalse(recovery["passed"])
+            self.assertEqual(recovery["observed"]["paired_recovery_count"], 0)
+            self.assertEqual(
+                recovery["observed"]["paired_recovered_by_repeat"],
+                [False, False, False],
+            )
 
     def test_compare_rejects_incompatible_server_commit(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

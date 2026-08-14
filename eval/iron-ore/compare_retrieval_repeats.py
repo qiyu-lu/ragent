@@ -422,8 +422,9 @@ def target_anchor_recovery_gate(off: Sequence[dict], on: Sequence[dict]) -> dict
         return any(normalize(anchor) == target_anchor for anchor in missed)
 
     off_missed = [anchor_is_missed(report) for report in off]
-    on_recovered = [not anchor_is_missed(report) for report in on]
-    recovery_count = sum(on_recovered)
+    on_hit = [not anchor_is_missed(report) for report in on]
+    paired_recovered = [missed and hit for missed, hit in zip(off_missed, on_hit)]
+    recovery_count = sum(paired_recovered)
     return gate_criterion(
         anchor_declared and recovery_count >= 2,
         operator=">=",
@@ -432,8 +433,9 @@ def target_anchor_recovery_gate(off: Sequence[dict], on: Sequence[dict]) -> dict
             "anchor": TARGET_MISSING_ANCHOR,
             "anchor_declared": anchor_declared,
             "off_missed_by_repeat": off_missed,
-            "on_recovered_by_repeat": on_recovered,
-            "on_recovery_count": recovery_count,
+            "on_hit_by_repeat": on_hit,
+            "paired_recovered_by_repeat": paired_recovered,
+            "paired_recovery_count": recovery_count,
         },
     )
 

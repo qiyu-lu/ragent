@@ -21,6 +21,7 @@ RAG 只提供证据和候选结果，文档版本、来源与状态由后端持�
 | 方向 | 已完成内容 | 详情 |
 | --- | --- | --- |
 | Java 后端 | 复用上游 Spring Boot 3.5.7、MyBatis-Plus 和 SSE；新增任务状态流转、确定性版本差异与可审计 API | [工业知识闭环](docs/iron-ore-rag/changes/2026-08-12-industrial-knowledge-demo.md) |
+| 后端可靠性 | 修复用户取消生成时 Redis 标记、进程内任务、SSE 连接与数据库 trace 并发收尾的竞态；通过多入口补偿和 `RUNNING → 终态` 条件更新，避免根 run 永久悬挂 | [取消后 trace 收尾](docs/iron-ore-rag/changes/2026-08-12-cancel-trace-run-hang.md) |
 | AI / RAG | 复用可替换模型客户端；新增请求级 TopK、`should_split` 执行、结构化重排和来源约束 | [检索纯度改进](docs/iron-ore-rag/changes/2026-08-13-request-level-retrieval-purity.md) |
 | 文档工程 | 复用 POI 与 PDF/MinerU 接入；新增 XLSX 精确单元格来源、结构感知分块、稳定文档键和显式版本 | [XLSX 分块](docs/iron-ore-rag/changes/2026-08-13-xlsx-structure-aware-chunking.md) |
 | 数据环境 | 为 PostgreSQL/PGVector、Redis、RustFS、RocketMQ 建立项目独立 Compose 开发栈 | [本地开发栈](docs/iron-ore-rag/changes/2026-08-12-reproducible-local-development-stack.md) |
@@ -31,18 +32,18 @@ RAG 只提供证据和候选结果，文档版本、来源与状态由后端持�
 | 改动 | 可复核结果 | 结论 |
 | --- | --- | --- |
 | XLSX 结构感知分块 | 超过 1,024 字符的块 `70 → 0`；最大长度 `12,489 → 1,019`；重复块 `17 → 0` | 修复合并单元格膨胀、重复续行和跨表回并 |
-| 请求级检索纯度（冻结索引 D0） | 平均上下文 `13.05 → 6.52`；Context Precision `17.1% → 29.2%`；文档召回保持 `97.6%` | 纯度提高，但 Anchor Recall `86.5% → 84.1%`、Hit@5 `95.2% → 90.5%` |
+| 请求级检索纯度（冻结旧索引、只替换检索代码的 D0 对照） | 平均上下文 `13.05 → 6.52`；Context Precision `17.1% → 29.2%`；文档召回保持 `97.6%` | 纯度提高，但 Anchor Recall `86.5% → 84.1%`、Hit@5 `95.2% → 90.5%` |
 | 公平回填（固定回放 D2） | 机制补满空位，但 Hit@5、Context Precision 和路由纯度未通过质量门槛 | 保留在特性开关后，默认关闭 |
 
-24 条完整回答在 B0 与 C-final 的人工严格通过率均为 `79.2%`。因此项目只声明分块质量、检索行为和工程可审计性改善，不宣称生成准确率提升。实验条件与完整指标见[改动索引](docs/iron-ore-rag/changes/README.md)。
+24 条完整回答在基线版本（B0）与检索改动前当前版（C-final）的人工严格通过率均为 `79.2%`。因此项目只声明分块质量、检索行为和工程可审计性改善，不宣称生成准确率提升。实验条件与完整指标见[改动索引](docs/iron-ore-rag/changes/README.md)。
 
 ## 能力边界
 
 - 评测集只有 3 份文档和 24 条固定问题，适合定位回归，不是通用 Office 解析或工业领域基准。
 - 最终评测配置为 `intent=off, ocr=off`，公平回填保持 `rag.search.request-level-refill-enabled=false`。
-- D0 使用冻结索引隔离检索代码；D1 在线重建时 PDF/MinerU 结果发生漂移，不能把全部变化归因于本地代码。
+- D0 是冻结旧索引、只替换检索代码的对照；D1 是重新入库后的组合验证，期间 PDF/MinerU 结果发生漂移，不能把全部变化归因于本地代码。
 - 工业知识闭环已完成工程实现、迁移和定向验证，但登录页面业务 E2E 未执行，不能写成完整用户流程已验收。
-- 原始企业材料、模型密钥、评测响应和数据库 dump 均位于 Git 忽略目录；仓库只跟踪有限脱敏派生样本，公开 fork 前仍需确认其发布授权。
+- 原始企业表格、国标原文件、模型密钥、评测响应和数据库 dump 均位于 Git 忽略目录，不进入公开仓库；仓库只跟踪有限脱敏派生样本和已有公开授权的内容。
 
 ## 快速开始
 

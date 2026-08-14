@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the frozen question set against ``GET /rag/eval`` and score retrieval."""
+"""Run the frozen question set against live or fixed-rewrite eval retrieval."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Dict, Mapping, Sequence, Tuple
 
 from evalkit import (
     ApiClient,
@@ -19,6 +20,7 @@ from evalkit import (
     load_jsonl,
     score_retrieval,
     sha256_file,
+    validate_retrieval_diagnostics,
     validate_label,
     write_json,
 )
@@ -55,7 +57,107 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--rows-per-chunk", type=int, default=50)
     parser.add_argument("--tolerance-factor", type=int, default=3)
     parser.add_argument("--compare", type=Path)
+    parser.add_argument(
+        "--fixed-rewrites-from",
+        type=Path,
+        help="Replay raw_response.subIntents from a compatible retrieval report",
+    )
+    parser.add_argument("--refill-mode", choices=["off", "on"])
+    parser.add_argument("--repeat-index", type=int, choices=[1, 2, 3])
     return parser.parse_args()
+
+
+def load_fixed_rewrites(
+    path: Path,
+    rows: Sequence[Mapping[str, object]],
+    *,
+    dataset_sha256: str,
+    corpus_sha256: str,
+    setup_manifest_sha256: str,
+) -> Tuple[Dict[str, list[str]], dict]:
+    """Load and strictly validate replay queries from an immutable retrieval report."""
+
+    try:
+        report = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"cannot read fixed rewrite source {path}: {exc}") from exc
+    if not isinstance(report, dict) or report.get("kind") != "retrieval":
+        raise ValueError(f"{path}: fixed rewrite source must have kind=retrieval")
+    expected_hashes = {
+        "dataset_sha256": dataset_sha256,
+        "corpus_sha256": corpus_sha256,
+        "setup_manifest_sha256": setup_manifest_sha256,
+    }
+    for field, expected in expected_hashes.items():
+        actual = report.get(field)
+        if actual != expected:
+            raise ValueError(f"{path}: {field} mismatch: expected {expected}, got {actual}")
+    if report.get("failures"):
+        raise ValueError(f"{path}: fixed rewrite source contains failures")
+
+    details = report.get("details")
+    if not isinstance(details, list):
+        raise ValueError(f"{path}: details must be a list")
+    expected_rows: Dict[str, Mapping[str, object]] = {}
+    for row in rows:
+        question_id = row.get("id")
+        if not isinstance(question_id, str) or not question_id:
+            raise ValueError("selected dataset contains an invalid question id")
+        if question_id in expected_rows:
+            raise ValueError(f"selected dataset contains duplicate id: {question_id}")
+        expected_rows[question_id] = row
+
+    rewrites: Dict[str, list[str]] = {}
+    for index, detail in enumerate(details):
+        if not isinstance(detail, dict):
+            raise ValueError(f"{path}: details[{index}] must be an object")
+        question_id = detail.get("id")
+        if not isinstance(question_id, str) or not question_id:
+            raise ValueError(f"{path}: details[{index}].id must be a non-empty string")
+        if question_id in rewrites:
+            raise ValueError(f"{path}: duplicate detail id: {question_id}")
+        if question_id not in expected_rows:
+            raise ValueError(f"{path}: unexpected detail id: {question_id}")
+        expected_question = expected_rows[question_id].get("question")
+        if detail.get("question") != expected_question:
+            raise ValueError(f"{path}: question text mismatch for id {question_id}")
+        raw_response = detail.get("raw_response")
+        if not isinstance(raw_response, dict):
+            raise ValueError(f"{path}: {question_id} is missing raw_response")
+        raw_sub_questions = raw_response.get("subIntents")
+        if not isinstance(raw_sub_questions, list) or not raw_sub_questions:
+            raise ValueError(f"{path}: {question_id}.raw_response.subIntents must be non-empty")
+        sub_questions: list[str] = []
+        seen = set()
+        for sub_index, value in enumerate(raw_sub_questions):
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(
+                    f"{path}: {question_id}.subIntents[{sub_index}] must be a non-empty string"
+                )
+            normalized = value.strip()
+            if normalized != value:
+                raise ValueError(f"{path}: {question_id}.subIntents[{sub_index}] is not trimmed")
+            if normalized in seen:
+                raise ValueError(f"{path}: {question_id}.subIntents contains a duplicate")
+            seen.add(normalized)
+            sub_questions.append(normalized)
+        rewrites[question_id] = sub_questions
+
+    missing = sorted(set(expected_rows) - set(rewrites))
+    if missing:
+        raise ValueError(f"{path}: missing detail ids: {', '.join(missing)}")
+    if len(rewrites) != len(expected_rows):
+        raise ValueError(f"{path}: fixed rewrite ids do not exactly match the selected dataset")
+
+    selection = report.get("selection")
+    if not isinstance(selection, dict) or selection.get("n") != len(details):
+        raise ValueError(f"{path}: selection.n must match details length")
+    metadata = {
+        "source_sha256": sha256_file(path),
+        "source_label": report.get("label"),
+        "source_server_commit": report.get("server_commit"),
+    }
+    return rewrites, metadata
 
 
 def print_summary(summary: dict) -> None:
@@ -119,6 +221,38 @@ def main() -> int:
     if args.setup_manifest and not args.setup_manifest.is_file():
         print(f"setup manifest does not exist: {args.setup_manifest}")
         return 1
+    if args.fixed_rewrites_from and not args.setup_manifest:
+        print("configuration error: --fixed-rewrites-from requires --setup-manifest")
+        return 1
+    if args.fixed_rewrites_from and (args.refill_mode is None or args.repeat_index is None):
+        print(
+            "configuration error: fixed replay requires both --refill-mode and --repeat-index"
+        )
+        return 1
+    if args.fixed_rewrites_from and args.concurrency != 1:
+        print("configuration error: fixed replay requires --concurrency 1")
+        return 1
+    if args.repeat_index is not None and args.refill_mode is None:
+        print("configuration error: --repeat-index requires --refill-mode")
+        return 1
+
+    dataset_sha256 = sha256_file(args.dataset)
+    corpus_sha256 = sha256_file(args.corpus)
+    setup_manifest_sha256 = sha256_file(args.setup_manifest) if args.setup_manifest else None
+    fixed_rewrites = None
+    fixed_rewrite_metadata = None
+    if args.fixed_rewrites_from:
+        try:
+            fixed_rewrites, fixed_rewrite_metadata = load_fixed_rewrites(
+                args.fixed_rewrites_from,
+                rows,
+                dataset_sha256=dataset_sha256,
+                corpus_sha256=corpus_sha256,
+                setup_manifest_sha256=setup_manifest_sha256,
+            )
+        except ValueError as exc:
+            print(f"configuration error: {exc}")
+            return 1
 
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     output = args.output or DEFAULT_RUNS / f"{stamp}-{args.label}" / "retrieval.json"
@@ -141,7 +275,20 @@ def main() -> int:
     def run_one(item):
         index, row = item
         try:
-            response, wall_ms = client.query_eval(row["question"])
+            expected_sub_intents = fixed_rewrites.get(row["id"]) if fixed_rewrites else None
+            response, wall_ms = client.query_eval(row["question"], expected_sub_intents)
+            if expected_sub_intents is not None:
+                actual_sub_intents = response.get("subIntents")
+                if actual_sub_intents != expected_sub_intents:
+                    raise ApiError(
+                        "replay response subIntents mismatch for "
+                        f"{row['id']}: expected {expected_sub_intents}, got {actual_sub_intents}"
+                    )
+            if args.refill_mode is not None:
+                try:
+                    validate_retrieval_diagnostics(response, args.refill_mode)
+                except ValueError as exc:
+                    raise ApiError(f"invalid retrieval diagnostics for {row['id']}: {exc}") from exc
             score = score_retrieval(row, response, doc_to_kb, args.intent_mode)
             return index, {
                 "id": row["id"],
@@ -179,13 +326,20 @@ def main() -> int:
         "started_at": started_at,
         "elapsed_seconds": round(time.monotonic() - started, 3),
         "base": args.base,
-        "dataset_sha256": sha256_file(args.dataset),
-        "corpus_sha256": sha256_file(args.corpus),
-        "setup_manifest_sha256": sha256_file(args.setup_manifest) if args.setup_manifest else None,
+        "dataset_sha256": dataset_sha256,
+        "corpus_sha256": corpus_sha256,
+        "setup_manifest_sha256": setup_manifest_sha256,
         "selection": {"families": args.family, "ids": args.ids, "n": len(rows)},
         "configuration": {
             "intent_mode": args.intent_mode,
             "ocr": args.ocr,
+            "concurrency": args.concurrency,
+            "rewrite": {
+                "mode": "replay" if fixed_rewrites is not None else "live",
+                **(fixed_rewrite_metadata or {}),
+            },
+            "refill_mode": args.refill_mode,
+            "repeat_index": args.repeat_index,
             "parse_profile": "fast",
             "chunk_budget": {
                 "max_chars": args.max_chars,

@@ -20,6 +20,7 @@ package com.nageoffer.ai.ragent.rag.eval;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.nageoffer.ai.ragent.framework.convention.RetrievedChunk;
+import com.nageoffer.ai.ragent.framework.exception.ClientException;
 import com.nageoffer.ai.ragent.knowledge.dao.entity.KnowledgeChunkDO;
 import com.nageoffer.ai.ragent.knowledge.dao.entity.KnowledgeDocumentDO;
 import com.nageoffer.ai.ragent.knowledge.dao.mapper.KnowledgeChunkMapper;
@@ -35,6 +36,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import com.nageoffer.ai.ragent.framework.convention.Result;
 import com.nageoffer.ai.ragent.framework.web.Results;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -64,10 +67,48 @@ public class EvalController {
         long start = System.currentTimeMillis();
 
         RewriteResult rewriteResult = queryRewriteService.rewriteWithSplit(question, List.of());
+
+        return evaluate(rewriteResult, start);
+    }
+
+    /**
+     * 使用冻结的子问题执行检索，完全绕过在线改写模型，用于同一索引上的因果对照。
+     */
+    @PostMapping("/rag/eval/replay")
+    public Result<EvalResponse> replay(@RequestBody EvalReplayRequest request) {
+        long start = System.currentTimeMillis();
+        RewriteResult rewriteResult = validateReplayRequest(request);
+
+        return evaluate(rewriteResult, start);
+    }
+
+    private Result<EvalResponse> evaluate(RewriteResult rewriteResult, long start) {
         List<SubQuestionIntent> subIntents = intentResolver.resolve(rewriteResult);
         RetrievalContext rc = retrievalEngine.retrieve(subIntents);
 
         return Results.success(buildResponse(rc, subIntents, System.currentTimeMillis() - start));
+    }
+
+    private RewriteResult validateReplayRequest(EvalReplayRequest request) {
+        if (request == null || StrUtil.isBlank(request.question())) {
+            throw new ClientException("固定评测的 question 不能为空");
+        }
+        if (CollUtil.isEmpty(request.subQuestions())) {
+            throw new ClientException("固定评测至少需要一个 subQuestion");
+        }
+        if (request.subQuestions().size() > 10) {
+            throw new ClientException("固定评测的 subQuestions 不能超过 10 个");
+        }
+        List<String> normalized = request.subQuestions().stream()
+                .map(value -> StrUtil.trim(value))
+                .toList();
+        if (normalized.stream().anyMatch(StrUtil::isBlank)) {
+            throw new ClientException("固定评测的 subQuestions 不能包含空值");
+        }
+        if (new LinkedHashSet<>(normalized).size() != normalized.size()) {
+            throw new ClientException("固定评测的 subQuestions 不能重复");
+        }
+        return new RewriteResult(request.question().trim(), normalized);
     }
 
     private EvalResponse buildResponse(RetrievalContext rc, List<SubQuestionIntent> subIntents, long latencyMs) {
@@ -99,21 +140,20 @@ public class EvalController {
                 .hasKb(rc != null && rc.hasKb())
                 .subIntents(extractSubIntents(subIntents))
                 .intentLeafIds(extractTopLeafIds(subIntents))
+                .retrievalDiagnostics(rc == null ? null : rc.getRetrievalDiagnostics())
                 .latencyMs(latencyMs)
                 .build();
     }
 
     /**
-     * 摊平 intentChunks（Map<intentId, List<RetrievedChunk>>），按 chunk id 去重并保留首次顺序
+     * 读取请求级最终 KB 列表，按 chunk id 去重并保留选择顺序。
      */
     private List<RetrievedChunk> flattenChunks(RetrievalContext rc) {
-        if (rc == null || CollUtil.isEmpty(rc.getIntentChunks())) {
+        if (rc == null || CollUtil.isEmpty(rc.effectiveKbChunks())) {
             return Collections.emptyList();
         }
         Set<String> seen = new LinkedHashSet<>();
-        return rc.getIntentChunks().values().stream()
-                .filter(CollUtil::isNotEmpty)
-                .flatMap(List::stream)
+        return rc.effectiveKbChunks().stream()
                 .filter(c -> c != null && StrUtil.isNotBlank(c.getId()))
                 .filter(c -> seen.add(c.getId()))
                 .collect(Collectors.toList());

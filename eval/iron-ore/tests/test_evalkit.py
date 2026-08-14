@@ -1,11 +1,20 @@
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from evalkit import aggregate_retrieval, anchor_rank, normalize, percentile, score_retrieval
+from evalkit import (
+    ApiClient,
+    aggregate_retrieval,
+    anchor_rank,
+    normalize,
+    percentile,
+    score_retrieval,
+    validate_retrieval_diagnostics,
+)
 
 
 class EvalKitTest(unittest.TestCase):
@@ -63,6 +72,50 @@ class EvalKitTest(unittest.TestCase):
         self.assertEqual(summary["by_family"]["xlsx"]["anchor_hit@5_any"], 1.0)
         self.assertEqual(summary["latency_ms"]["p95"], 30)
         self.assertEqual(percentile([1, 2, 3, 4], 0.5), 2)
+
+    def test_query_eval_posts_replayed_sub_questions(self):
+        client = ApiClient("http://127.0.0.1:9090")
+        with patch.object(client, "request_json", return_value={"subIntents": ["一", "二"]}) as request:
+            response, _ = client.query_eval("原问题", ["一", "二"])
+        self.assertEqual(response["subIntents"], ["一", "二"])
+        request.assert_called_once_with(
+            "/rag/eval/replay",
+            method="POST",
+            body={"question": "原问题", "subQuestions": ["一", "二"]},
+        )
+
+    def test_query_eval_keeps_live_get_behavior(self):
+        client = ApiClient("http://127.0.0.1:9090")
+        with patch.object(client, "request_json", return_value={"subIntents": ["原问题"]}) as request:
+            client.query_eval("原问题")
+        request.assert_called_once_with("/rag/eval", query={"question": "原问题"})
+
+    def test_query_eval_rejects_non_object_response(self):
+        client = ApiClient("http://127.0.0.1:9090")
+        with patch.object(client, "request_json", return_value=None):
+            with self.assertRaisesRegex(RuntimeError, "non-object"):
+                client.query_eval("原问题", ["固定子问题"])
+
+    def test_validate_retrieval_diagnostics_checks_mode_and_counts(self):
+        response = {
+            "retrievedChunkIds": ["a", "b", "c"],
+            "retrievedContexts": ["A", "B", "C"],
+            "retrievalDiagnostics": {
+                "fairRefillEnabled": True,
+                "requestTopK": 3,
+                "initialBudgets": [2, 1],
+                "candidateCount": 5,
+                "candidateUniqueCount": 4,
+                "uniqueBeforeRefill": 2,
+                "refillAdded": 1,
+                "finalUniqueCount": 3,
+                "unfilledSlots": 0,
+            },
+        }
+        diagnostics = validate_retrieval_diagnostics(response, "on")
+        self.assertEqual(diagnostics["refillAdded"], 1)
+        with self.assertRaisesRegex(ValueError, "does not match"):
+            validate_retrieval_diagnostics(response, "off")
 
 
 if __name__ == "__main__":

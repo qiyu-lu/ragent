@@ -17,6 +17,7 @@ rag:
   search:
     default-top-k: 10
     recall-budget: 20
+    request-level-refill-enabled: false
     scope:
       fallback-mode: global
       min-intent-score: 0.4

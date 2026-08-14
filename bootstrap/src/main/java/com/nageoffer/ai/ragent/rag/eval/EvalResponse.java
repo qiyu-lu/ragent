@@ -17,6 +17,7 @@
 
 package com.nageoffer.ai.ragent.rag.eval;
 
+import com.nageoffer.ai.ragent.rag.dto.RetrievalSelectionDiagnostics;
 import lombok.Builder;
 import lombok.Data;
 
@@ -95,6 +96,11 @@ public class EvalResponse {
      * 评测脚本据此与评估集 intent_l2 比对，计算 Top-1 准确率
      */
     private List<String> intentLeafIds;
+
+    /**
+     * 请求级上下文选择诊断，用于固定评测校验公平回填是否实际执行。
+     */
+    private RetrievalSelectionDiagnostics retrievalDiagnostics;
 
     /**
      * 总耗时（毫秒）

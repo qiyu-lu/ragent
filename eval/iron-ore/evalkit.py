@@ -234,9 +234,22 @@ class ApiClient:
             raise ApiError(f"upload {file_path}: {payload.get('code')} {payload.get('message')}")
         return payload.get("data")
 
-    def query_eval(self, question: str) -> Tuple[dict, int]:
+    def query_eval(
+        self,
+        question: str,
+        sub_questions: Optional[Sequence[str]] = None,
+    ) -> Tuple[dict, int]:
         started = time.monotonic()
-        result = self.request_json("/rag/eval", query={"question": question})
+        if sub_questions is None:
+            result = self.request_json("/rag/eval", query={"question": question})
+        else:
+            result = self.request_json(
+                "/rag/eval/replay",
+                method="POST",
+                body={"question": question, "subQuestions": list(sub_questions)},
+            )
+        if not isinstance(result, dict):
+            raise ApiError("eval endpoint returned a non-object response")
         return result, round((time.monotonic() - started) * 1000)
 
     def query_answer(self, question: str, deep_thinking: bool = False) -> dict:
@@ -300,6 +313,88 @@ class ApiClient:
             "events": events,
             "wall_ms": round((time.monotonic() - started) * 1000),
         }
+
+
+def validate_retrieval_diagnostics(
+    response: Mapping[str, Any],
+    refill_mode: str,
+) -> Dict[str, Any]:
+    """Validate the request-level fair-refill diagnostics returned by the eval API.
+
+    The runner treats these fields as evidence rather than optional logging.  A
+    mislabeled server (for example, a report declared as ``on`` while the
+    backend still runs the control path) must fail before it can be compared.
+    """
+
+    if refill_mode not in {"off", "on"}:
+        raise ValueError(f"unsupported refill mode: {refill_mode}")
+    raw = response.get("retrievalDiagnostics")
+    if not isinstance(raw, Mapping):
+        raise ValueError("response is missing retrievalDiagnostics")
+
+    expected_enabled = refill_mode == "on"
+    enabled = raw.get("fairRefillEnabled")
+    if not isinstance(enabled, bool):
+        raise ValueError("retrievalDiagnostics.fairRefillEnabled must be boolean")
+    if enabled != expected_enabled:
+        raise ValueError(
+            "retrievalDiagnostics.fairRefillEnabled does not match "
+            f"--refill-mode {refill_mode}"
+        )
+
+    def integer(name: str) -> int:
+        value = raw.get(name)
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ValueError(f"retrievalDiagnostics.{name} must be an integer")
+        if value < 0:
+            raise ValueError(f"retrievalDiagnostics.{name} must be >= 0")
+        return value
+
+    request_top_k = integer("requestTopK")
+    candidate_count = integer("candidateCount")
+    candidate_unique = integer("candidateUniqueCount")
+    unique_before = integer("uniqueBeforeRefill")
+    refill_added = integer("refillAdded")
+    final_unique = integer("finalUniqueCount")
+    unfilled_slots = integer("unfilledSlots")
+
+    budgets = raw.get("initialBudgets")
+    if not isinstance(budgets, list) or not budgets:
+        raise ValueError("retrievalDiagnostics.initialBudgets must be a non-empty list")
+    if any(isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in budgets):
+        raise ValueError("retrievalDiagnostics.initialBudgets must contain non-negative integers")
+
+    if request_top_k <= 0:
+        raise ValueError("retrievalDiagnostics.requestTopK must be > 0")
+    if sum(budgets) != request_top_k:
+        raise ValueError("retrievalDiagnostics.initialBudgets must sum to requestTopK")
+    if candidate_unique > candidate_count:
+        raise ValueError("candidateUniqueCount cannot exceed candidateCount")
+    if unique_before > candidate_unique:
+        raise ValueError("uniqueBeforeRefill cannot exceed candidateUniqueCount")
+    if final_unique > candidate_unique:
+        raise ValueError("finalUniqueCount cannot exceed candidateUniqueCount")
+    if final_unique > request_top_k:
+        raise ValueError("finalUniqueCount cannot exceed requestTopK")
+    if final_unique != unique_before + refill_added:
+        raise ValueError("finalUniqueCount must equal uniqueBeforeRefill + refillAdded")
+    if unfilled_slots != request_top_k - final_unique:
+        raise ValueError("unfilledSlots must equal requestTopK - finalUniqueCount")
+    if not expected_enabled and refill_added != 0:
+        raise ValueError("refillAdded must be zero while fair refill is disabled")
+
+    chunk_ids = response.get("retrievedChunkIds")
+    contexts = response.get("retrievedContexts")
+    if not isinstance(chunk_ids, list) or not isinstance(contexts, list):
+        raise ValueError("retrievedChunkIds and retrievedContexts must be lists")
+    if any(not isinstance(chunk_id, str) or not chunk_id for chunk_id in chunk_ids):
+        raise ValueError("retrievedChunkIds must contain non-empty strings")
+    if len(chunk_ids) != len(set(chunk_ids)):
+        raise ValueError("retrievedChunkIds must be unique")
+    if len(chunk_ids) != final_unique or len(contexts) != final_unique:
+        raise ValueError("finalUniqueCount must match returned chunk ids and contexts")
+
+    return dict(raw)
 
 
 def score_retrieval(

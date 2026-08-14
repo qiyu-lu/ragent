@@ -6,9 +6,9 @@
 - 上游基线：Ragent `1.1.0`，提交 `f64de341452c8998ebf64cd264e60ccad6a31631`。
 - 本地基线标签：`checkpoint/iron-ore-rag-baseline-1.1.0`。
 - 已验证：本地中间件、后端、前端、知识库创建、小型 Markdown 上传、异步摄取、检索问答、行内引用和来源返回。
-- 未验证或未实施：完整铁矿调研 Excel 摄取、工业数据模型、模板审核、机器人和真实设备。
+- 阶段 0 当时未验证或未实施：完整领域 Excel 摄取、工业数据模型、模板审核和外部执行适配；后续状态见[改动索引](../changes/README.md)。
 
-详细的逐项验证证据已归档在[阶段 0 实施记录](../archive/2026-08-12-stage-0-implementation-log.md)。一般复现只需阅读本页。
+环境改动原因、故障定位、验证证据和回滚方式见[可重复本地开发栈](../changes/2026-08-12-reproducible-local-development-stack.md)。一般复现只需阅读本页。
 
 ## 复现步骤
 
@@ -19,7 +19,7 @@ git switch research/iron-ore-rag
 git status --short --branch
 ```
 
-使用 JDK 17、Docker Compose，以及能够执行 `npm ci` 的 Node.js/npm 环境。API 密钥继续配置在 IDEA Run Configuration 或本机环境变量中，不写入仓库。
+使用 JDK 17、Docker Compose，以及能够执行 `npm ci` 的 Node.js/npm 环境。API 密钥只通过系统环境变量、密钥管理器或 IDE Password Safe 注入；不得写入仓库或 IDEA Run Configuration XML。
 
 ### 2. 启动中间件
 
@@ -67,9 +67,9 @@ npm run dev
 - RocketMQ 5.2.0 在 Docker 所在文件系统使用率达到 90% 时会强制禁止写入，应长期保留足够空间。
 - 当前 Redis 宿主机端口是 `6380`，不是常见的 `6379`。
 - `resources/database/examples/intent_node_tutorial.sql` 是可选教程参考，不属于基础复现，也不会自动导入。
-- `local-data/source/铁矿石人工检测流程调研V1.2.xlsx` 是本地只读研究材料并由 Git 忽略；阶段 0 不摄取完整文件。
+- `local-data/source/` 中的企业研究材料只在本机使用并由 Git 忽略；阶段 0 不摄取完整文件。
 - 无需向协作者发送 API 密钥。需要运行模型链路时，优先复用 IDEA 进程已有环境变量。
 
 ## 阶段停止点
 
-能够稳定完成一次“小文档上传 → 摄取 → 检索问答 → 来源返回”即结束本阶段。下一阶段从原始调研材料中人工选择有限样本并建立评测基线，不在复现阶段继续堆功能。
+能够稳定完成一次“小文档上传 → 摄取 → 检索问答 → 来源返回”即结束本阶段。后续领域改造和评测结果由 `changes/` 单项文档记录，不再向复现手册追加实验流水。

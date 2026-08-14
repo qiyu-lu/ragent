@@ -10,11 +10,17 @@
 | 分支 | `research/iron-ore-rag` |
 | Git 提交 | `fd538a8`（检索纯度）；XLSX 分块依赖 `ed2590e` |
 
-## 问题与边界
+## 改动目的
+
+在不扩大最终上下文、不重建冻结索引的前提下，把 `TopK=10` 恢复为整个用户请求的上限，并让文档名、工作表和表格行语义真正参与 rerank。目标是减少“答案证据已经召回，但同时混入大量低相关块”的情况，并让预算、路由和排序问题可以由评测接口定位。
+
+本次不改变阶段 2/3 的产品边界，不把意图关闭时的全局检索本身判定为 bug，也不依据一次在线运行宣称生成准确率提升。
+
+## 问题如何发现
 
 C-final 的 Context Precision 只有 `17.1%`。逐题检查发现，21 道可回答/近领域题中有 17 道被改写为 2～3 个子问题；旧实现把配置的 TopK=10 发给每一个子问题，再把结果合并。因此返回块数不是请求级 10，而是平均 `13.05`、最大 `19`，17/21 道题超过 10。增加 TopK 只会继续放大噪声和上下文成本。
 
-本次只修复能够由代码和冻结结果证明的三项问题：请求级预算失效、模型输出的 `should_split` 未被执行、rerank 看不到文档名与结构化 embedding text。意图关闭时使用全局作用域是既有的显式配置，不把跨知识库检索本身误判为 bug，也不依据一次在线运行宣称稳定准确率提升。
+随后沿调用链核对三个数据契约：`RetrievalEngine` 的 TopK 在子问题层被重复使用；改写 JSON 虽包含 `should_split`，解析器却只看 `sub_questions`；入库已有 `embedding_text` 和结构元数据，rerank 输入却只有展示正文。由此把低纯度拆成三个可独立验证的代码问题，而不是先通过调大 TopK 或更换模型碰运气。
 
 ## 根因
 
@@ -23,15 +29,22 @@ C-final 的 Context Precision 只有 `17.1%`。逐题检查发现，21 道可回
 3. 向量入库使用了章节路径和表格结构化文本，但 rerank 只接收展示正文。标准名、sheet 和表格行语义没有进入重排判断；后置元数据补全又排在 rerank 之后。
 4. C-final 的 Hit@5 已经较高，低纯度主要表现为“正确块存在，但同一请求又带回大量无关块”，不是召回池不足。
 
-## 实施内容
+## 方案取舍
+
+- 不增加最终 TopK：这会掩盖请求级预算失效，并继续增加 Prompt 噪声和成本。
+- 不直接压小每个子问题的召回池：候选召回和最终展示是两个预算，过早截断可能损害召回。
+- 不只修改 Prompt：`should_split`、额度分配和排序输入都是后端契约，必须由代码和测试约束。
+- 选择“每题保留候选、请求级统一分配最终额度、结构化文本只用于排序”的方案：既守住 10 块产品上限，又不把内部 ranking text 暴露为引用正文。
+
+## 具体改动与调用链
 
 - 将 TopK 定义恢复为请求级产品契约：多子问题共享 10 条最终上下文额度，候选召回预算和 rerank 候选池仍按每个子问题保留，不用缩小候选池换取表面纯度。
-- `fd538a8` 检查点新增始终启用的 `FinalTopKPostProcessor`，即使 rerank 未启用、失败或被跳过，单个子问题也不能突破分配额度。
+- `fd538a8` 当时新增始终启用的 `FinalTopKPostProcessor`，即使 rerank 未启用、失败或被跳过，单个子问题也不能突破分配额度；该处理器后来在 D2 被候选池守卫和请求级选择器替代，不是当前链路中的并存组件。
 - `MultiQuestionRewriteService` 真实执行 `should_split`；`false` 时只使用 rewrite，`true` 时裁剪空白并按原顺序去重。
 - 将元数据补全移动到 rerank 之前，重排输入改为“去扩展名的文档名 + 已落库 embedding text”；展示、引用和最终提示词继续使用原始正文，不把内部排序文本泄漏给用户。
 - 评测接口增加 collection、最终分数、Excel sheet 和 cell range 的逐块诊断字段，用于定位跨库混入和排序失败，不改变产品回答接口。
 
-D1 检查点的后置处理顺序为：`Deduplication(1) → Fusion(5) → MetadataEnrichment(8) → Rerank(10) → FinalTopK(15)`。
+D1 检查点的后置处理顺序为：`Deduplication(1) → Fusion(5) → MetadataEnrichment(8) → Rerank(10) → FinalTopK(15)`。当前 D2 链路已演进为：`Deduplication → Fusion → CandidatePoolLimit → MetadataEnrichment → Rerank → 请求级选择`；最终 Prompt、来源、grounding 和评测统一读取同一份请求级结果。
 
 ## 验证
 
@@ -84,9 +97,15 @@ D1 唯一丢失的是 `xlsx-hard-06` 的一个目标锚点。该内容仍存在�
 
 完整 D1 总体指标低于 D0，主要下降发生在本次重新解析后发生块形状变化的两类 PDF；因此不作为检索代码失败或成功的单因果证据。D1 的数据库和结果哈希已保存到 `local-data/eval/snapshots/current-D1-chunk-purity/`，该目录受 Git 忽略并只在本机保留。
 
-### D2 后续结论
+## 改动效果与限制
 
-D1 提出的请求级公平补位已在 D2 以默认关闭的开关实现。当前 `dcd9222` 用 `CandidatePoolLimitPostProcessor` 在昂贵的元数据补全与 rerank 前守住候选池成本，再由请求级选择器统一完成最终 TopK；不再把 D1 的 `FinalTopKPostProcessor` 当作当前实现。D2 复用同一 D1 数据库、固定 24 题 `subIntents` 做 off/on 各三次回放。机制每次都把旧路径留下的 `73` 个空位补满，但总体 Hit@5、Context Precision 和路由纯度均越过预注册退化门槛，最终 gate 为 fail。`xlsx-hard-06` 的 D2 off 三次已经命中，因此 on 命中也不能算作恢复 D1 的单次缺失。详细协议和结果见[请求级公平回填固定回放评测](2026-08-14-request-level-fair-refill.md)。
+D0 是本次检索代码的主要因果证据：冻结 141 个块和向量，仅替换检索代码后，平均上下文减半、Context Precision 和路由纯度提高、文档召回不变。但自动 Anchor Recall 与 Hit@5 小幅下降，人工严格回答质量也没有因此重新评为提升，因此效果只能表述为“预算收口与检索纯度改善”。
+
+D1 同时包含 XLSX 新分块和 PDF 在线重新解析，只能用于组合兼容验证；XLSX 分块指标稳定，两类 PDF 的块数发生远端漂移，所以 D1 总体指标不能作为本地检索改动的单因果证据。完整分块效果见 [XLSX 结构感知分块](2026-08-13-xlsx-structure-aware-chunking.md)。
+
+### D2 后续结论与停止决定
+
+D1 提出的请求级公平补位已在 D2 以默认关闭的开关实现，并用固定 24 题改写做 off/on 各三次回放。机制能够补满空位，但 Hit@5、Context Precision 和路由纯度越过非退化门槛；D1 单次丢失的目标题在 D2 off 三次中已全部命中，也没有形成配对恢复证据。详细协议、实现和负结果见[请求级公平回填固定回放评测](2026-08-14-request-level-fair-refill.md)。
 
 因此 D1 的请求级上限和结构化重排继续保留，公平回填保持 `false`；本阶段不继续增加重复次数或调参。
 

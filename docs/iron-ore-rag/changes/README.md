@@ -1,32 +1,34 @@
-# 铁矿检测 RAG 改动索引
+# 工业文档 RAG 改动索引
 
-本页只回答“改过什么、对应哪次提交、到哪里看详情”。具体问题分析、验证和回滚方法放在单项详情中，避免形成一个越来越长的实施日志。
+本页只映射“改过什么、对应哪次提交、到哪里看原因与证据”。发现过程、根因、方案取舍、实现、效果、限制和回滚均放在单项详情中。
 
-## 已实施改动
+## Java 后端 + AI 主线
 
-| 日期 | 阶段 | 改动 | Git 检查点 | 详情 |
-| --- | --- | --- | --- | --- |
-| 2026-08-12 | 0 | 固定 Ragent 1.1.0 项目上下文并隔离本地调研材料 | `eddeec0`、`7da3042` | [阶段 0 归档记录](../archive/2026-08-12-stage-0-implementation-log.md) |
-| 2026-08-12 | 0 | 建立项目专属 PostgreSQL、Redis、RustFS、RocketMQ 开发栈并完成基线验证 | `4962aad`、`b3a6085`、`bcfba62` | [阶段 0 归档记录](../archive/2026-08-12-stage-0-implementation-log.md) |
-| 2026-08-12 | 0 / 工程修复 | 用户取消生成后，trace run 可能永久停留在 `RUNNING` | `24bd7f8`、`e0d0871`，合并点 `c7e8da8` | [取消后 trace run 悬挂修复](2026-08-12-cancel-trace-run-hang.md) |
-| 2026-08-12 | 1 | 建立脱敏 XLSX/Markdown 固定样本和 8 题 A/B，验证表格结构化摄取与精确来源 | `a016f01` | [阶段 1：表格样本评测](../stages/01-table-sample-evaluation.md) |
-| 2026-08-12 | 2 | XLSX 精确来源、严格检索、候选任务、模拟执行与确定性版本差异 Demo | `a016f01` | [工业知识闭环 Demo](2026-08-12-industrial-knowledge-demo.md) |
-| 2026-08-12 | 3 | 已批准候选任务确定性编译并通过 ROS1 Action 派发、反馈与取消 dry-run 搬运任务 | `a016f01` | [ROS1 机器人任务 Demo](2026-08-12-ros1-robot-mission-demo.md) |
-| 2026-08-13 | 评测 | 3 类文档、24 题的冻结基线/当前版评测、OCR/意图诊断、盲评与数据库快照工具 | `318e1f3` | [小型系统评测工具](2026-08-13-system-evaluation-harness.md) |
-| 2026-08-13 | 评测后优化 | 修复 XLSX 合并单元格膨胀、重复续行、双文本预算失真和跨工作表回并 | 代码 `ed2590e`；D1 证据 `03a89db` | [XLSX 结构感知分块与去重](2026-08-13-xlsx-structure-aware-chunking.md) |
-| 2026-08-13 | 评测后优化 | 恢复请求级 TopK 契约，执行 `should_split`，并让文档名与结构化文本进入 rerank | 代码 `fd538a8`；D0/D1 证据 `03a89db` | [请求级检索预算与结构化重排](2026-08-13-request-level-retrieval-purity.md) |
-| 2026-08-14 | 评测后优化 | 在默认关闭的特性开关后实现请求级公平回填，并以固定改写完成 3 次 off / 3 次 on 回放；机制生效但质量 gate fail，不启用 | 代码 `dcd9222`；回放 `fa1bc3f`；门槛 `d2f0b1f`；脱敏 `37fc9d0` | [D2 请求级公平回填评测](2026-08-14-request-level-fair-refill.md) |
+| 日期 | 改动 | Git 检查点 | 详情 |
+| --- | --- | --- | --- |
+| 2026-08-12 | 建立精确来源、稳定文档键、显式版本、证据约束任务草案、人工审批和确定性版本差异闭环 | `a016f01` | [工业知识闭环](2026-08-12-industrial-knowledge-demo.md) |
+| 2026-08-13 | 修复 XLSX 合并单元格膨胀、重复续行、双文本预算失真和跨工作表回并 | 代码 `ed2590e`；D1 证据 `03a89db` | [XLSX 结构感知分块](2026-08-13-xlsx-structure-aware-chunking.md) |
+| 2026-08-13 | 恢复请求级 TopK 契约，执行 `should_split`，让文档名与结构化文本进入 rerank | 代码 `fd538a8`；D0/D1 证据 `03a89db` | [请求级检索纯度](2026-08-13-request-level-retrieval-purity.md) |
 
-通用教程意图节点仍只是复现参考；铁矿 Demo 使用单独的幂等脚本 [`resources/database/examples/iron_ore_demo_intents.sql`](../../../resources/database/examples/iron_ore_demo_intents.sql)。
+## 评测与证据驱动决策
 
-本阶段已经收尾：根 README 只展示 Java 后端 + AI 工业文档 RAG 主线与精选结果，本索引只列改动，`stages/` 保存复现/验收步骤，历史基线分析统一放入 `archive/`。详细实验数据不再复制到多个入口页，ROS1 仅作为可选扩展保留。
+| 日期 | 改动 | Git 检查点 | 详情 |
+| --- | --- | --- | --- |
+| 2026-08-12 | 先用有限脱敏表格样本和 8 题 A/B 验证摄取、来源与拒答边界 | `a016f01` | [表格样本基线](2026-08-12-table-sample-baseline.md) |
+| 2026-08-13 | 建立 3 类文档、24 题、盲评、数据库快照和固定选型门槛 | `318e1f3` | [小型系统评测](2026-08-13-system-evaluation-harness.md) |
+| 2026-08-14 | 实现受开关保护的请求级公平回填并完成 3 次 off / 3 次 on 固定回放；机制生效但质量 gate fail | 代码 `dcd9222`；回放 `fa1bc3f`；门槛 `d2f0b1f`；脱敏 `37fc9d0` | [D2 公平回填负结果](2026-08-14-request-level-fair-refill.md) |
 
-## 后续如何记录
+## 通用 Java 后端工程
 
-1. 先确认改动属于哪个阶段，并在对应阶段文档中写清验收边界。
-2. 实施和验证代码、配置或数据库变化，并形成可回滚的 Git 提交。
-3. 对需要解释或复现的改动复制 [`TEMPLATE.md`](TEMPLATE.md)，每项改动单独建文件。
-4. 在上表追加一行，链接详情和代码提交；不要把详情直接写入本索引。
-5. 阶段结束时更新[项目入口](../README.md)的当前阶段和下一阶段。
+| 日期 | 改动 | Git 检查点 | 详情 |
+| --- | --- | --- | --- |
+| 2026-08-12 | 隔离项目数据并建立 PostgreSQL、Redis、RustFS、RocketMQ 独立开发栈和可复现基线 | `eddeec0`、`7da3042`、`4962aad`、`b3a6085`、`bcfba62` | [可重复本地开发栈](2026-08-12-reproducible-local-development-stack.md) |
+| 2026-08-12 | 修复用户取消生成后 trace run 永久停留在 `RUNNING` 的竞态 | `24bd7f8`、`e0d0871`；合并点 `c7e8da8` | [取消后 trace 悬挂](2026-08-12-cancel-trace-run-hang.md) |
 
-建议详情文件名使用 `YYYY-MM-DD-short-topic.md`。同一问题的后续补丁继续更新原详情，并追加新的提交与验证结果；只有目标或行为边界已经变化时才建立新文件。
+## 可选执行适配
+
+| 日期 | 改动 | Git 检查点 | 详情 |
+| --- | --- | --- | --- |
+| 2026-08-12 | 将已批准任务确定性编译为 ROS1 Action dry-run，验证反馈、取消和非 dry-run 拒绝 | `a016f01` | [ROS1 dry-run（非求职主线）](2026-08-12-ros1-robot-mission-demo.md) |
+
+项目已在 D2 停止点冻结，不再维护未来改动模板，也不通过扩大 TopK、修改冻结题集或反复重跑追逐有利数字。若未来重新立项，应新增独立记录并预先固定数据、变量和通过门槛。

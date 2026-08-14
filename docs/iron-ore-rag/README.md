@@ -1,6 +1,6 @@
-# Java 后端 + AI 工业文档 RAG 工程入口
+# 工业文档 RAG 工程入口
 
-本页用于恢复当前工程检查点和选择下一份文档。项目主线是 Java 后端 + AI 的工业文档 RAG，ROS1 dry-run 仅为可选执行扩展。面向 GitHub 访客的项目介绍、量化结果和快速启动见[仓库首页](../../README.md)；这里不重复展开实验流水。
+本页只用于恢复当前检查点和选择阅读路径。面向 GitHub 访客的项目定位、代表性结果和快速启动见[仓库首页](../../README.md)。
 
 ## 当前检查点
 
@@ -8,58 +8,32 @@
 | --- | --- |
 | 上游基线 | Ragent `1.1.0`，`f64de341452c8998ebf64cd264e60ccad6a31631` |
 | 开发分支 | `research/iron-ore-rag` |
-| MVP 功能检查点 | `a016f01`：工业知识闭环；附带 ROS1 dry-run 可选扩展 |
-| 评测工具检查点 | `318e1f3`：3 类文档、24 题、盲评和数据库快照；`fa1bc3f`：确定性检索回放；`d2f0b1f`：配对恢复门槛；`37fc9d0`：目标锚点脱敏 |
-| 本阶段代码检查点 | `ed2590e`：XLSX 分块；`fd538a8`：请求级检索纯度；`dcd9222`：受开关保护的公平回填 |
-| 当前阶段 | D2 固定改写的 3 次 off / 3 次 on 回放已完成；公平回填 gate fail，默认关闭 |
-| 产品边界 | 主线只生成有文档依据、需人工审批的候选任务；机器人接口不是必需链路且仅允许 dry-run |
+| 冻结状态 | D2 固定回放已结束；公平回填质量 gate fail，代码保留但默认关闭 |
+| 最终配置 | `intent=off`、`ocr=off`、`rag.search.request-level-refill-enabled=false` |
 
-阶段 2/3 的代码、数据库迁移、针对性测试、前端构建、ROS1 构建以及成功/取消/拒绝非 dry-run 路径已经验证。尚未完成的是登录页面中的最终人工点击验收；这与评测优化收尾分开管理。
+阶段 2 的工程实现、迁移和定向测试已完成；ROS1 可选扩展另有三条本地运行时路径通过。两者的登录页面业务 E2E 均未完成，作为已知边界保留，不再列为本阶段待开发事项。提交与问题的对应关系统一见[改动索引](changes/README.md)。
 
-## 本阶段收尾结论
+## 主线阅读路径
 
-| 方向 | 结论 | 证据 |
-| --- | --- | --- |
-| 小型系统评测 | 固定 3 类文档、24 题和 15 个解析锚点；B0/C-final 共 48 条回答完成盲评 | [评测工具与冻结结果](changes/2026-08-13-system-evaluation-harness.md) |
-| 回答质量 | B0 与 C-final 人工严格通过率均为 79.2%，只能表述为维持基线质量 | [评测结果](changes/2026-08-13-system-evaluation-harness.md) |
-| XLSX 分块 | 超过 1,024 字符的块 `70 → 0`，最大长度 `12,489 → 1,019`，重复块 `17 → 0` | [XLSX 分块](changes/2026-08-13-xlsx-structure-aware-chunking.md) |
-| 检索纯度 | 冻结索引上 Context Precision `17.1% → 29.2%`，平均上下文 `13.05 → 6.52`，文档召回保持 97.6% | [请求级检索纯度](changes/2026-08-13-request-level-retrieval-purity.md) |
-| D2 公平回填 | 每次 24 题回放都补满了旧路径存在空位的 19 题，但 off/on 中位数未通过质量门槛且 P95 变差；实现保留、默认关闭 | [固定回放评测](changes/2026-08-14-request-level-fair-refill.md) |
-
-本阶段不再通过增大 TopK、修改冻结题集或反复重跑来追逐一次有利数字。D2 证明公平回填机制能够补满候选缺口，但质量 gate 阻止它上线；默认配置保持 `rag.search.request-level-refill-enabled=false`。
-
-## 按任务阅读
-
-| 任务 | 阅读路径 |
+| 任务 | 文档 |
 | --- | --- |
-| 了解项目目标、成果和量化结果 | [仓库首页](../../README.md) |
-| 重建本地开发环境 | [阶段 0：本地基线复现](stages/00-reproduction.md) → [本地中间件说明](../../resources/docker/dev/README.md) |
-| 查看最小表格样本与早期 A/B | [阶段 1：表格样本评测](stages/01-table-sample-evaluation.md) |
-| 部署或验收工业知识闭环 | [阶段 2：工业知识闭环](stages/02-industrial-knowledge-demo.md) |
-| 查看可选的 ROS1 dry-run 扩展 | [阶段 3：ROS1 机器人任务](stages/03-ros1-robot-mission-demo.md) |
-| 重跑 3 文档 / 24 题评测 | [评测说明](../../eval/iron-ore/README.md) → [固定运行手册](../../eval/iron-ore/RUNBOOK.md) |
-| 查看 D2 固定改写六轮回放 | [公平回填评测](changes/2026-08-14-request-level-fair-refill.md) |
-| 查看问题、实现、验证和回滚 | [改动索引](changes/README.md) |
-| 查阅原始基线分析与阶段 0 证据 | [历史归档](archive/README.md) |
+| 了解项目与量化结果 | [仓库首页](../../README.md) |
+| 重建本地环境 | [阶段 0：本地基线复现](stages/00-reproduction.md) → [开发栈改动说明](changes/2026-08-12-reproducible-local-development-stack.md) |
+| 了解 Java 后端 + AI 核心改造 | [工业知识闭环改动](changes/2026-08-12-industrial-knowledge-demo.md) → [部署与验收手册](stages/02-industrial-knowledge-demo.md) |
+| 复现小型系统评测 | [评测工具与冻结结果](changes/2026-08-13-system-evaluation-harness.md) → [评测说明](../../eval/iron-ore/README.md) → [固定运行手册](../../eval/iron-ore/RUNBOOK.md) |
+| 查看证据驱动优化 | [XLSX 分块](changes/2026-08-13-xlsx-structure-aware-chunking.md) → [检索纯度](changes/2026-08-13-request-level-retrieval-purity.md) → [D2 负结果](changes/2026-08-14-request-level-fair-refill.md) |
+| 查找某次改动、提交和回滚方式 | [改动索引](changes/README.md) |
 
-## 文档组织约定
+早期最小样本方法保留在[表格样本基线](changes/2026-08-12-table-sample-baseline.md)；ROS1 dry-run 是非求职主线的[可选执行适配案例](changes/2026-08-12-ros1-robot-mission-demo.md)。
 
-- `stages/` 只保存各阶段的目标、复现/验收步骤和停止点；完成后冻结，不追加实验流水。
-- `changes/` 每个问题一份详情，记录根因、代码、验证、数据影响和回滚；[改动索引](changes/README.md)是唯一总表。
-- `archive/` 保存已过时但仍有溯源价值的基线审计和实施记录；不能用其中的“尚未实现”判断当前能力。
-- `eval/iron-ore/` 保存评测协议和工具；真实材料、响应、评分表和数据库 dump 位于 Git 忽略目录。
-- 根 README 是公开项目主页，本页只做内部恢复和导航，避免两处重复维护完整指标。
+## 文档职责
 
-## 明确边界
+- `stages/` 只保留仍有使用价值的复现或验收手册，不记录实验流水。
+- `changes/` 按问题保存发现证据、根因、方案取舍、实现、效果、限制和回滚；索引是唯一提交总表。
+- `eval/iron-ore/` 定义评测协议与运行命令；原始材料、响应、评分表和数据库 dump 位于 Git 忽略目录。
 
-- 当前只验证一个企业 XLSX、一个原生 PDF 和一个扫描/异常文本层 PDF，不代表通用复杂文档平台。
-- 意图开启和 OCR 开启均未通过预先固定的选型门槛，最终评测配置仍为 `intent=off, ocr=off`。
-- RAG、人工审批、确定性任务编译、ROS1 适配和安全控制是不同职责，不能由模型绕过。
-- 公平回填未通过 D2 质量门槛，最终配置仍为 `rag.search.request-level-refill-enabled=false`。
-- 报警知识、真实实验设备、感知定位、底层控制和真实机器人安全联锁尚不具备；ROS1 不属于主线交付。
+## 阶段停止点
 
-## 下一步
-
-1. 按阶段 2/3 文档完成登录页面中的最终人工点击验收。
-2. 后续主线优先扩充代表性文档与后端可观测性；公平回填保持关闭，除非有新的排序假设和预先固定的通过门槛。
-3. ROS1 仅作为可选适配案例；只有真实技能接口、设备协议和安全责任明确后，才讨论真实设备集成。
+- 当前只验证 3 份文档、24 题和 15 个解析锚点；B0/C-final 的人工严格通过率均为 `79.2%`，不外推为行业基准或生成准确率提升。
+- D0 是冻结索引实验；D1 的 PDF 结果受在线 MinerU 漂移影响；D2 证明机制能补位但未通过质量门槛。
+- 本阶段代码与评测结论冻结，不继续调参或上线公平回填。只有新增代表性语料、提出新的排序假设并预先固定门槛时，才重新立项。

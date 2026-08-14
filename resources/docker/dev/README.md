@@ -27,7 +27,7 @@ docker compose -f resources/docker/dev/ragent-dev.compose.yaml up -d
 
 ## 本地覆盖
 
-Compose 已提供与应用配置一致的开发默认值。如需覆盖，可复制 `.env.example` 为同目录 `.env`；`.env` 已被 Git 忽略。模型供应商、MinerU 等 API 密钥继续由 IDEA Run Configuration 或系统环境变量提供，不写入此目录。
+Compose 已提供与应用配置一致的开发默认值。如需覆盖，可复制 `.env.example` 为同目录 `.env`；`.env` 已被 Git 忽略。模型供应商、MinerU 等 API 密钥只通过系统环境变量、密钥管理器或 IDE Password Safe 注入，不写入 `.env` 或 IDEA Run Configuration XML。
 
 RocketMQ 使用本 Compose 专属的 `rocketmq-data` 持久化命名卷，不依赖外置硬盘。开发配置把普通消息清理阈值 `diskMaxUsedSpaceRatio` 从默认 75% 提高到 88%；RocketMQ 5.2.0 仍会在存储文件系统使用率达到 90% 时强制禁止写入，而且该硬保护不能通过把配置写得更大来绕过。因此应让 Docker 所在文件系统长期保持在 90% 以下。
 

@@ -23,7 +23,7 @@ QUALITY_METRICS = (
     "routing_purity",
 )
 TARGET_ID = "xlsx-hard-06"
-TARGET_MISSING_ANCHOR = "称取 0.2g 烘干矿样"
+TARGET_ANCHOR_INDEX = 1
 EXPECTED_REPORTS_PER_ARM = 3
 EXPECTED_QUESTIONS_PER_REPORT = 24
 EPSILON = 1e-12
@@ -406,12 +406,18 @@ def fixed_sub_intents_gate(reports: Sequence[dict], ids: Sequence[str]) -> dict:
 
 
 def target_anchor_recovery_gate(off: Sequence[dict], on: Sequence[dict]) -> dict:
-    target_anchor = normalize(TARGET_MISSING_ANCHOR)
     declared_anchors = off[0]["_details_by_id"][TARGET_ID].get("reference_anchors") or []
-    anchor_declared = any(
-        isinstance(anchor, str) and normalize(anchor) == target_anchor
-        for anchor in declared_anchors
-    )
+    if (
+        not isinstance(declared_anchors, list)
+        or len(declared_anchors) <= TARGET_ANCHOR_INDEX
+        or not isinstance(declared_anchors[TARGET_ANCHOR_INDEX], str)
+        or not declared_anchors[TARGET_ANCHOR_INDEX].strip()
+    ):
+        raise ValueError(
+            f"{off[0].get('_path')}: {TARGET_ID} has no valid anchor at index "
+            f"{TARGET_ANCHOR_INDEX}"
+        )
+    target_anchor = normalize(declared_anchors[TARGET_ANCHOR_INDEX])
 
     def anchor_is_missed(report: Mapping[str, Any]) -> bool:
         missed = (report["_details_by_id"][TARGET_ID].get("score") or {}).get(
@@ -426,12 +432,12 @@ def target_anchor_recovery_gate(off: Sequence[dict], on: Sequence[dict]) -> dict
     paired_recovered = [missed and hit for missed, hit in zip(off_missed, on_hit)]
     recovery_count = sum(paired_recovered)
     return gate_criterion(
-        anchor_declared and recovery_count >= 2,
+        recovery_count >= 2,
         operator=">=",
         threshold={"recoveries": 2, "repeats": EXPECTED_REPORTS_PER_ARM},
         observed={
-            "anchor": TARGET_MISSING_ANCHOR,
-            "anchor_declared": anchor_declared,
+            "target_question_id": TARGET_ID,
+            "anchor_index": TARGET_ANCHOR_INDEX,
             "off_missed_by_repeat": off_missed,
             "on_hit_by_repeat": on_hit,
             "paired_recovered_by_repeat": paired_recovered,

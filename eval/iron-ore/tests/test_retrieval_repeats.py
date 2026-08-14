@@ -11,12 +11,14 @@ HERE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(HERE))
 
 from compare_retrieval_repeats import (
-    TARGET_MISSING_ANCHOR,
     assert_compatible,
     build_comparison,
     organize,
 )
 from run_retrieval import load_fixed_rewrites
+
+
+TEST_TARGET_ANCHOR = "测试目标锚点"
 
 
 class RetrievalRepeatTest(unittest.TestCase):
@@ -119,7 +121,7 @@ class RetrievalRepeatTest(unittest.TestCase):
             "context_precision": 0.6 if enabled else 0.5,
             "doc_recall": 1.0,
             "routing_purity": 1.0,
-            "missed_anchors": [] if anchor_recall == 1.0 else [TARGET_MISSING_ANCHOR],
+            "missed_anchors": [] if anchor_recall == 1.0 else [TEST_TARGET_ANCHOR],
         }
         return {
             "id": question_id,
@@ -129,7 +131,7 @@ class RetrievalRepeatTest(unittest.TestCase):
             "answerable": True,
             "reference_docs": ["doc"],
             "reference_anchors": (
-                [TARGET_MISSING_ANCHOR, "另一锚点"] if target else ["普通锚点"]
+                ["另一锚点", TEST_TARGET_ANCHOR] if target else ["普通锚点"]
             ),
             "score": score,
             "raw_response": {
@@ -222,11 +224,12 @@ class RetrievalRepeatTest(unittest.TestCase):
             self.assertEqual(report["gate"]["decision"], "pass")
             self.assertTrue(report["gate"]["passed"])
             self.assertEqual(report["gate"]["failed_criteria"], [])
-            self.assertTrue(
-                report["gate"]["criteria"]["xlsx_hard_06_missing_anchor_recovered"][
-                    "passed"
-                ]
-            )
+            recovery = report["gate"]["criteria"][
+                "xlsx_hard_06_missing_anchor_recovered"
+            ]
+            self.assertTrue(recovery["passed"])
+            self.assertEqual(recovery["observed"]["anchor_index"], 1)
+            self.assertNotIn("anchor", recovery["observed"])
             self.assertFalse(report["gate"]["record_only"]["included_in_decision"])
 
     def test_gate_fails_when_target_recovery_and_anchor_gain_are_not_met(self):
@@ -241,7 +244,7 @@ class RetrievalRepeatTest(unittest.TestCase):
                         target = report["details"][0]
                         target["score"]["anchor_recall"] = 0.5
                         target["score"]["anchor_hit@5_all"] = 0.5
-                        target["score"]["missed_anchors"] = [TARGET_MISSING_ANCHOR]
+                        target["score"]["missed_anchors"] = [TEST_TARGET_ANCHOR]
                         for metric in (
                             "anchor_hit@5_any",
                             "anchor_hit@5_all",

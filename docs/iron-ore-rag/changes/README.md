@@ -15,10 +15,11 @@
 | 2026-08-13 | 评测 | 3 类文档、24 题的冻结基线/当前版评测、OCR/意图诊断、盲评与数据库快照工具 | `318e1f3` | [小型系统评测工具](2026-08-13-system-evaluation-harness.md) |
 | 2026-08-13 | 评测后优化 | 修复 XLSX 合并单元格膨胀、重复续行、双文本预算失真和跨工作表回并 | 代码 `ed2590e`；D1 证据 `03a89db` | [XLSX 结构感知分块与去重](2026-08-13-xlsx-structure-aware-chunking.md) |
 | 2026-08-13 | 评测后优化 | 恢复请求级 TopK 契约，执行 `should_split`，并让文档名与结构化文本进入 rerank | 代码 `fd538a8`；D0/D1 证据 `03a89db` | [请求级检索预算与结构化重排](2026-08-13-request-level-retrieval-purity.md) |
+| 2026-08-14 | 评测后优化 | 在默认关闭的特性开关后实现请求级公平回填，并以固定改写完成 3 次 off / 3 次 on 回放；机制生效但质量 gate fail，不启用 | 代码 `dcd9222`；回放 `fa1bc3f`；门槛 `d2f0b1f`；脱敏 `37fc9d0` | [D2 请求级公平回填评测](2026-08-14-request-level-fair-refill.md) |
 
 通用教程意图节点仍只是复现参考；铁矿 Demo 使用单独的幂等脚本 [`resources/database/examples/iron_ore_demo_intents.sql`](../../../resources/database/examples/iron_ore_demo_intents.sql)。
 
-本阶段已经收尾：根 README 只展示项目与精选结果，本索引只列改动，`stages/` 保存复现/验收步骤，历史基线分析统一放入 `archive/`。详细实验数据不再复制到多个入口页。
+本阶段已经收尾：根 README 只展示 Java 后端 + AI 工业文档 RAG 主线与精选结果，本索引只列改动，`stages/` 保存复现/验收步骤，历史基线分析统一放入 `archive/`。详细实验数据不再复制到多个入口页，ROS1 仅作为可选扩展保留。
 
 ## 后续如何记录
 

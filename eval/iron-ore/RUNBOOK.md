@@ -212,3 +212,86 @@ python3 eval/iron-ore/render_summary.py \
 ```
 
 只有用户确认摘要没有敏感信息后，才把其中的聚合数字转写到简历或项目文档。
+
+## 8. D2 请求级公平回填固定回放
+
+D2 是 D1 之后的单变量诊断，不重跑在线改写，也不重建索引。保存的六份报告由服务端提交 `fa1bc3f001d0926e0b1a9ba4dea954fc8ecf9c70` 产生；随后 `d2f0b1f` 修正配对恢复门槛，`37fc9d0` 将目标锚点原文移出 Git，两者都不改变服务端检索行为。以下命令复现这组已保存证据；若以后用其他提交重跑，必须如实替换 `--server-commit` 并保存到新目录，不能混入本组结果。
+
+先停止当前后端，确认 `ragent_eval_current` 仍是 `current-D1-chunk-purity`。若状态已经改变，只在 D2 开始前恢复一次 D1 快照：
+
+```bash
+python3 eval/iron-ore/restore_eval_database.py \
+  --database ragent_eval_current \
+  --confirm-database ragent_eval_current --yes-replace \
+  --postgres-container ragent-iron-ore-dev-postgres-1 \
+  --redis-container ragent-iron-ore-dev-redis-1 \
+  --dump local-data/eval/snapshots/current-D1-chunk-purity/ragent_eval_current.dump
+```
+
+之后 off/on 必须复用这一个数据库，禁止再次恢复、导入或调用 `prepare_kb.py`。固定回放加载器会校验 dataset、corpus、D1 setup manifest 三个 SHA，并逐题校验问题 ID、文本和非空去重的 `subIntents`；预期值见[D2 详情](../../docs/iron-ore-rag/changes/2026-08-14-request-level-fair-refill.md)。D1 回放源是：
+
+```text
+local-data/eval/runs/D1-chunk-and-purity/retrieval.json
+```
+
+以 OCR 关闭、意图关闭状态启动当前后端。每次切换实验臂都要停止并重启后端，在第 2 节当前版参数后追加对应值：
+
+```text
+--rag.search.request-level-refill-enabled=<false|true>
+```
+
+先定义单轮命令；`mode` 必须和当前后端开关一致：
+
+```bash
+run_d2() {
+  mode="$1"
+  repeat_index="$2"
+  python3 eval/iron-ore/run_retrieval.py \
+    --base http://127.0.0.1:9092/api/ragent \
+    --label "D2-refill-${mode}-r${repeat_index}" --variant current \
+    --server-commit fa1bc3f001d0926e0b1a9ba4dea954fc8ecf9c70 \
+    --intent-mode off --ocr off --concurrency 1 \
+    --setup-manifest local-data/eval/runs/D1-chunk-and-purity/setup.json \
+    --fixed-rewrites-from local-data/eval/runs/D1-chunk-and-purity/retrieval.json \
+    --refill-mode "${mode}" --repeat-index "${repeat_index}" \
+    --output "local-data/eval/runs/D2-request-level-refill/${mode}-r${repeat_index}.json"
+}
+```
+
+保存证据时实际采用以下交错顺序，减少运行时段只偏向某一臂。每个注释处都要按标注值重启后端，六轮之间不恢复数据库、不重新入库：
+
+```bash
+# 后端 false
+run_d2 off 1
+# 后端 true
+run_d2 on 1
+run_d2 on 2
+# 后端 false
+run_d2 off 2
+run_d2 off 3
+# 后端 true
+run_d2 on 3
+```
+
+比较六份报告并执行预注册 gate：
+
+```bash
+python3 eval/iron-ore/compare_retrieval_repeats.py \
+  --off local-data/eval/runs/D2-request-level-refill/off-r1.json \
+  --off local-data/eval/runs/D2-request-level-refill/off-r2.json \
+  --off local-data/eval/runs/D2-request-level-refill/off-r3.json \
+  --on local-data/eval/runs/D2-request-level-refill/on-r1.json \
+  --on local-data/eval/runs/D2-request-level-refill/on-r2.json \
+  --on local-data/eval/runs/D2-request-level-refill/on-r3.json \
+  --output local-data/eval/runs/D2-request-level-refill/comparison.json
+```
+
+工具会拒绝覆盖已有报告；复跑时新建带日期或序号的目录，不删除既有证据。比较器要求 off/on 各恰好三份 24 题报告、重复编号为 1～3、固定 `subIntents` 完全一致，并校验每题 `retrievalDiagnostics` 与开关标签相符。
+
+本次结果为 gate fail：on 虽在每次重复中补满原先留空的 19 题，但总体 Hit@5、Context Precision 和路由纯度越过退化门槛。完成后把后端恢复为：
+
+```text
+--rag.search.request-level-refill-enabled=false
+```
+
+无需重建知识库。本阶段按 stop gate 结束；不要通过增加重复次数、放宽门槛或增大 TopK 回填成绩。

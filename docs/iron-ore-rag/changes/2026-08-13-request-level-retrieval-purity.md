@@ -26,12 +26,12 @@ C-final 的 Context Precision 只有 `17.1%`。逐题检查发现，21 道可回
 ## 实施内容
 
 - 将 TopK 定义恢复为请求级产品契约：多子问题共享 10 条最终上下文额度，候选召回预算和 rerank 候选池仍按每个子问题保留，不用缩小候选池换取表面纯度。
-- 新增始终启用的 `FinalTopKPostProcessor`，即使 rerank 未启用、失败或被跳过，单个子问题也不能突破分配额度。
+- `fd538a8` 检查点新增始终启用的 `FinalTopKPostProcessor`，即使 rerank 未启用、失败或被跳过，单个子问题也不能突破分配额度。
 - `MultiQuestionRewriteService` 真实执行 `should_split`；`false` 时只使用 rewrite，`true` 时裁剪空白并按原顺序去重。
 - 将元数据补全移动到 rerank 之前，重排输入改为“去扩展名的文档名 + 已落库 embedding text”；展示、引用和最终提示词继续使用原始正文，不把内部排序文本泄漏给用户。
 - 评测接口增加 collection、最终分数、Excel sheet 和 cell range 的逐块诊断字段，用于定位跨库混入和排序失败，不改变产品回答接口。
 
-后置处理顺序固定为：`Deduplication(1) → Fusion(5) → MetadataEnrichment(8) → Rerank(10) → FinalTopK(15)`。
+D1 检查点的后置处理顺序为：`Deduplication(1) → Fusion(5) → MetadataEnrichment(8) → Rerank(10) → FinalTopK(15)`。
 
 ## 验证
 
@@ -80,9 +80,15 @@ XLSX 六题的可比结果如下：
 | Context Precision | 27.9% | 50.7% | 39.3% |
 | 文档召回 | 100.0% | 100.0% | 100.0% |
 
-D1 唯一丢失的 XLSX 锚点是 `xlsx-hard-06` 中的“称取 0.2g 烘干矿样”。该内容仍存在于正确 sheet 的 `B10:H14` 块中，但问题被拆为方法、称样量、熔融条件三个子问题后，块未进入最终请求上下文。这暴露了下一项明确限制：子问题分别截断后再去重，会留下未使用的请求额度，却不会从各子问题候选中回填。后续若继续优化，应实现请求级去重后的公平补位或固定改写输出进行重复试验，而不是简单增大最终 TopK。
+D1 唯一丢失的是 `xlsx-hard-06` 的一个目标锚点。该内容仍存在于正确工作表的对应块中，但问题拆为三个子问题后，该块未进入最终请求上下文。这在当时暴露出一项明确限制：子问题分别截断后再去重，会留下未使用的请求额度，却不会从各子问题候选中回填。因此 D2 固定改写输出并验证请求级公平补位，而不是简单增大最终 TopK。真实锚点文本和单元格范围只保留在 Git 忽略的本地评测数据中。
 
 完整 D1 总体指标低于 D0，主要下降发生在本次重新解析后发生块形状变化的两类 PDF；因此不作为检索代码失败或成功的单因果证据。D1 的数据库和结果哈希已保存到 `local-data/eval/snapshots/current-D1-chunk-purity/`，该目录受 Git 忽略并只在本机保留。
+
+### D2 后续结论
+
+D1 提出的请求级公平补位已在 D2 以默认关闭的开关实现。当前 `dcd9222` 用 `CandidatePoolLimitPostProcessor` 在昂贵的元数据补全与 rerank 前守住候选池成本，再由请求级选择器统一完成最终 TopK；不再把 D1 的 `FinalTopKPostProcessor` 当作当前实现。D2 复用同一 D1 数据库、固定 24 题 `subIntents` 做 off/on 各三次回放。机制每次都把旧路径留下的 `73` 个空位补满，但总体 Hit@5、Context Precision 和路由纯度均越过预注册退化门槛，最终 gate 为 fail。`xlsx-hard-06` 的 D2 off 三次已经命中，因此 on 命中也不能算作恢复 D1 的单次缺失。详细协议和结果见[请求级公平回填固定回放评测](2026-08-14-request-level-fair-refill.md)。
+
+因此 D1 的请求级上限和结构化重排继续保留，公平回填保持 `false`；本阶段不继续增加重复次数或调参。
 
 ## 可用于简历的保守表述
 

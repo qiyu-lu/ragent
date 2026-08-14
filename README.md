@@ -1,49 +1,41 @@
-# 铁矿检测流程 RAG 与 ROS1 Dry-run
+# Java 后端 + AI 工业文档 RAG
 
-基于 [Ragent 1.1.0](https://github.com/nageoffer/ragent) 改造的工业文档 RAG 项目，面向铁矿检测流程中的文档解析、证据检索、候选任务审批和受控机器人任务演示。
+这是一个基于 [Ragent 1.1.0](https://github.com/nageoffer/ragent) 改造的工业文档 RAG 项目，面向 Java 后端 + AI 应用岗位展示完整工程能力：文档摄取、结构化分块、向量检索与重排、可追溯回答、关系数据建模、人工审批和可重复评测。
 
-本仓库重点不是包装通用聊天 Demo，而是建立一条可审计的最小闭环：文档中的事实必须能够追溯到来源，模型生成的任务只能作为候选草案，批准后的任务由确定性代码编译，并且当前机器人接口只允许 ROS1 dry-run。
+> 项目主线是工业文档知识服务。ROS1 机器人任务仅作为“已批准任务如何接入外部执行器”的可选 dry-run 扩展，不是项目定位，也不连接真实设备。
 
-> 当前能力边界：不连接真实机器人，不执行真实矿石检测，不让 LLM 直接生成底层控制指令，也不把 3 份文档的小型评测外推为行业基准。
-
-## 项目流程
+## 核心链路
 
 ```mermaid
 flowchart LR
-    A[XLSX / PDF 文档] --> B[解析与结构感知分块]
-    B --> C[正文、结构化向量文本与来源元数据]
-    C --> D[PostgreSQL / PGVector]
-    Q[用户问题] --> E[问题改写与可控拆分]
-    E --> F[检索、融合与 Rerank]
-    D --> F
-    F --> G[请求级 TopK 上下文]
-    G --> H[带来源回答]
-    H --> I[候选任务草案]
-    I --> J[人工审批]
-    J --> K[确定性任务编译]
-    K --> L[ROS1 Noetic dry-run]
+    A[XLSX / PDF] --> B[结构感知解析与分块]
+    B --> C[PostgreSQL / PGVector]
+    Q[用户问题] --> D[改写、检索、融合与 Rerank]
+    C --> D
+    D --> E[带来源回答]
+    E --> F[候选任务草案]
+    F --> G[人工审批与确定性编译]
+    G -. 可选扩展 .-> H[ROS1 dry-run]
 ```
 
-知识、审批、编排与控制被刻意分开：RAG 提供证据和草案，关系数据库保存版本与审批状态，白名单编译器生成任务，ROS1 网关只接受明确允许的模拟技能。
+RAG 只提供证据和候选草案；文档版本、来源、审批状态与执行记录由后端持久化；外部执行必须经过人工审批和白名单编译，LLM 不能直接生成底层控制指令。
 
-## 主要改动
+## 工程重点
 
-| 方向 | 已完成内容 | 详细记录 |
+| 方向 | 已完成内容 | 详情 |
 | --- | --- | --- |
-| 可重复开发环境 | 使用独立 PostgreSQL/PGVector、Redis、RustFS 和 RocketMQ Compose 栈，隔离研究数据与上游环境 | [阶段 0：本地基线复现](docs/iron-ore-rag/stages/00-reproduction.md) |
-| 工业知识闭环 | XLSX 精确来源、严格检索、候选任务、人工批准、模拟执行和确定性版本差异 | [工业知识闭环 Demo](docs/iron-ore-rag/changes/2026-08-12-industrial-knowledge-demo.md) |
-| ROS1 受控执行 | 将已批准任务编译为白名单搬运技能，支持 Action 派发、反馈、取消，并拒绝非 dry-run 请求 | [ROS1 机器人任务 Demo](docs/iron-ore-rag/changes/2026-08-12-ros1-robot-mission-demo.md) |
-| 可审计评测 | 固定 3 类文档、24 条问题、15 个解析锚点、基线/当前版隔离数据库、盲评与快照恢复工具 | [小型系统评测](docs/iron-ore-rag/changes/2026-08-13-system-evaluation-harness.md) |
-| XLSX 分块 | 修复合并单元格膨胀、重复续行、Markdown/Embedding 双预算失真和跨工作表回并 | [XLSX 结构感知分块](docs/iron-ore-rag/changes/2026-08-13-xlsx-structure-aware-chunking.md) |
-| 检索纯度 | 恢复请求级 TopK 契约，执行 `should_split`，让文档名和结构化向量文本参与 Rerank | [请求级检索纯度](docs/iron-ore-rag/changes/2026-08-13-request-level-retrieval-purity.md) |
+| Java 后端 | Spring Boot 3.5.7、MyBatis-Plus、SSE、任务状态流转、版本差异与可审计 API | [工业知识闭环](docs/iron-ore-rag/changes/2026-08-12-industrial-knowledge-demo.md) |
+| AI / RAG | 可替换的 Chat、Embedding、Rerank 客户端，问题改写、请求级 TopK、结构化重排与来源约束 | [请求级检索纯度](docs/iron-ore-rag/changes/2026-08-13-request-level-retrieval-purity.md) |
+| 文档工程 | XLSX 精确单元格来源、结构感知分块、PDF/MinerU 接入与不可变文档版本 | [XLSX 分块](docs/iron-ore-rag/changes/2026-08-13-xlsx-structure-aware-chunking.md) |
+| 数据与环境 | PostgreSQL/PGVector、Redis、RustFS、RocketMQ 的项目独立 Compose 开发栈 | [本地基线复现](docs/iron-ore-rag/stages/00-reproduction.md) |
+| 评测与回归 | 固定 3 类文档、24 题、15 个解析锚点，支持盲评、数据库快照与确定性检索回放 | [小型系统评测](docs/iron-ore-rag/changes/2026-08-13-system-evaluation-harness.md) |
+| 可选执行扩展 | 已批准任务可编译为 ROS1 Action dry-run，支持反馈、取消并拒绝非 dry-run 请求 | [ROS1 dry-run](docs/iron-ore-rag/changes/2026-08-12-ros1-robot-mission-demo.md) |
 
-完整提交和回滚入口见[改动索引](docs/iron-ore-rag/changes/README.md)。
+## 可信结果
 
-## 量化结果
+### XLSX 结构感知分块
 
-### XLSX 分块
-
-同一份铁矿检测流程工作簿在冻结索引与修复后 D1 干净重建中的结果：
+同一工作簿在冻结索引与 D1 干净重建中的结果如下；完整条件与回滚方式见 [XLSX 分块记录](docs/iron-ore-rag/changes/2026-08-13-xlsx-structure-aware-chunking.md)。
 
 | 指标 | 修复前 | 修复后 |
 | --- | ---: | ---: |
@@ -54,9 +46,9 @@ flowchart LR
 | 多余精确重复块 | 17 | 0 |
 | 固定解析锚点 | 5/5 | 5/5 |
 
-### 检索纯度
+### 请求级检索纯度
 
-D0 直接复用 C-final 的 141 个冻结块，只替换检索代码，用于隔离请求级预算、问题拆分和结构化 Rerank 的影响：
+D0 复用 C-final 的 141 个冻结块，只替换检索代码，以隔离请求级预算、问题拆分和结构化 Rerank 的影响；详情见 [请求级检索记录](docs/iron-ore-rag/changes/2026-08-13-request-level-retrieval-purity.md)。
 
 | 指标 | C-final | D0 |
 | --- | ---: | ---: |
@@ -67,59 +59,48 @@ D0 直接复用 C-final 的 141 个冻结块，只替换检索代码，用于隔
 | 路由纯度 | 73.6% | 84.8% |
 | 文档召回 | 97.6% | 97.6% |
 
-这些数字描述的是固定小样本中的分块与检索，不是完整回答准确率。24 条完整回答的人工严格通过率在基线与 C-final 中均为 79.2%，因此本项目不会把本轮结果表述为生成质量提升。
+### D2 公平回填：门槛未通过
 
-## 已知限制与下一步
+D2 固定相同的改写结果，对默认路径（off）和公平回填候选（on）各重复 3 次。下表是六轮结果的组内中位数，完整协议与逐轮结果见 [D2 固定回放评测](docs/iron-ore-rag/changes/2026-08-14-request-level-fair-refill.md)。
 
-- 评测集只有 3 份文档和 24 条固定问题，适合定位回归，不代表通用 Excel/PDF 或工业领域水平。
-- D0 的自动 Anchor Recall 从 86.5% 变为 84.1%，Hit@5(any) 从 95.2% 变为 90.5%。新增失败题已返回正确标准标题，但没有命中严格字符串锚点；原始分数仍保留，没有事后修改题集。
-- 多子问题分别截断后再去重时，剩余请求额度还不会从候选池公平补位；D1 因此漏掉一条仍存在于正确 sheet 的称样量块。
-- MinerU 在线解析存在运行间漂移；重新入库后的 PDF 总体指标不能简单归因于本地代码。
-- 当前 ROS1 集成只验证纸箱搬运 dry-run。真实设备、安全联锁、感知定位和底层控制不属于本检查点。
-- 阶段 2/3 的自动化验证已完成，但登录页面中的最终人工点击验收仍是单独待办。
+| 指标（中位数） | off | on |
+| --- | ---: | ---: |
+| `anchor_hit@5_any` | 0.905 | 0.762 |
+| `anchor_recall` | 0.841 | 0.865 |
+| `context_precision` | 0.254 | 0.200 |
+| `doc_recall` | 1.000 | 1.000 |
+| `routing_purity` | 0.915 | 0.811 |
+| P95 延迟 | 6,542 ms | 9,584 ms |
 
-如果继续优化，优先固定问题改写输出、实现请求级去重后的公平补位，并进行至少三次重复运行；不通过简单增加 TopK 追逐一次有利数字。
+公平回填在每次 24 题回放中都补满了旧路径存在空位的 19 题；`anchor_recall` 改善、`doc_recall` 持平，但 Hit@5、Context Precision 和路由纯度退化，P95 延迟也变差（仅记录、不参与放行）。质量 gate 失败，功能保留在特性开关后，默认配置继续使用 `rag.search.request-level-refill-enabled=false`。
 
-## 技术栈
+24 条完整回答的人工严格通过率在 B0 与 C-final 中均为 79.2%，因此这里只声明分块质量、检索行为和工程可审计性，不宣称生成准确率提升。
 
-- 后端：Java 17、Spring Boot 3.5.7、MyBatis-Plus、SSE
-- AI 链路：自定义 Chat / Embedding / Rerank 客户端、问题改写、意图树、多通道检索框架
-- 数据与中间件：PostgreSQL、PGVector、Redis/Redisson、RocketMQ、RustFS
-- 文档处理：Apache Tika、POI、MinerU，结构化 XLSX/PDF 分块与来源元数据
-- 前端：React 18、TypeScript、Vite、Zustand、Radix UI
-- 机器人演示：ROS1 Noetic Action、Python dry-run 网关
+## 能力边界
 
-默认评测配置只启用向量召回与 Rerank。源码虽然保留关键词、图检索和联网搜索通道，但不能据此宣称运行态已经启用全部混合检索能力。
+- 评测集只有 3 份文档和 24 条固定问题，适合定位回归，不代表通用 Office 解析或工业领域基准。
+- 默认评测配置为 `intent=off, ocr=off`；源码中存在的其他通道不等于运行态已经启用。
+- MinerU 在线解析存在运行间漂移，重新入库后的 PDF 指标不能简单归因于本地代码。
+- 当前不具备真实实验设备、感知定位、底层控制或机器人安全联锁；ROS1 只验证纸箱搬运 dry-run。
 
 ## 快速开始
 
-### 1. 环境要求
+环境需要 JDK 17、Node.js、Docker / Docker Compose，以及通过系统环境变量、密钥管理器或 IDE Password Safe 注入的模型、Embedding、Rerank 和文档解析服务凭据。密钥不要写入仓库或 IDE 工程文件。
 
-- JDK 17
-- Node.js 与 npm
-- Docker 与 Docker Compose
-- 与本地配置相匹配的模型、Embedding、Rerank 和文档解析服务凭据
-
-密钥只应放在系统环境变量或 IDE Run Configuration 中，不要写入仓库。
-
-### 2. 启动中间件
+启动项目独立中间件：
 
 ```bash
 docker compose -f resources/docker/dev/ragent-dev.compose.yaml up -d
 docker compose -f resources/docker/dev/ragent-dev.compose.yaml ps
 ```
 
-该开发栈会启动 PostgreSQL/PGVector、Redis、RustFS 和 RocketMQ。端口和数据重建边界见[本地中间件说明](resources/docker/dev/README.md)。
-
-### 3. 启动后端与前端
-
-在 IDE 中运行：
+在 IDE 中运行后端入口：
 
 ```text
 bootstrap/src/main/java/com/nageoffer/ai/ragent/RagentApplication.java
 ```
 
-随后启动前端：
+再启动前端：
 
 ```bash
 cd frontend
@@ -127,32 +108,25 @@ npm ci
 npm run dev
 ```
 
-访问 `http://127.0.0.1:5173`。完整冒烟步骤、默认端口和清理注意事项见[阶段 0 复现说明](docs/iron-ore-rag/stages/00-reproduction.md)。
+访问 `http://127.0.0.1:5173`。端口、冒烟步骤和清理边界见 [阶段 0 复现说明](docs/iron-ore-rag/stages/00-reproduction.md)。
 
-## 仓库结构
+## 代码与文档入口
 
 | 路径 | 用途 |
 | --- | --- |
 | `bootstrap/` | RAG、知识库、摄取、审批、任务和管理 API |
-| `framework/` | Web、认证上下文、Redis、MQ、Trace 等基础能力 |
 | `infra-ai/` | Chat、Embedding、Rerank、VLM 与模型路由 |
-| `frontend/` | 聊天、来源预览、知识库、任务审批与机器人演示页面 |
-| `robot-gateway/` | ROS1 Action、dry-run 网关和机器人演示消息 |
-| `eval/iron-ore/` | 固定题集校验、检索/回答评测、盲评和快照工具 |
-| `docs/iron-ore-rag/` | 当前检查点、阶段说明、改动详情和历史归档 |
+| `framework/` | Web、认证上下文、Redis、MQ 与 Trace 基础能力 |
+| `eval/iron-ore/` | 固定题集、检索/回答评测、盲评和快照工具 |
+| `frontend/` | 聊天、来源预览、知识库与任务审批页面 |
+| `robot-gateway/` | 可选的 ROS1 Action dry-run 适配层 |
+
+- [当前检查点与阅读路径](docs/iron-ore-rag/README.md)
+- [改动索引](docs/iron-ore-rag/changes/README.md)
+- [评测说明](eval/iron-ore/README.md)与[固定运行手册](eval/iron-ore/RUNBOOK.md)
 
 原始企业材料、模型密钥、评测响应和数据库 dump 位于 Git 忽略目录，不随仓库发布。
 
-## 文档入口
-
-- [当前检查点与阅读路径](docs/iron-ore-rag/README.md)
-- [全部改动索引](docs/iron-ore-rag/changes/README.md)
-- [评测方法](eval/iron-ore/README.md)与[固定运行手册](eval/iron-ore/RUNBOOK.md)
-- [阶段 2：工业知识闭环验收](docs/iron-ore-rag/stages/02-industrial-knowledge-demo.md)
-- [阶段 3：ROS1 dry-run 验收](docs/iron-ore-rag/stages/03-ros1-robot-mission-demo.md)
-
 ## 上游与许可证
 
-本仓库基于 `nageoffer/ragent` 的 `1.1.0` 版本和提交 `f64de341452c8998ebf64cd264e60ccad6a31631` 开展改造。上游作者及历史提交保持不变；本 fork 的领域改动、评测和实验结论由本仓库单独记录。
-
-项目继续遵循 [Apache License 2.0](LICENSE)。
+本仓库基于 `nageoffer/ragent` 的 `1.1.0` 版本和提交 `f64de341452c8998ebf64cd264e60ccad6a31631` 开展改造，上游作者及历史提交保持不变。项目继续遵循 [Apache License 2.0](LICENSE)。

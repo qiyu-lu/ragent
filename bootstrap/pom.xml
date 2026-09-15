@@ -88,6 +88,12 @@
         </dependency>
 
         <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>s3</artifactId>
         </dependency>
@@ -153,6 +159,19 @@
     </dependencies>
 
     <build>
+        <testResources>
+            <testResource>
+                <directory>src/test/resources</directory>
+            </testResource>
+            <!-- Integration tests execute the actual incremental migration. -->
+            <testResource>
+                <directory>${project.basedir}/../resources/database/upgrades/v1.1.0</directory>
+                <targetPath>db</targetPath>
+                <includes>
+                    <include>260915_task_agent.sql</include>
+                </includes>
+            </testResource>
+        </testResources>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>

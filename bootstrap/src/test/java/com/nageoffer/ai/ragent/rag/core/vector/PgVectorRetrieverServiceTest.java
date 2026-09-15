@@ -27,8 +27,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -38,6 +40,31 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class PgVectorRetrieverServiceTest {
+
+    @Test
+    @DisplayName("限定规程在召回LIMIT之前过滤且文档ID仅通过参数传入")
+    @SuppressWarnings("unchecked")
+    void bindsSelectedDocumentFilterBeforeLimit() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        EmbeddingService embeddings = mock(EmbeddingService.class);
+        when(embeddings.embed("送检要求")).thenReturn(List.of(3.0F, 4.0F));
+        when(jdbc.query(anyString(), any(RowMapper.class), any(Object[].class))).thenReturn(List.of());
+        String documentId = "doc-'quoted'";
+
+        new PgVectorRetrieverService(jdbc, embeddings).retrieve(RetrieveRequest.builder()
+                .query("送检要求").collectionName("procedures").topK(20)
+                .metadataFilters(Map.of("doc_id", documentId)).build());
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Object[]> args = ArgumentCaptor.forClass(Object[].class);
+        verify(jdbc).query(sql.capture(), any(RowMapper.class), args.capture());
+        assertTrue(sql.getValue().contains("metadata->>'doc_id' = ?"));
+        assertTrue(sql.getValue().indexOf("metadata->>'doc_id'") < sql.getValue().indexOf("ORDER BY"));
+        assertFalse(sql.getValue().contains(documentId));
+        assertEquals("procedures", args.getValue()[1]);
+        assertEquals(documentId, args.getValue()[2]);
+        assertEquals(20, args.getValue()[4]);
+    }
 
     @Test
     @DisplayName("多Collection使用单条IN查询并只携带一个总LIMIT")

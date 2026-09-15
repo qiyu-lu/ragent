@@ -1,0 +1,31 @@
+{
+  "schema_version": "context-selection-development-grid-v1",
+  "frozen_before_run": "2026-09-05",
+  "token_budget": 1024,
+  "max_chunks": 10,
+  "arms": [
+    {"label": "CS-P", "strategy": "CS-P", "lambda": 0.0, "mu": 0.0},
+    {"label": "CS-R", "strategy": "CS-R", "lambda": 0.0, "mu": 0.0},
+    {"label": "CS-M-mu0.0", "strategy": "CS-M", "lambda": 0.0, "mu": 0.0},
+    {"label": "CS-M-mu0.1", "strategy": "CS-M", "lambda": 0.0, "mu": 0.1},
+    {"label": "CS-M-mu0.3", "strategy": "CS-M", "lambda": 0.0, "mu": 0.3},
+    {"label": "CS-M-mu0.5", "strategy": "CS-M", "lambda": 0.0, "mu": 0.5},
+    {"label": "CS-C-l0.5-mu0.0", "strategy": "CS-C", "lambda": 0.5, "mu": 0.0},
+    {"label": "CS-C-l0.5-mu0.1", "strategy": "CS-C", "lambda": 0.5, "mu": 0.1},
+    {"label": "CS-C-l0.5-mu0.3", "strategy": "CS-C", "lambda": 0.5, "mu": 0.3},
+    {"label": "CS-C-l0.5-mu0.5", "strategy": "CS-C", "lambda": 0.5, "mu": 0.5},
+    {"label": "CS-C-l1.0-mu0.0", "strategy": "CS-C", "lambda": 1.0, "mu": 0.0},
+    {"label": "CS-C-l1.0-mu0.1", "strategy": "CS-C", "lambda": 1.0, "mu": 0.1},
+    {"label": "CS-C-l1.0-mu0.3", "strategy": "CS-C", "lambda": 1.0, "mu": 0.3},
+    {"label": "CS-C-l1.0-mu0.5", "strategy": "CS-C", "lambda": 1.0, "mu": 0.5},
+    {"label": "CS-C-l2.0-mu0.0", "strategy": "CS-C", "lambda": 2.0, "mu": 0.0},
+    {"label": "CS-C-l2.0-mu0.1", "strategy": "CS-C", "lambda": 2.0, "mu": 0.1},
+    {"label": "CS-C-l2.0-mu0.3", "strategy": "CS-C", "lambda": 2.0, "mu": 0.3},
+    {"label": "CS-C-l2.0-mu0.5", "strategy": "CS-C", "lambda": 2.0, "mu": 0.5}
+  ],
+  "notes": [
+    "The twelve CS-C combinations are fixed before reading development results.",
+    "CS-C with mu=0 is the no-diversity ablation.",
+    "CS-C-no-cover is implementation-equivalent to CS-M at the same mu and is not rerun."
+  ]
+}

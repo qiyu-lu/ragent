@@ -1,0 +1,4 @@
+[
+  {"_id":"train-bridge","question":"Where is the company led by Ada based?","answer":"Leeds","type":"bridge","level":"easy","supporting_facts":[["Ada",0],["Ada Corp",0]],"context":[["Ada",["Ada leads Ada Corp."]],["Ada Corp",["Ada Corp is based in Leeds."]],["Noise",["Noise text."]]]},
+  {"_id":"train-comparison","question":"Who was born first, Ann or Bob?","answer":"Ann","type":"comparison","level":"easy","supporting_facts":[["Ann",0],["Bob",0]],"context":[["Ann",["Ann was born in 1900."]],["Bob",["Bob was born in 1910."]],["Noise Two",["Other text."]]]}
+]

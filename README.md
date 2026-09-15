@@ -72,6 +72,7 @@ npm run dev
 
 ## 文档入口
 
+- [项目复习主讲义：上游特色、完整流程与证据约束闭环](docs/iron-ore-rag/project-study-guide.md)
 - [当前检查点与阅读路径](docs/iron-ore-rag/README.md)
 - [改动索引](docs/iron-ore-rag/changes/README.md)
 - [评测说明](eval/iron-ore/README.md)与[固定运行手册](eval/iron-ore/RUNBOOK.md)

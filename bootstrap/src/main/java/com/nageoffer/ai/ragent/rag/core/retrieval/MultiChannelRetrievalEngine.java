@@ -79,14 +79,25 @@ public class MultiChannelRetrievalEngine {
     @RagTraceNode(name = "multi-channel-retrieval", type = "RETRIEVE_CHANNEL")
     public KnowledgeRetrievalResult retrieveKnowledgeChannels(SubQuestionIntent subIntent,
                                                                RetrievalBudget budget) {
+        return retrieveKnowledgeChannels(subIntent, budget, null);
+    }
+
+    public KnowledgeRetrievalResult retrieveKnowledgeChannels(SubQuestionIntent subIntent,
+                                                               RetrievalBudget budget,
+                                                               RetrievalCapture capture) {
         SearchContext context = buildSearchContext(subIntent, budget);
 
         List<SearchChannelResult> channelResults = executeSearchChannels(context);
+        if (capture != null) {
+            channelResults.forEach(result -> capture.record(subIntent.subQuestion(),
+                    "channel-" + result.getChannelName(), result.getChunks(), result.getLatencyMs(),
+                    result.getChunks().isEmpty() ? "empty-or-failed-channel" : null));
+        }
         if (CollUtil.isEmpty(channelResults)) {
             return KnowledgeRetrievalResult.empty();
         }
 
-        List<RetrievedChunk> chunks = executePostProcessors(channelResults, context);
+        List<RetrievedChunk> chunks = executePostProcessors(channelResults, context, capture);
         // 异常或超时导致定向证据为空时，保留的定向范围会使其按未命中处理
         return new KnowledgeRetrievalResult(
                 chunks,
@@ -198,7 +209,8 @@ public class MultiChannelRetrievalEngine {
     }
 
     private List<RetrievedChunk> executePostProcessors(List<SearchChannelResult> results,
-                                                       SearchContext context) {
+                                                       SearchContext context,
+                                                       RetrievalCapture capture) {
         List<SearchResultPostProcessor> enabledProcessors = postProcessors.stream()
                 .filter(processor -> processor.isEnabled(context))
                 .sorted(Comparator.comparingInt(SearchResultPostProcessor::getOrder))
@@ -218,10 +230,15 @@ public class MultiChannelRetrievalEngine {
         int initialSize = chunks.size();
 
         for (SearchResultPostProcessor processor : enabledProcessors) {
+            long started = System.nanoTime();
             try {
                 int beforeSize = chunks.size();
                 chunks = processor.process(chunks, results, context);
                 int afterSize = chunks.size();
+                if (capture != null) {
+                    capture.record(context.getMainQuestion(), "post-" + processor.getName(), chunks,
+                            TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started), null);
+                }
 
                 log.info("后置处理器 {} 完成 - 输入: {} 个 Chunk, 输出: {} 个 Chunk, 变化: {}",
                         processor.getName(),
@@ -230,6 +247,10 @@ public class MultiChannelRetrievalEngine {
                         (afterSize - beforeSize > 0 ? "+" : "") + (afterSize - beforeSize)
                 );
             } catch (Exception e) {
+                if (capture != null) {
+                    capture.record(context.getMainQuestion(), "post-" + processor.getName(), chunks,
+                            TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started), e.getClass().getSimpleName());
+                }
                 log.error("后置处理器 {} 执行失败，跳过该处理器", processor.getName(), e);
             }
         }

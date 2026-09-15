@@ -1,0 +1,74 @@
+# Public corpus only. Credentials inherited from IDEA by start_pooled.py.
+server:
+  address: 127.0.0.1
+  port: 9093
+unique-name: "-cs-pool-v1"
+spring:
+  datasource:
+    url: jdbc:postgresql://127.0.0.1:5432/ragent_eval_pool_v1?client_encoding=UTF8
+  data:
+    redis:
+      database: 13
+ragent:
+  engine:
+    type: workflow
+  demo-mode: false
+  eval:
+    enabled: true
+    pooled:
+      enabled: true
+rag:
+  vector:
+    type: pg
+  storage:
+    kb-bucket: ragent-cs-pool-v1-sources
+    asset-bucket: ragent-cs-pool-v1-assets
+  query-rewrite:
+    enabled: true
+  rerank:
+    enabled: true
+  search:
+    default-top-k: 10
+    recall-budget: 40
+    request-level-refill-enabled: false
+    channels:
+      timeout-ms: 30000
+      vector:
+        enabled: true
+      keyword:
+        enabled: false
+      graph:
+        enabled: false
+      web-search:
+        enabled: false
+    fusion:
+      rerank-candidate-limit: 40
+ai:
+  chat:
+    tiers:
+      fast:
+        candidates: [qwen3-max]
+        timeout-ms: 30000
+      standard:
+        candidates: [qwen3-max]
+        timeout-ms: 30000
+      deep:
+        candidates: [qwen3-max]
+        timeout-ms: 60000
+  embedding:
+    default-model: qwen-emb-8b
+    candidates:
+      - id: qwen-emb-8b
+        provider: siliconflow
+        model: Qwen/Qwen3-Embedding-8B
+        dimension: 1536
+        priority: 1
+  rerank:
+    default-model: qwen3-rerank
+    candidates:
+      - id: qwen3-rerank
+        provider: bailian
+        model: qwen3-rerank
+        priority: 1
+mineru:
+  ocr: false

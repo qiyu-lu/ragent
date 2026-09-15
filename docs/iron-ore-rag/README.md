@@ -17,6 +17,7 @@
 
 | 任务 | 文档 |
 | --- | --- |
+| 不打开源码复习上游特色、完整业务链、重点改进、技术概念与面试追问 | [项目复习主讲义](project-study-guide.md) |
 | 了解项目与量化结果 | [仓库首页](../../README.md) |
 | 重建本地环境 | [阶段 0：本地基线复现](stages/00-reproduction.md) → [开发栈改动说明](changes/2026-08-12-reproducible-local-development-stack.md) |
 | 了解 Java 后端 + AI 核心改造 | [工业知识闭环改动](changes/2026-08-12-industrial-knowledge-demo.md) → [部署与验收手册](stages/02-industrial-knowledge-demo.md) |
@@ -28,6 +29,7 @@
 
 ## 文档职责
 
+- `project-study-guide.md` 按完整业务流程解释当前实现，单列上游 Ragent 原有特色及启用边界，并总结本分支重点改进的发现证据、根因、实现、取舍、效果与边界，是日常复习主入口。
 - `stages/` 只保留仍有使用价值的复现或验收手册，不记录实验流水。
 - `changes/` 按问题保存发现证据、根因、方案取舍、实现、效果、限制和回滚；索引是唯一提交总表。
 - `eval/iron-ore/` 定义评测协议与运行命令；原始材料、响应、评分表和数据库 dump 位于 Git 忽略目录。

@@ -1,0 +1,23 @@
+# Inherits the isolated public corpus profile; no business/default configuration changes.
+spring:
+  config:
+    import: application-pooled-eval.yaml
+---
+rag:
+  keyword:
+    type: es
+    es:
+      uris: http://127.0.0.1:9201
+      index: cs_pool_hybrid_v1
+      analyzer: english
+      search-analyzer: english
+  search:
+    channels:
+      keyword:
+        enabled: true
+    fusion:
+      strategy: rrf
+      rrf-k: 20
+      channel-weights:
+        vector: 1.0
+        keyword: 1.0

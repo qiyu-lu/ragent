@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ragent.local/schemas/context-selection-candidate-snapshot-v1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "example_id", "split", "language", "task_type", "original_question", "predicted_aspects", "candidates", "provenance", "timings_ms"],
+  "properties": {
+    "schema_version": {"const": "context-selection-candidate-snapshot-v1"},
+    "example_id": {"type": "string", "minLength": 1},
+    "split": {"type": "string", "minLength": 1},
+    "language": {"type": "string", "minLength": 1},
+    "task_type": {"type": "string", "minLength": 1},
+    "original_question": {"type": "string", "minLength": 1},
+    "predicted_aspects": {"type": "array", "minItems": 1, "maxItems": 4, "items": {"type": "string", "minLength": 1}},
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "text", "text_sha256", "ranking_text_sha256", "source_order", "source_ranks", "source_scores", "original_question_score", "aspect_scores", "embedding", "embedding_type", "render_token_count"]
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["dataset_sha256", "code_commit", "index_identity", "config_identity", "original_score_model", "aspect_score_model", "embedding_model", "tokenizer", "provider", "random_seed", "fallbacks", "captured_at"]
+    },
+    "timings_ms": {"type": "object"}
+  }
+}

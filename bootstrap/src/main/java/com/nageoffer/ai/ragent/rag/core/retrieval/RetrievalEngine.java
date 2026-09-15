@@ -81,6 +81,10 @@ public class RetrievalEngine {
      */
     @RagTraceNode(name = "retrieval-engine", type = "RETRIEVE")
     public RetrievalContext retrieve(List<SubQuestionIntent> subIntents) {
+        return retrieve(subIntents, null);
+    }
+
+    public RetrievalContext retrieve(List<SubQuestionIntent> subIntents, RetrievalCapture capture) {
         if (CollUtil.isEmpty(subIntents)) {
             return RetrievalContext.builder()
                     .kbChunks(List.of())
@@ -110,8 +114,12 @@ public class RetrievalEngine {
             tasks.add(CompletableFuture.supplyAsync(
                         () -> {
                             try {
-                                return buildSubQuestionContext(subIntent, candidateBudget, kbSkipped);
+                                return buildSubQuestionContext(subIntent, candidateBudget, kbSkipped, capture);
                             } catch (Exception e) {
+                                if (capture != null) {
+                                    capture.record(subIntent.subQuestion(), "subquestion-failed", List.of(), 0,
+                                            e.getClass().getSimpleName());
+                                }
                                 log.error("子问题上下文构建失败，降级为空上下文，question：{}", subIntent.subQuestion(), e);
                                 return new SubQuestionContext(subIntent, "", KnowledgeRetrievalResult.empty(), false);
                             }
@@ -132,6 +140,9 @@ public class RetrievalEngine {
                 requestBudget.contextTopK(),
                 fairRefillEnabled);
         List<RetrievedChunk> kbChunks = requestSelection.orderedUniqueChunks();
+        if (capture != null) {
+            capture.record("", "request-final", kbChunks, 0, null);
+        }
         Set<String> selectedKeys = kbChunks.stream()
                 .map(RetrievedChunkKey::of)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
@@ -203,14 +214,17 @@ public class RetrievalEngine {
 
     private SubQuestionContext buildSubQuestionContext(SubQuestionIntent intent,
                                                        RetrievalBudget candidateBudget,
-                                                       boolean kbSkipped) {
+                                                       boolean kbSkipped,
+                                                       RetrievalCapture capture) {
         List<NodeScore> mcpIntents = NodeScoreFilters.mcp(intent.nodeScores());
         KnowledgeRetrievalResult retrievalResult;
         if (kbSkipped) {
             log.warn("子问题超出请求级上下文额度，跳过 KB 检索，question={}", intent.subQuestion());
             retrievalResult = KnowledgeRetrievalResult.empty();
         } else {
-            retrievalResult = multiChannelRetrievalEngine.retrieveKnowledgeChannels(intent, candidateBudget);
+            retrievalResult = capture == null
+                    ? multiChannelRetrievalEngine.retrieveKnowledgeChannels(intent, candidateBudget)
+                    : multiChannelRetrievalEngine.retrieveKnowledgeChannels(intent, candidateBudget, capture);
         }
 
         String mcpContext = CollUtil.isNotEmpty(mcpIntents)

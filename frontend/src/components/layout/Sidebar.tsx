@@ -213,6 +213,17 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   <span className="block text-xs text-[#94A3B8]">从空白开始</span>
                 </span>
               </button>
+              <button
+                type="button"
+                className="mt-2 flex w-full items-center gap-3 rounded-xl bg-white px-4 py-3 text-sm text-slate-700 hover:bg-blue-50"
+                onClick={() => {
+                  navigate("/tasks");
+                  onClose();
+                }}
+              >
+                <PlayCircle className="h-4 w-4 text-blue-600" />
+                送检任务助手
+              </button>
               {user?.role === "admin" ? (
                 <button
                   type="button"

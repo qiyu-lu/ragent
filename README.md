@@ -12,6 +12,10 @@ flowchart LR
     C --> D
     D --> E[带来源回答]
     E --> F[固定数据集与回归评测]
+    T[送检目标] --> G[单 Agent 工具循环与持久状态]
+    C --> G
+    G --> H[人工确认有依据的草稿]
+    H --> I[预约工位与创建送检记录]
 ```
 
 RAG 只提供证据和候选结果，文档版本、来源与状态由后端持久化；LLM 不直接执行外部控制。
@@ -23,6 +27,7 @@ RAG 只提供证据和候选结果，文档版本、来源与状态由后端持�
 | Java 后端 | 复用上游 Spring Boot 3.5.7、MyBatis-Plus 和 SSE；新增任务状态流转、确定性版本差异与可审计 API | [工业知识闭环](docs/iron-ore-rag/changes/2026-08-12-industrial-knowledge-demo.md) |
 | 后端可靠性 | 修复用户取消生成时 Redis 标记、进程内任务、SSE 连接与数据库 trace 并发收尾的竞态；通过多入口补偿和 `RUNNING → 终态` 条件更新，避免根 run 永久悬挂 | [取消后 trace 收尾](docs/iron-ore-rag/changes/2026-08-12-cancel-trace-run-hang.md) |
 | AI / RAG | 复用可替换模型客户端；新增请求级 TopK、`should_split` 执行、结构化重排和来源约束 | [检索纯度改进](docs/iron-ore-rag/changes/2026-08-13-request-level-retrieval-purity.md) |
+| 业务 Agent | 新增规程驱动的送检办理：工具查询、缺资料等待、人工确认、工位冲突后重新规划、持久化恢复与幂等业务提交；当前使用本地示例业务 | [改动过程与体验步骤](docs/iron-ore-rag/changes/2026-09-15-task-agent.md) |
 | 文档工程 | 复用 POI 与 PDF/MinerU 接入；新增 XLSX 精确单元格来源、结构感知分块、稳定文档键和显式版本 | [XLSX 分块](docs/iron-ore-rag/changes/2026-08-13-xlsx-structure-aware-chunking.md) |
 | 数据环境 | 为 PostgreSQL/PGVector、Redis、RustFS、RocketMQ 建立项目独立 Compose 开发栈 | [本地开发栈](docs/iron-ore-rag/changes/2026-08-12-reproducible-local-development-stack.md) |
 | 评测回归 | 新增固定 3 类文档、24 题、15 个解析锚点，支持盲评、快照及固定改写和哈希校验的配对回放 | [评测工具](docs/iron-ore-rag/changes/2026-08-13-system-evaluation-harness.md) |
@@ -43,6 +48,7 @@ RAG 只提供证据和候选结果，文档版本、来源与状态由后端持�
 - 最终评测配置为 `intent=off, ocr=off`，公平回填保持 `rag.search.request-level-refill-enabled=false`。
 - D0 是冻结旧索引、只替换检索代码的对照；D1 是重新入库后的组合验证，期间 PDF/MinerU 结果发生漂移，不能把全部变化归因于本地代码。
 - 工业知识闭环已完成工程实现、迁移和定向验证，但登录页面业务 E2E 未执行，不能写成完整用户流程已验收。
+- 送检 Agent 已通过可控模型响应下的 JDBC/HTTP 测试和 PostgreSQL 事务复跑；未做真实模型页面 E2E，也没有接入实际检测、机器人或企业业务系统。
 - 原始企业表格、国标原文件、模型密钥、评测响应和数据库 dump 均位于 Git 忽略目录，不进入公开仓库；仓库只跟踪有限脱敏派生样本和已有公开授权的内容。
 
 ## 快速开始
@@ -69,6 +75,8 @@ npm run dev
 ```
 
 访问 `http://127.0.0.1:5173`。端口、冒烟步骤与清理边界见[本地基线复现](docs/iron-ore-rag/stages/00-reproduction.md)。
+
+送检任务入口为登录后的 `/tasks`。已有数据库需先应用新增 SQL，再上传构造规程并准备示例数据，具体见[送检 Agent 体验步骤](docs/iron-ore-rag/changes/2026-09-15-task-agent.md#本地体验步骤)。
 
 ## 文档入口
 

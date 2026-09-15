@@ -13,6 +13,8 @@
 
 阶段 2 的工程实现、迁移和定向测试已完成；ROS1 可选扩展另有三条本地运行时路径通过。两者的登录页面业务 E2E 均未完成，作为已知边界保留，不再列为本阶段待开发事项。提交与问题的对应关系统一见[改动索引](changes/README.md)。
 
+2026-09-15 新增独立的规程驱动送检 Agent，不改写上述冻结实验。后端、页面和软件层定向验证已完成，真实模型页面验收尚未执行；完整改动过程集中在[送检任务 Agent 记录](changes/2026-09-15-task-agent.md)。
+
 ## 主线阅读路径
 
 | 任务 | 文档 |
@@ -21,6 +23,7 @@
 | 了解项目与量化结果 | [仓库首页](../../README.md) |
 | 重建本地环境 | [阶段 0：本地基线复现](stages/00-reproduction.md) → [开发栈改动说明](changes/2026-08-12-reproducible-local-development-stack.md) |
 | 了解 Java 后端 + AI 核心改造 | [工业知识闭环改动](changes/2026-08-12-industrial-knowledge-demo.md) → [部署与验收手册](stages/02-industrial-knowledge-demo.md) |
+| 体验工具调用、人工确认、业务提交及任务恢复 | [规程驱动送检 Agent：过程、验证、体验步骤](changes/2026-09-15-task-agent.md) |
 | 复现小型系统评测 | [评测工具与冻结结果](changes/2026-08-13-system-evaluation-harness.md) → [评测说明](../../eval/iron-ore/README.md) → [固定运行手册](../../eval/iron-ore/RUNBOOK.md) |
 | 查看证据驱动优化 | [XLSX 分块](changes/2026-08-13-xlsx-structure-aware-chunking.md) → [检索纯度](changes/2026-08-13-request-level-retrieval-purity.md) → [D2 负结果](changes/2026-08-14-request-level-fair-refill.md) |
 | 查找某次改动、提交和回滚方式 | [改动索引](changes/README.md) |

@@ -186,3 +186,45 @@ docker compose -f resources/docker/dev/ragent-dev.compose.yaml exec -T postgres 
 ## 回退方式
 
 代码按本次后端、前端阶段提交分别回退，保留改造前检查点 `5c123f4`。停用新页面与新接口即可不再推进新任务；已建的五张表和送检记录可以保留。不要通过删除数据库或开发卷回滚代码，也不要自动撤销用户已经确认的预约。本次无远程推送。
+
+## 2026-09-16：RocketMQ 存储迁移
+
+页面验收进行到文档分块时，`knowledge-document-chunk_topic` 事务消息发送被 Broker 拒绝：`CODE: 14`，`CL/CQ/INDEX = 0.92`。实际检查确认 Broker 的数据卷位于系统分区 `/dev/nvme1n1p3`，使用率为 92%；不是文档解析、模型调用或 Agent 决策失败。
+
+用户授权仅迁移报错服务的存储，提供 `LiWeishuaiA` 和“新加卷”两个位置。选用 `/media/sd101t/LiWeishuaiA`：宿主机为可写 ext4，约 214 GiB 可用、使用率 43%；“新加卷”为 NTFS/FUSE，约 101 GiB 可用、使用率 80%。工具沙箱最初显示前者只读，提升到宿主机权限后已确认是隔离视图，不是硬盘被系统保护为只读；没有执行重新挂载或磁盘修复。
+
+迁移映射：
+
+| 对象 | 位置 |
+| --- | --- |
+| 原 RocketMQ 卷 | `ragent-iron-ore-dev_rocketmq-data`，保留作迁移前备份 |
+| 新数据目录 | `/media/sd101t/LiWeishuaiA/ragent-iron-ore-dev/rocketmq-store` |
+| 新外部卷 | `ragent-iron-ore-dev_rocketmq-external-data`，Docker local bind 指向上述目录 |
+| 容器内路径 | 仍为 `/home/rocketmq/store`，端口和 Broker 名称不变 |
+
+只停止并重建本项目 Broker、与其共享网络的 Dashboard 和存储权限初始化容器；NameServer、PostgreSQL、Redis、RustFS 及其他项目容器不迁移、不清空。原数据约 7.8 MiB 实际占用、1.6 GiB 逻辑长度，包含稀疏文件；迁移意图是让 MQ 使用低占用分区，不是借此大量释放系统盘。
+
+已完成：停 Broker 后只读挂载原卷，使用 `cp -a --sparse=always` 复制，`diff -qr` 逐文件比较无差异；两侧实际占用均约 7.8 MiB、逻辑长度均约 1.6 GiB，目录 UID/GID 均为 `3000:3000`。没有删除、清空或覆盖原卷。停止 Broker 等待 30 秒后退出码为 137，新实例日志识别到上次异常退出，随后成功加载并恢复存储，未把该过程记作正常停机。
+
+Compose 仅增加可选卷名和 external 配置，本机通过忽略的 `.env` 启用，其他机器默认行为不变。新卷创建命令如下（仅作为实施记录，数据复制和校验必须先完成）：
+
+```bash
+docker volume create --driver local \
+  --opt type=none --opt o=bind \
+  --opt device=/media/sd101t/LiWeishuaiA/ragent-iron-ore-dev/rocketmq-store \
+  --label ragent.purpose=rocketmq-external-store \
+  ragent-iron-ore-dev_rocketmq-external-data
+```
+
+本机 `.env` 仅包含两个卷选择变量，不包含模型密钥，已确认被 Git 忽略。原有启动命令无需增加第二份 Compose 文件；默认卷模式和外部卷模式的 `docker compose config` 均验证通过。
+
+实际验证：
+
+- 初始化容器退出码 0，Broker 和 Dashboard 重新运行，Dashboard HTTP 检查返回 200；其他服务未重启。
+- Broker 内 `df -h /home/rocketmq/store` 显示 `/dev/sda1`，使用率 43%；`brokerStatus` 的 `commitLogDiskRatio` 和 `consumeQueueDiskRatio` 均为 `0.43`。
+- 独立诊断 Topic `ragent-storage-migration-probe-20260916` 发送 1 条无业务内容消息，返回 `SEND_OK`，消息 ID `AC1600050188266474C24D59184D0000`；随后 `putMessageTimesTotal=1`、`putMessageFailedTimes=0`。没有向业务分块 Topic 发送伪造任务。
+- 测试后仅清理上述新建诊断 Topic 的元数据，删除命令分别确认 Broker 和 NameServer 成功；业务 Topic、原卷和外部数据目录均保留。
+- 原失败文档 `2100015238547021824` 仍为 `pending`、`chunk_count=0`；没有手工改数据库状态，也没有自动重试分块或调用付费模型。由用户回到页面直接重试“分块”。
+- 系统分区仍约 92%，这里只解除 RocketMQ 使用该分区导致的拒写，不代表整机磁盘空间问题已经消失。
+
+后续必须保持外部盘已挂载、使用期间不拔盘。原卷是迁移时点备份；新消息产生后，回迁需停止 Broker 并将最新数据同步回选定目标，不能直接切回旧卷。当前验证证明存储切换和普通消息发送恢复，不代替文档分块、Embedding 或 Agent 的完整页面验收。

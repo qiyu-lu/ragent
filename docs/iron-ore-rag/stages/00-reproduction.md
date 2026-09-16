@@ -61,7 +61,7 @@ npm run dev
 
 ## 注意事项
 
-- Compose 使用项目专属 Docker 命名卷，数据保存在本机 Docker 存储中，不使用可能被拔除的 `sda1` 移动硬盘。
+- Compose 默认使用项目专属 Docker 命名卷。2026-09-16 本机按需将 RocketMQ 单独迁到外部 ext4 盘；启用外部卷时必须保持目标盘挂载，具体配置和回退边界见[中间件文档](../../../resources/docker/dev/README.md#仅迁移-rocketmq-存储)。
 - PostgreSQL 初始化脚本只在空 Volume 第一次创建时执行。项目升级后若表结构不匹配，应先备份，再明确选择升级或重建。
 - `docker compose ... down -v` 会永久删除本项目 PostgreSQL、Redis、RustFS 和 RocketMQ 数据；它不是普通停止命令。
 - RocketMQ 5.2.0 在 Docker 所在文件系统使用率达到 90% 时会强制禁止写入，应长期保留足够空间。

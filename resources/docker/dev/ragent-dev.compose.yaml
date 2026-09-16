@@ -147,3 +147,5 @@ volumes:
   redis-data:
   rustfs-data:
   rocketmq-data:
+    name: ${RAGENT_ROCKETMQ_VOLUME_NAME:-ragent-iron-ore-dev_rocketmq-data}
+    external: ${RAGENT_ROCKETMQ_VOLUME_EXTERNAL:-false}

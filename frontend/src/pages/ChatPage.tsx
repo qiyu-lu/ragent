@@ -6,6 +6,9 @@ import { MessageList } from "@/components/chat/MessageList";
 import { SourcesPanel } from "@/components/chat/SourcesPanel";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useChatStore } from "@/stores/chatStore";
+import { useResearchStore } from "@/stores/researchStore";
+import type { Message } from "@/types";
+import { activeResearch } from "@/types/research";
 
 export function ChatPage() {
   const navigate = useNavigate();
@@ -21,12 +24,49 @@ export function ChatPage() {
     selectSession,
     createSession
   } = useChatStore();
-  const showWelcome = messages.length === 0 && !isLoading;
+  const runs = useResearchStore((state) => state.runs);
+  const watchConversation = useResearchStore((state) => state.watchConversation);
+  React.useEffect(() => {
+    if (currentSessionId) return watchConversation(currentSessionId);
+  }, [currentSessionId, watchConversation]);
+  const shownMessages = React.useMemo(() => {
+    const researchMessages: Message[] = Object.values(runs)
+      .filter((run) => run.conversationId === currentSessionId)
+      .flatMap((run) => [
+        {
+          id: `research-user-${run.id}`,
+          role: "user",
+          content: run.brief.goal,
+          status: "done",
+          createdAt: run.createdAt ?? run.startedAt
+        },
+        {
+          id: run.id,
+          role: "assistant",
+          content: "",
+          researchRunId: run.id,
+          status: "done",
+          createdAt: run.createdAt ?? run.startedAt
+        }
+      ]);
+    return [...messages, ...researchMessages].sort(
+      (a, b) =>
+        (a.createdAt ? Date.parse(a.createdAt) : Infinity) -
+        (b.createdAt ? Date.parse(b.createdAt) : Infinity)
+    );
+  }, [messages, runs, currentSessionId]);
+  const showWelcome = shownMessages.length === 0 && !isLoading;
+  const hasRunningResearch = Object.values(runs).some(
+    (run) => run.conversationId === currentSessionId && activeResearch(run)
+  );
   const [sessionsReady, setSessionsReady] = React.useState(false);
   const sessionExists = React.useMemo(() => {
     if (!sessionId) return false;
-    return sessions.some((session) => session.id === sessionId);
-  }, [sessionId, sessions]);
+    return (
+      sessions.some((session) => session.id === sessionId) ||
+      Object.values(runs).some((run) => run.conversationId === sessionId)
+    );
+  }, [sessionId, sessions, runs]);
 
   React.useEffect(() => {
     let active = true;
@@ -85,9 +125,9 @@ export function ChatPage() {
         <div className="flex h-full min-w-0 flex-1 flex-col bg-white">
           <div className="flex-1 min-h-0">
             <MessageList
-              messages={messages}
+              messages={shownMessages}
               isLoading={isLoading}
-              isStreaming={isStreaming}
+              isStreaming={isStreaming || hasRunningResearch}
               sessionKey={currentSessionId}
             />
           </div>

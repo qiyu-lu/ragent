@@ -69,13 +69,14 @@ public class ResearchRunService {
     private final ResearchRunner runner;
     private final ResearchProperties properties;
     private final ResearchCompletionService completion;
+    private final ResearchEvidenceStore evidenceStore;
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
     private final ThreadPoolExecutor tasks;
     private final Map<String, Execution> executions = new ConcurrentHashMap<>();
 
     public ResearchRunService(ResearchRunStore store, ResearchRunner runner, ResearchProperties properties,
-                               JdbcTemplate jdbc, ObjectMapper json, ResearchCompletionService completion) {
+                               JdbcTemplate jdbc, ObjectMapper json, ResearchCompletionService completion, ResearchEvidenceStore evidenceStore) {
         properties.validate();
         this.store = store;
         this.runner = runner;
@@ -83,6 +84,7 @@ public class ResearchRunService {
         this.jdbc = jdbc;
         this.json = json;
         this.completion = completion;
+        this.evidenceStore = evidenceStore;
         AtomicInteger thread = new AtomicInteger();
         this.tasks = new ThreadPoolExecutor(properties.getMaxConcurrentRuns(), properties.getMaxConcurrentRuns(),
                 0, TimeUnit.SECONDS, new ArrayBlockingQueue<>(properties.getQueueCapacity()),
@@ -110,6 +112,10 @@ public class ResearchRunService {
     }
 
     public ResearchRun get(String id) { return store.get(id, owner()); }
+    public List<com.nageoffer.ai.ragent.research.model.EvidenceRecord> sources(String id) {
+        store.get(id, owner());
+        return evidenceStore.readSources(id, owner());
+    }
     public List<ResearchEvent> events(String id, long after, int limit) { return store.events(id, owner(), after, limit); }
 
     public List<ResearchRun> list(String conversationId) {

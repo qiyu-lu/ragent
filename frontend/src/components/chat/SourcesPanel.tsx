@@ -3,8 +3,10 @@ import { X } from "lucide-react";
 
 import { SourceIcon } from "@/components/chat/SourceIcon";
 import { cn } from "@/lib/utils";
-import { openSource, sourceSite } from "@/lib/source";
+import { openSource, sourceSite, researchLocation } from "@/lib/source";
 import { useChatStore } from "@/stores/chatStore";
+import { useResearchStore } from "@/stores/researchStore";
+import { researchSources } from "@/services/researchService";
 
 /**
  * 参考来源面板：作为 flex 兄弟项从右侧推挤入场（非模态 不压暗主页）
@@ -14,10 +16,17 @@ export function SourcesPanel() {
   const openedSourceMessageId = useChatStore((state) => state.openedSourceMessageId);
   const messages = useChatStore((state) => state.messages);
   const closeSourcesPanel = useChatStore((state) => state.closeSourcesPanel);
+  const researchRuns = useResearchStore((state) => state.runs);
+  const readSources = useResearchStore((state) => state.readSources);
 
   const open = openedSourceMessageId != null;
-  // 来源以 messages 为唯一数据源 按打开的消息 ID 派生 不再单独存一份副本
-  const sources = messages.find((message) => message.id === openedSourceMessageId)?.sources ?? [];
+  // 按打开的消息或研究 ID 派生来源；最终引用优先使用已落库的产物映射。
+  const researchRun = openedSourceMessageId ? researchRuns[openedSourceMessageId] : undefined;
+  const sources = researchRun
+    ? researchRun.artifact
+      ? researchSources(researchRun)
+      : (readSources[researchRun.id] ?? [])
+    : (messages.find((message) => message.id === openedSourceMessageId)?.sources ?? []);
 
   // 收起动画期间保留上一次内容 避免瞬间清空闪烁
   const lastSourcesRef = React.useRef(sources);
@@ -109,6 +118,19 @@ export function SourcesPanel() {
                           {source.excerpt}
                         </p>
                       ) : null}
+                      {source.sourceLocation && (
+                        <p className="mt-2 text-xs text-slate-500">
+                          {researchLocation(source.sourceLocation)}
+                        </p>
+                      )}
+                      {source.sourceExtent && (
+                        <p className="mt-1 text-xs text-amber-700">
+                          {source.sourceExtent === "AVAILABLE_EXCERPT"
+                            ? "可用原文摘录"
+                            : "文档片段"}
+                          {source.truncated ? " · 已截断" : ""}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </button>

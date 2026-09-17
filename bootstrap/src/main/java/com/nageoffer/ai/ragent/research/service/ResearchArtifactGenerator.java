@@ -173,7 +173,7 @@ public class ResearchArtifactGenerator {
         citations.forEach(c -> indexes.put(c.evidenceId(), c.index()));
         StringBuilder markdown = new StringBuilder("# " + payload.title() + "\n\n");
         for (var section : payload.sections()) markdown.append("## ").append(section.heading()).append("\n\n")
-                .append(section.text()).append(" ").append(section.evidenceIds().stream().map(id -> "[" + indexes.get(id) + "]").reduce("", String::concat)).append("\n\n");
+                .append(section.text()).append(" ").append(section.evidenceIds().stream().map(id -> "[" + indexes.get(id) + "](#cite-" + indexes.get(id) + ")").reduce("", String::concat)).append("\n\n");
         if (!gaps.isEmpty()) markdown.append("## 资料缺口\n\n").append(String.join("\n\n", gaps)).append("\n\n");
         if (!conflicts.isEmpty()) markdown.append("## 资料冲突\n\n").append(String.join("\n\n", conflicts));
         return new ResearchArtifact(brief.outputType(), payload.title(), brief.goal(),

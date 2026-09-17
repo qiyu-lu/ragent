@@ -7,6 +7,7 @@ import { RecommendedQuestions } from "@/components/chat/RecommendedQuestions";
 import { RecommendedQuestionsButton } from "@/components/chat/RecommendedQuestionsButton";
 import { SourcesButton } from "@/components/chat/SourcesButton";
 import { ThinkingIndicator } from "@/components/chat/ThinkingIndicator";
+import { ResearchProgress } from "@/components/chat/ResearchProgress";
 import { cn } from "@/lib/utils";
 import type { Message } from "@/types";
 
@@ -47,6 +48,8 @@ export const MessageItem = React.memo(function MessageItem({ message }: MessageI
       </div>
     );
   }
+
+  if (message.researchRunId) return <ResearchProgress runId={message.researchRunId} />;
 
   const thinkingDuration = message.thinkingDuration ? `${message.thinkingDuration}秒` : "";
   return (

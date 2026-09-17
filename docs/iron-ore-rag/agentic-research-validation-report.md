@@ -1,6 +1,6 @@
 # 统一研究工作流验证报告
 
-日期：2026-09-17。P0—P5 已实现；P5 最新 160/160 个程序回归及前端 build 通过。统一产物生成、引用/结构校验、有限修复、产物事务/取消已验证；真实供应商联调被自动审批拒绝未执行，质量评分不在本批结论内。P6 页面/SSE、P7 A/B/C 未开始。下方保留历史批次，最新边界见 P5。
+日期：2026-09-17。P0—P6 已实现；最新 168/168 个程序回归、后端 clean package 和前端 build 通过。三种聊天入口、来源/计划卡、只读 SSE、刷新、补充输入、取消与重连已通过本地受控浏览器验收。真实供应商产物联调被自动审批拒绝未执行，质量评分不在本批结论内；P7 A/B/C、P8 未开始。下方保留历史批次，最新边界见 P6。
 
 ## P0 基线
 
@@ -283,3 +283,23 @@ P3 的 COMPLETED 表示 `state.researchResult` 研究摘要经过已读引用身
 最终定向后端 22 类 160/160；package 和前端 build 通过。新增 6 个真实 SDK/本地 HTTP 用例与 2 个真实 PostgreSQL 隔离库用例，覆盖 REPORT/PLAN、多文档引用、未知参数、14→16 次预留生成/修复、两次 JSON 错误、未读证据拒绝、生成取消/配额释放、产物与发布事件原子性、取消后迟到结果和首次会话幂等。删除退役草稿的 13 个旧用例，因此用例总数不能直接与 P4 165 作覆盖增减指标。
 
 运行 `P5_TESTS=<22 个类> bash scripts/validate-agentic-research-p5.sh`；完整命令和边界见[执行记录](agentic-research-execution-log.md)。所有模型响应为本地 HTTP fixture，程序引用身份通过不代表语义质量。两条 `--phase p5` dry-run 通过；真实供应商 `--execute` 被自动审批拒绝，没有发送付费模型请求。新建 schema 移除旧计划表；测试库已自动清理，未对业务数据库升级或 DROP 旧数据。原始构建/回归日志及清单见执行记录 P5，完整 Web/浏览器验证从 P6 接续。
+
+
+## P6 聊天与只读 SSE 实际验证
+
+P5 提交 `3507d9e` 后接入聊天三模式、ResearchProgress / PlanDraftCard、已读来源恢复与 SSE。最新后端 **23 类 168/168**、0 失败/错误/跳过；clean package、前端 Vite build、node 类型检查通过。app 类型检查保留 P0 的 24 个诊断，去除行号后逐条内容相同，无新增研究代码诊断。完整命令见[执行记录](agentic-research-execution-log.md)，源码与原始产物 hash 见 [P6 manifest](../../eval/agentic-research/manifests/research-p6-validation-2026-09-17.json)。
+
+| 检查 | 实际结果与边界 |
+| --- | --- |
+| 研究 SSE | 固定 owner、最大游标回放、最终尾部 ARTIFACT、snapshot、内部 payload 过滤、错误归属拒绝；订阅断开/重连无调度或 cancel，断线不写 JSON |
+| 来源与接口 | 会话列表/来源快照只读，sources 排除未读与其他 owner，取消后已读快照保留；regenerate 校验新 clientRequestId；finalization HTTP 400 不重试，usage unknown 且释放配额 |
+| 浏览器 M | 9 项通过，真实 React/研究服务/SDK HTTP/隔离 PG；普通问答、REPORT 双文档引用、PLAN 7 ms/未知温度、来源面板、重新生成、刷新、等待输入、取消、会话列表失败和重连 |
+| 请求与状态 | 49 次本地 fixture 模型调用；6 run，5 COMPLETED 有产物、1 CANCELLED 无产物；5 次创建 POST、1 次 regenerate POST，刷新不增加模型调用，断线仅 GET 恢复 |
+| 受控部分 | 认证、知识搜索、原文读取、模型内容与普通问答响应，均非真实供应商/完整普通 RAG；没有登录与文档下载预览 E2E |
+| 开发失败及修复 | A—H/K 失败、I/J 首轮通过、L/M 补充场景通过原始日志保留；REPORT 改 canonical 引用、研究滚动接入已有 MessageList、SSE IOException 不进入 JSON 返回；fixture/虚拟列表断言修正单列 |
+| 已知日志边界 | J 无 SSE 转换异常；取消 worker 的现有 Reactor 阻塞中断 / onErrorDropped 日志保留。持久取消/HTTP 本地结束与无产物通过，不代表远端停止计算 |
+| 未执行 | 本轮真实供应商产物联调被自动审批拒绝；无 A/B/C、EM/F1、引用语义评分、完整生产 RAG 或全服务 E2E；P7/P8 未实施 |
+
+程序日志/JUnit 在 `local-data/agentic-research/runs/20260917T125800_P6_validation/`，最终浏览器日志/summary/plan.png 在 `20260917T131200_P6_browser_M/`。本批没有付费供应商请求，随机测试库与进程已清理，历史 SQL 和业务数据库未改变。COMPLETED 表示合法产物形成，不能作为计划可执行、事实正确或资料完整的保证。
+
+最终静态验收通过：5 份入口 Markdown 的 100 个本地链接/锚点、围栏、whitespace 与 shell/Python 语法；35 个阶段文件在约定范围，79 份源码/配置/测试及原始验证产物共 192 个指纹一致。P5 按冻结提交 3507d9e 核验，16 份历史升级 SQL 不变。检查记录与脚本在 P6 validation 目录，指纹由 P6 manifest 引用。

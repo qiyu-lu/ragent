@@ -74,6 +74,13 @@ public class ResearchTools {
                     : reader.read(session.claim.run().id(), session.claim.owner(), id, readMode, session.documents());
             session.check();
             session.delivered(result.evidence());
+            var e = result.evidence();
+            var source = new java.util.LinkedHashMap<String, Object>();
+            source.put("evidenceId", e.evidenceId()); source.put("docId", e.docId()); source.put("docName", e.documentName());
+            source.put("documentVersion", e.documentVersion()); source.put("sourceLocation", e.sourceLocation());
+            source.put("excerpt", e.text()); source.put("chunkIds", e.chunkIds()); source.put("truncated", e.truncated());
+            source.put("sourceExtent", e.sourceExtent()); source.put("sourceState", result.sourceState());
+            session.event("SOURCE_READ", "已查阅来源：" + e.documentName(), source);
             return result;
         });
     }

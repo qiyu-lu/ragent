@@ -47,6 +47,37 @@ export function openSource(source: SourceRef) {
   window.open(`/preview/doc/${source.docId}`, "_blank", "noopener,noreferrer");
 }
 
+export function researchLocation(location: Record<string, unknown>): string {
+  const labels: Record<string, string> = {
+    sectionPath: "章节",
+    section_path: "章节",
+    section_name: "章节",
+    outline_path: "目录",
+    page_number: "页码",
+    start_page: "起始页",
+    end_page: "结束页",
+    sheet_name: "工作表",
+    cell_range: "单元格",
+    sourceParagraphId: "段落",
+    source_paragraph_id: "段落",
+    chunk_index: "片段序号",
+    section_index: "章节序号",
+    paragraph_index: "段落序号",
+    source_title: "来源标题"
+  };
+  if (Array.isArray(location.chunks))
+    return location.chunks
+      .map((chunk) => researchLocation(chunk as Record<string, unknown>))
+      .join(" / ");
+  return Object.entries(location)
+    .filter(([key, value]) => labels[key] && value != null)
+    .map(
+      ([key, value]) =>
+        `${labels[key]}：${Array.isArray(value) ? value.join(" / ") : String(value)}`
+    )
+    .join(" · ");
+}
+
 // 网页标题里常见的章节标记 如 ^第8章^
 const CHAPTER_MARK = /\^([^^]{1,40})\^/g;
 // 网页标题尾部的更新时间 如 最新更新:2018-04-04 16:02:03

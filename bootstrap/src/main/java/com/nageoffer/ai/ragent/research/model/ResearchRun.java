@@ -25,7 +25,13 @@ public record ResearchRun(String id, String conversationId, String clientRequest
                           ResearchBrief brief, Status status, long revision, long epoch,
                           Map<String, Object> state, Map<String, Object> artifact,
                           Map<String, Object> usage, String errorSummary,
-                          Instant startedAt, Instant completedAt) {
+                          Instant startedAt, Instant completedAt, Instant createdAt) {
+    public ResearchRun(String id, String conversationId, String clientRequestId, ResearchBrief brief, Status status,
+                       long revision, long epoch, Map<String, Object> state, Map<String, Object> artifact,
+                       Map<String, Object> usage, String errorSummary, Instant startedAt, Instant completedAt) {
+        this(id, conversationId, clientRequestId, brief, status, revision, epoch, state, artifact, usage,
+                errorSummary, startedAt, completedAt, startedAt);
+    }
     public enum Status {
         QUEUED, RUNNING, WAITING_INPUT, COMPLETED, PARTIAL, FAILED, CANCELLED, INTERRUPTED;
 

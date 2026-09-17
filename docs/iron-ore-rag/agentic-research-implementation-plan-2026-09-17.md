@@ -1,6 +1,6 @@
 # 统一研究 Agent 与计划草稿改造实施计划
 
-> 制定日期：2026-09-17。实施状态：P0—P5 已实现。P5 接入统一 REPORT/PLAN 生成、有限修复、结构与引用校验及产物原子落库；160 个程序回归通过。P5 真实供应商联调因自动审批拒绝尚未执行，不能作为质量通过；P6—P8 未开始。当前进度与验证边界见[执行记录](agentic-research-execution-log.md)和[验证报告](agentic-research-validation-report.md)。
+> 制定日期：2026-09-17。实施状态：P0—P6 已实现。P5 完成统一 REPORT/PLAN 生成、有限修复、结构与引用校验及产物原子落库；P6 接入三种聊天模式、只读 SSE、来源和计划卡。最新 168 个程序回归通过，本地受控模型的浏览器流程通过。P5/P6 真实供应商产物联调因自动审批拒绝尚未执行，不能作为质量通过；P7—P8 未开始。当前进度与验证边界见[执行记录](agentic-research-execution-log.md)和[验证报告](agentic-research-validation-report.md)。
 >
 > 本文件是后续实施的主要交接入口。它记录本轮已经确定的产品方向、技术选择、删除范围、数据准备、阶段提交和验证方式。后续无需重新阅读完整聊天，也不要重新把方向改回送检助手。
 >
@@ -437,6 +437,8 @@ P2 第三批已新增 [eval/agentic-research/](../../eval/agentic-research/READM
 
 ### P6：聊天入口、进度和来源展示
 
+**当前状态：已实现，程序及本地受控浏览器验证通过。** 三种入口共用聊天页面；researchService 只读重连，ResearchProgress / PlanDraftCard 与现有来源面板接通。普通问答响应、认证、检索、阅读和模型在浏览器验收中受控，不代表完整生产 RAG 或真实供应商质量通过。实现和复现命令见执行记录 P6。
+
 **工作：**
 
 - 在 ChatInput / ChatPage 接入三个处理选项，保留现有普通问答。
@@ -605,8 +607,8 @@ npm --prefix frontend run build
 | P2 数据与工具 | 已完成：证据工具、转换抽样、完整训练/开发摄取及真实联调 | 4b8a328、365d3e4、943c11a、4b06f21；验收见执行记录 |
 | P3 单研究运行 | 已完成：原生工具、持久化运行闭环与真实联调 | `feat: implement bounded research runs with native tool calls`；见执行记录与验证报告 |
 | P4 多 Agent | 已完成 | conduct_research、2/4 worker 限制、隔离上下文与共享额度；真实复测和 165 个定向测试；见[执行记录](agentic-research-execution-log.md) |
-| P5 报告与计划 | 已实现；程序验证通过，真实联调待授权 | `feat: generate reports and plan drafts from shared research`；见执行记录 |
-| P6 前端整合 | 未开始 | — |
+| P5 报告与计划 | 已实现；程序验证通过，真实联调待授权 | 3507d9e；见执行记录 |
+| P6 前端整合 | 已实现；168 个回归及本地受控浏览器流程通过 | `feat: integrate research and plan modes into chat`；见执行记录 |
 | P7 对照与可靠性 | 未开始 | — |
 | P8 清理与交接 | 未开始 | — |
 

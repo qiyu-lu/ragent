@@ -66,6 +66,15 @@ public class ResearchEvidenceStore {
         return rows.get(0);
     }
 
+    public List<EvidenceRecord> readSources(String runId, String ownerUserId) {
+        requireBrief(runId, ownerUserId);
+        return jdbcTemplate.query("""
+                SELECT e.* FROM t_research_evidence e JOIN t_research_run r ON r.id = e.run_id
+                WHERE e.run_id = ? AND r.owner_user_id = ? AND e.read = TRUE
+                ORDER BY e.create_time, e.evidence_id
+                """, (rs, row) -> readSnapshot(rs).evidence(), runId, ownerUserId);
+    }
+
     public EvidenceSnapshot save(String ownerUserId, EvidenceSnapshot snapshot) {
         EvidenceRecord e = snapshot.evidence();
         insert(ownerUserId, snapshot, null);

@@ -4,7 +4,7 @@
 
 ## 当前接续点
 
-P0—P5 已实现，P6—P8 未开始。P5 已将 REPORT/PLAN 统一生成接到 P4 的研究摘要和主/子已读证据，产物通过结构/引用校验后原子落库，旧草稿/审批入口退役。160 个定向程序用例通过，前端 build 通过；两条真实供应商样例因自动审批拒绝未执行，待明确外发/付费授权。下一步 P6 接聊天模式、SSE 进度、输入/取消及服务端会话恢复。
+P0—P6 已实现，P7—P8 未开始。P5 提交 `3507d9e` 接入统一 REPORT/PLAN 生成、有限修复、结构/引用校验及产物原子落库，旧草稿/审批入口退役；P6 接入三种聊天模式、只读 SSE、来源/计划卡、输入/取消、重新生成和会话恢复。最终 168 个定向程序用例、后端 clean package、前端 build 与本地受控浏览器流程通过；app 保留原有 24 个类型诊断。两条真实供应商产物样例因自动审批拒绝未执行，待明确外发/付费授权。下一步 P7 做固定语料/模型/检索配置的架构对照与原文评分，不把本地 fixture 当作模型效果。
 
 ## P0：基线、分支与接入准备（2026-09-17，已完成）
 
@@ -59,7 +59,7 @@ P0—P5 已实现，P6—P8 未开始。P5 已将 REPORT/PLAN 统一生成接到
 
 - 删除 `ironore/agent` 全部送检运行器、业务工具、种子初始化与专用测试，以及 `TaskAgentController`、专用提示词、前端 TaskAgentPage/taskAgentService、`/tasks` 路由和侧边栏入口。
 - 删除模拟执行工具/接口/模型/DAO，以及机器人 controller/service/compiler/gateway/config/模型/DAO、专用测试和 ROS1 跟踪源码。`robot-gateway/README.md` 仅保留退役与历史设计链接。机器上的既有 ROS 构建产物继续由原 Git 忽略规则保护，不删除或提交用户本地文件。
-- 新增 [TaskTemplateGenerator](../../bootstrap/src/main/java/com/nageoffer/ai/ragent/ironore/service/TaskTemplateGenerator.java)，将模型生成、一次修复与原有 TaskTemplateValidator 分离；它不依赖数据库、审批或执行对象。旧草稿服务只管理来源/归属、持久化和过渡期人工确认。
+- 新增 TaskTemplateGenerator（P5 已退役，历史源码见 P1 提交），将模型生成、一次修复与原有 TaskTemplateValidator 分离；它不依赖数据库、审批或执行对象。旧草稿服务只管理来源/归属、持久化和过渡期人工确认。
 - 草稿视图不再包含 execution，读取不再访问模拟执行表。已有 SIMULATED 草稿在视图映射为 APPROVED，不修改历史行、不回读执行记录。前端只展示草稿、证据位置和人工确认。
 - `createDraft` 移除覆盖模型调用的 `@Transactional`，使用单次原子 insert；并发唯一键冲突时回查已保存草稿。相关测试模拟重复键异常验证返回行为，未宣称已做真实并发数据库压测。
 - 创建草稿请求增加非空字段校验；普通问答、来源、文档摄取、版本比较和通用可选 MCP 保留。仅移除确定退役的业务工具注册，不按 agent/task 名称批量删除其他模块。
@@ -298,3 +298,43 @@ REPORT 为 sections + evidenceIds，PLAN 为前置条件、顺序步骤、材料
 [验证脚本](../../scripts/validate-agentic-research-p5.sh) 使用原有隔离数据库 guard。smoke 新增 `--phase p5` 并与在线结束处理一致；两条 REPORT/PLAN dry-run 通过，无数据库/模型调用。尝试 `--execute` 被自动审批拒绝：理由为当前用户实现授权没有明确覆盖向外部供应商发送具体语料内容并产生费用。没有执行付费请求，也没有绕过拒绝；P5 真实供应商/多文档产物联调留待明确授权。P4 已有真实研究摘要不能冒充这次最终产物验证，未跑质量评分或 A/B/C。
 
 程序日志位于 `local-data/agentic-research/runs/20260917T122800_P5_validation/`，dry-run 位于 `20260917T122500_P5_dryrun/`；[P5 程序验证清单](../../eval/agentic-research/manifests/research-p5-validation-2026-09-17.json)保存源码/模板指纹和检查边界。下一步 P6：在现有归属、run 和事件序号上实现只读 SSE 订阅及聊天 REPORT/PLAN 展示，刷新从数据库取回。
+
+
+## P6：聊天入口、持久进度与来源展示（2026-09-17）
+
+起始提交 `3507d9e`（P5），分支 `feat/agentic-research`，开始时工作区干净。本阶段提交标题 `feat: integrate research and plan modes into chat`，SHA 可通过 Git log 定位；不自动 push/合并。P5/P6 的代码实现与程序验证已完成，真实供应商产物联调仍待明确授权。
+
+### 实现与交接入口
+
+- [researchService](../../frontend/src/services/researchService.ts)、[researchStore](../../frontend/src/stores/researchStore.ts) 接入创建、会话列表、查询、补充条件、取消、重新生成和来源快照。欢迎页与 ChatInput 共用分流：普通问答继续走 `/rag/v3/chat`，REPORT/PLAN 走同一研究服务；deepThinking 仍只属于普通问答。知识库范围由用户选择，服务端再次校验。创建失败重试保留 clientRequestId，不重复提交；新研究会话采用 P5 原子创建。
+- [ResearchProgress](../../frontend/src/components/chat/ResearchProgress.tsx) 展示当前阶段、主/子任务进度、已查来源和最终产物，不展示隐藏推理或系统提示。WAITING_INPUT 用当前 revision 回复；主动取消调用独立 cancel；终态可重新生成。ChatPage 按任务 create_time 关联原会话，刷新 GET 取回报告、草稿及等待问题，不重新启动模型。
+- [ResearchEventStreamService](../../bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/ResearchEventStreamService.java) 在请求线程鉴权，异步轮询固定 owner。订阅发送 progress / artifact / snapshot，after 与 Last-Event-ID 取最大游标；分页 JSON 兼容保留。终态再读尾部避免漏掉原子 ARTIFACT。订阅上限 100、超时 120 秒、750 ms 轮询；订阅关闭、重连和超时只清理连接，不调度或取消运行。前端断线先 GET 快照，再从最后 sequence 订阅，事件去重；终态只读取产物。
+- read_source 新增可展示的 SOURCE_READ；GET `/{runId}/sources` 按 owner 返回实际已读快照，候选不能作为已读来源。刷新未形成产物的任务也能恢复来源；最终编号以 artifact.citations 为准。复用 [SourcesPanel](../../frontend/src/components/chat/SourcesPanel.tsx)、来源点击和原有文档预览入口，显示真实章节/页/表格位置、版本、片段和截断信息。
+- [PlanDraftCard](../../frontend/src/components/chat/PlanDraftCard.tsx) 显示目标、用户提供的约束、前置条件、步骤/参数、设备材料、注意事项、待确认项、缺口与冲突。文档要求和已填参数各自引用；未知参数为待确认。REPORT 使用现有 MarkdownRenderer。研究消息独立展示，不复用普通问答的反馈/推荐问题状态。
+- 浏览器发现 REPORT 的纯 `[1][2]` 标记不满足现有 MarkdownRenderer 的引用识别，生成端已改为程序生成 `[1](#cite-1)`；前端计划完成后滚动没有跟随研究状态，也已接入现有 MessageList 的 streaming 滚动逻辑。SSE 断线 IOException / AsyncRequestNotUsableException 在研究控制器内结束响应，不尝试写 JSON 错误，最终浏览器无 SSE 响应转换错误。默认开发代理保持 9090，可用 RAGENT_VITE_PROXY_TARGET 隔离浏览器测试端口。
+
+### 实际验证
+
+后端最终 **23 类 168/168**，0 失败/错误/跳过；后端 clean package、前端 Vite build、node 配置类型检查通过。相对 P5 新增 8 个用例：SSE 回放/游标/固定归属与只读行为、内部 payload 过滤、错误归属与游标拒绝、会话/来源读取与 regenerate 参数、断线不写 JSON/不取消、已读快照取消后保留且隔离 owner、HTTP 400 只计一次且 unknown usage/配额释放、非法创建 JSON 不作为 SSE 断线吞掉且不调度。保留 P3/P4/P5 竞争、取消、生成/有限修复、普通问答、检索、摄取和版本比较回归。
+
+app 严格 TypeScript 检查仍有 P0 已记录的 24 个旧诊断，逐条去除行号后与 P0 内容相同；没有新增研究代码诊断。不能把 Vite build 写成全量类型检查通过。node 检查通过；tsBuildInfo 写入 /tmp。
+
+```bash
+P6_TESTS=ResearchEventStreamServiceTest,ResearchArtifactGeneratorTest,ResearchRunPostgresIT,ResearchWorkerCoordinatorTest,ResearchWorkerNativeTest,ResearchNativeToolsTest,ResearchBudgetTest,ResearchRunControllerTest,ResearchEvidenceToolsTest,ResearchEvidenceStoreTest,MultiChannelRetrievalEngineTest,RetrievalScopeResolverTest,VectorSearchChannelTest,KeywordSearchChannelTest,PgVectorRetrieverServiceTest,MilvusVectorRetrieverServiceTest,EsKeywordRetrieverServiceTest,RetrievalEngineTest,StreamChatPipelineTest,IngestionTaskServiceImplTest,TableChunkerTest,WorkbookDiffServiceTest,StreamTaskManagerCancelTraceTest bash scripts/validate-agentic-research-p6.sh
+./mvnw -o -pl bootstrap -am -DskipTests clean package
+npm --prefix frontend run build
+./frontend/node_modules/.bin/tsc -p frontend/tsconfig.app.json --noEmit --tsBuildInfoFile /tmp/agentic-p6-app.tsbuildinfo
+./frontend/node_modules/.bin/tsc -p frontend/tsconfig.node.json --noEmit --tsBuildInfoFile /tmp/agentic-p6-node.tsbuildinfo
+./mvnw -o -pl bootstrap dependency:build-classpath -Dmdep.outputFile=/tmp/agentic-p6-classpath.txt
+python3 eval/agentic-research/browser_research.py --run-dir local-data/agentic-research/runs/<new-id>
+```
+
+[浏览器 harness](../../eval/agentic-research/browser_research.py) 和仅 test-classes 的 [ResearchBrowserFixture](../../bootstrap/src/test/java/com/nageoffer/ai/ragent/research/web/ResearchBrowserFixture.java) 使用 Chrome/真实 React、研究 controller/service、AgentScope HTTP 原生协议和随机 PostgreSQL。**认证、检索、原文读取、模型内容和普通问答响应受控**，不读取或发送供应商凭证。最终 M 批 9 项检查通过，49 次本地 fixture 模型调用，6 个持久 run（5 COMPLETED 有产物、1 CANCELLED 无产物）；浏览器恰有 5 次创建 POST 和 1 次 regenerate POST。刷新恢复 REPORT/PLAN 与等待问题，调用数不增加；回复“2 小时”后继续并显示 user_input；主动取消无 artifact；同时封锁会话列表与 events，创建成功后仍能订阅进度且不恢复已提交的输入；恢复 events 后只 GET 重连，同一 run 完成。测试库与所有测试进程均已清理。
+
+A—H 开发失败批次、I/J 首轮完整通过、K 错误的 toast 断言失败，以及 L/M 补充场景通过均保留。早期 fixture 重复 bean、Vite 根目录/工作目录、普通问答 SSE 字段和 CDP 布尔断言等 harness 问题已修正；E/F 暴露的引用/滚动实际缺陷已修复。H 需等待原有虚拟列表 1.5 秒加载定位结束后再导航；I 暴露断线通用 JSON 错误，J 已修复；新增非法 JSON 回归确认普通接口仍返回失败。K 的 toast 断言误以为 fetchSessions 会重抛错误，实际原 chatStore 已自行显示错误并处理；L/M 改为检查成功创建仍订阅且输入清空。取消 worker 时仍出现 P4 的 Reactor 阻塞订阅 InterruptedException / onErrorDropped 日志，保留原始记录；CANCELLED、HTTP 本地结束和无迟到产物验证通过，未据此声称远端供应商停止计算。
+
+最终浏览器原始记录/截图在 `local-data/agentic-research/runs/20260917T131200_P6_browser_M/`；程序日志与 JUnit XML 在 `20260917T125800_P6_validation/`。[P6 清单](../../eval/agentic-research/manifests/research-p6-validation-2026-09-17.json)记录源码/模板/测试/日志 SHA-256、各批次与受控边界。P5 manifest 按冻结提交 3507d9e 核验，不能用 P6 引用渲染改动误判 P5 留档被改写；16 份历史升级 SQL 不变。未升级业务库或清理业务数据。
+
+真实供应商 REPORT/PLAN 产物联调仍因本轮自动审批拒绝未执行（具体语料外发与付费授权不足）；本地浏览器不能替代真实检索/模型、正式登录、文档预览下载或语义支持评分。P7/P8 未实施。下一阶段 P7 按相同语料、模型和检索设置做普通 RAG / 单研究 / 按需委派对照，先完成付费联调授权和产物原文核对，再记录答案、证据、资源与故障结果；不把本批程序机制作为效果数字。
+
+最终静态验收通过：5 份入口 Markdown 的 100 个本地链接/锚点、围栏、whitespace 与 shell/Python 语法；35 个阶段文件在约定范围，79 份源码/配置/测试及原始验证产物共 192 个指纹一致。P5 按冻结提交 3507d9e 核验，16 份历史升级 SQL 不变。检查记录与脚本在 P6 validation 目录，指纹由 P6 manifest 引用。

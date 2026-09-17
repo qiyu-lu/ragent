@@ -36,10 +36,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ResearchRunControllerTest {
     private MockMvc mvc;
     private ResearchRunService service;
+    private com.nageoffer.ai.ragent.research.service.ResearchEventStreamService streams;
     private final ObjectMapper json = new ObjectMapper();
     @BeforeEach void setup() {
         service = mock(ResearchRunService.class);
-        mvc = MockMvcBuilders.standaloneSetup(new ResearchRunController(service)).build();
+        streams = mock(com.nageoffer.ai.ragent.research.service.ResearchEventStreamService.class);
+        mvc = MockMvcBuilders.standaloneSetup(new ResearchRunController(service, streams)).build();
     }
 
     @Test void createValidatesGoalAndScopeBeforeScheduling() throws Exception {
@@ -74,5 +76,35 @@ class ResearchRunControllerTest {
         verifyNoInteractions(service);
         mvc.perform(post("/rag/research/runs/run/cancel")).andExpect(status().isOk());
         verify(service).cancel("run");
+    }
+
+    @Test void conversationRecoveryAndReadSourcesOnlyReadExistingRunAndRegenerationValidatesRequestId() throws Exception {
+        when(service.list("conversation")).thenReturn(List.of());
+        when(service.sources("run")).thenReturn(List.of());
+        mvc.perform(get("/rag/research/runs").param("conversationId", "conversation")).andExpect(status().isOk());
+        mvc.perform(get("/rag/research/runs/run/sources")).andExpect(status().isOk());
+        verify(service).list("conversation"); verify(service).sources("run"); verifyNoMoreInteractions(service);
+        mvc.perform(post("/rag/research/runs/run/regenerate").contentType("application/json").content("{\"clientRequestId\":\"new-request\"}")).andExpect(status().isOk());
+        verify(service).regenerate("run", "new-request");
+        reset(service);
+        mvc.perform(post("/rag/research/runs/run/regenerate").contentType("application/json").content("{\"clientRequestId\":\"\"}")).andExpect(status().isBadRequest());
+        verifyNoInteractions(service);
+    }
+
+    @Test void disconnectedEventStreamDoesNotAttemptJsonErrorResponseOrCancelResearch() throws Exception {
+        for (Exception failure : List.of(new java.io.IOException("disconnected"),
+                new org.springframework.web.context.request.async.AsyncRequestNotUsableException("disconnected"))) {
+            doAnswer(invocation -> { throw failure; }).when(streams).subscribe("run", 0);
+            mvc.perform(get("/rag/research/runs/run/events").accept("text/event-stream"))
+                    .andExpect(status().isOk()).andExpect(content().string(""));
+        }
+        verifyNoInteractions(service);
+    }
+
+    @Test void malformedCreateJsonIsNotMistakenForDisconnectedProgressStream() throws Exception {
+        mvc.perform(post("/rag/research/runs").contentType("application/json").content("{invalid"))
+                .andExpect(status().isOk()).andExpect(content().contentTypeCompatibleWith("application/json"))
+                .andExpect(jsonPath("$.code").value(com.nageoffer.ai.ragent.framework.errorcode.BaseErrorCode.SERVICE_ERROR.code()));
+        verifyNoInteractions(service);
     }
 }

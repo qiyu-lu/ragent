@@ -1,6 +1,6 @@
 # 统一研究工作流的数据准备
 
-这里实现 P2 的离线转换、校验与真实幂等摄取，以及 P3/P4 的原生工具、独立 worker 与运行联调。转换不调用模型；`import_corpus.py --execute` 复用项目已有分块、向量化和索引落点，再用知识搜索/原文读取服务回查。`smoke_research.py --execute` 调用真实研究模型，进度与失败记录见[执行记录](../../docs/iron-ore-rag/agentic-research-execution-log.md)。
+这里实现 P2 的离线转换、校验与真实幂等摄取，以及 P3—P6 的原生工具、独立 worker、统一产物和聊天接入。转换不调用模型；`import_corpus.py --execute` 复用项目已有分块、向量化和索引落点，再用知识搜索/原文读取服务回查。`smoke_research.py --execute` 调用真实研究模型，进度与失败记录见[执行记录](../../docs/iron-ore-rag/agentic-research-execution-log.md)。
 
 ## 来源与环境
 
@@ -30,9 +30,9 @@ python3 -m unittest discover -s eval/agentic-research/tests -v
 
 ## 原生研究运行联调（P3/P4）
 
-研究运行器接入 AgentScope Java 2.0.1，主 Agent 使用原生 `search_knowledge`、`read_source`、`conduct_research`、`ask_user` 和 `finish_research`，worker 只注册检索、阅读、结束三个工具。创建、查询、补充输入、取消接口位于 `/rag/research/runs`；事件接口目前返回 `after`/`limit` 分页 JSON，SSE 在 P6 接续。创建时必须提供当前用户的 `conversationId`、唯一 `clientRequestId`、目标、REPORT/PLAN 以及可用知识库范围。知识库仍采用项目现有全局共享规则，运行和会话按用户归属隔离。
+研究运行器接入 AgentScope Java 2.0.1，主 Agent 使用原生 `search_knowledge`、`read_source`、`conduct_research`、`ask_user` 和 `finish_research`，worker 只注册检索、阅读、结束三个工具。创建、查询、补充输入、取消接口位于 `/rag/research/runs`。P3/P4 当时提供 `after`/`limit` 分页 JSON 和必填 conversationId；当前 P5/P6 已增加 SSE、可选会话与完整产物，契约见下节。知识库仍采用项目现有全局共享规则，运行和会话按用户归属隔离。
 
-本阶段返回 `state.researchResult` 中的发现、已读证据 ID、缺口和冲突；`artifact` 仍为空。COMPLETED 在 P3/P4 只表示研究阶段形成经过引用身份检查的摘要，完整报告、计划 JSON 和卡片属于 P5/P6。资料没有提供的要求不能补造。等待输入通过 `state.question` 展示，回复携带当前 `revision` 与 `answer`；原研究范围保持不变，需要更换范围时使用新的请求。
+`--phase p3/p4` 联调返回 `state.researchResult` 中的发现、已读证据 ID、缺口和冲突，保留 artifact 为空的历史阶段边界。COMPLETED 在这些联调中只表示研究摘要形成。资料没有提供的要求不能补造。等待输入通过 `state.question` 展示，回复携带当前 `revision` 与 `answer`；原研究范围保持不变，需要更换范围时使用新的请求。
 
 运行器默认最多 16 次模型调用、24 次工具调用、300 秒累计活动时长，预留 2 次最终生成额度；最后两次研究调用限定为原生 finish_research。人工等待不计入活动时长，恢复保留已消耗额度。预算/超时退出时，有已读证据则保留为 PARTIAL，无证据则 FAILED。失败 worker 的 gaps 自动纳入主摘要，状态为 PARTIAL；主 Agent 预算/超时退出仍保留成功 worker 的 findings。取消关闭父子 SDK/HTTP 订阅并阻止迟到写回，供应商是否停止远端计算保持 unknown。运行与模型并发分别限制为 2；本阶段采用单 JVM 执行，重启将失去执行者的 QUEUED/RUNNING 标为 INTERRUPTED，不恢复中间 token。
 
@@ -71,6 +71,27 @@ python3 eval/agentic-research/smoke_research.py --phase p4 --case comparison-wor
 ```
 
 跨文档样例从 gold-free queries 选择两份不同文档，`[[DOC_n]]` 由 Java 入口替换为真实 docId，不用 gold 选择材料或拆解任务。比较和 PLAN 是应用联调样例，不是 QASPER 问答分数。`--phase p3` 保留旧五个样例集合，但使用当前版本运行器；历史 P3 回放应检出 `20b1133`。批次 A/B 等名称表示开发复测，不是 P7 的架构 A/B/C。清单见 [P4 smoke manifest](manifests/research-p4-smoke-2026-09-17.json)。
+
+## P5/P6 统一产物与浏览器验收
+
+当前聊天页面的普通问答仍调用 `/rag/v3/chat`；深入分析和生成计划均创建研究任务，以 REPORT/PLAN 区分产物。创建需 clientRequestId、goal、outputType、allowedKbIds；省略 conversationId 时，首次幂等请求同时建立会话。GET `/rag/research/runs?conversationId=...` 恢复记录；GET `/{runId}/sources` 返回该任务已经实际读取的快照。终态任务 POST `/{runId}/regenerate` 携带新 clientRequestId，复用同一研究流程。
+
+GET `/{runId}/events` 按 Accept 返回分页 JSON 或 `text/event-stream`。SSE 发送 progress、artifact 和 snapshot，支持 after / Last-Event-ID；订阅、刷新及重连只读持久记录，不创建模型执行。主动 cancel 才取消研究。最终生成使用预留的两次调用，结构与已读引用校验后原子提交 artifact 和事件；生成失败保留研究摘要、落 FAILED，不发布非法结果。计划未知参数保留待确认，用户约束标为 user_input。
+
+```bash
+# 本地模型 HTTP 和随机 PostgreSQL 隔离库回归，不消耗供应商额度
+bash scripts/validate-agentic-research-p6.sh
+
+# P5 完整生成 smoke 请求准备；未执行付费联调
+python3 eval/agentic-research/smoke_research.py --phase p5 --case comparison-workers --case plan-workers --run-dir local-data/agentic-research/runs/<new-id>
+
+# 浏览器 fixture 需要现有 Chrome、Python websocket-client、frontend/node_modules 和开发 PostgreSQL
+./mvnw -o -pl bootstrap -am test-compile -DskipTests
+./mvnw -o -pl bootstrap dependency:build-classpath -Dmdep.outputFile=/tmp/agentic-p6-classpath.txt
+python3 eval/agentic-research/browser_research.py --run-dir local-data/agentic-research/runs/<new-id>
+```
+
+浏览器 fixture 使用真实 React、研究 HTTP/服务、SDK 原生工具协议和随机 PostgreSQL；认证、检索、原文读取、模型回答和普通问答响应受控。它核对三种入口、来源映射、重新生成、刷新不增加调用、等待输入、取消无产物及断线重连不重复创建，退出后清理测试库与进程。不会读取模型凭证或访问供应商；不能据此声称真实 RAG 检索、登录、文档预览下载或引用语义质量通过。程序与页面验证清单见 [P5 manifest](manifests/research-p5-validation-2026-09-17.json) 和 [P6 manifest](manifests/research-p6-validation-2026-09-17.json)。P5 真实供应商联调因自动审批拒绝未执行，授权后再使用相同命令追加 `--execute`，保留独立批次。
 
 ## 产物与标注隔离
 

@@ -233,6 +233,20 @@ class ResearchRunPostgresIT {
     }
 
     @Test
+    void readSourcesSurviveCancellationAndUnreadCandidatesOrOtherOwnersAreExcluded() {
+        var run = run();
+        var evidence = new ResearchEvidenceStore(jdbc, json);
+        var read = new com.nageoffer.ai.ragent.research.model.EvidenceRecord(run.id(), "ev-read-" + run.id(), kb, "doc", "paper.md", "v1", List.of("chunk"), "hash", "已读正文", Map.of("chunk_index", 0), "main", false, true,
+                com.nageoffer.ai.ragent.research.model.EvidenceRecord.SourceExtent.CHUNK);
+        var unread = new com.nageoffer.ai.ragent.research.model.EvidenceRecord(run.id(), "ev-unread-" + run.id(), kb, "doc", "paper.md", "v1", List.of("chunk-2"), "hash-2", "检索摘要", Map.of("chunk_index", 1), "main", true, false, read.sourceExtent());
+        evidence.save(owner, new com.nageoffer.ai.ragent.research.model.EvidenceSnapshot(read, "已读正文", "metadata"));
+        evidence.save(owner, new com.nageoffer.ai.ragent.research.model.EvidenceSnapshot(unread, "完整但未读的正文", "metadata-2"));
+        store.cancel(run.id(), owner);
+        assertEquals(List.of(read.evidenceId()), evidence.readSources(run.id(), owner).stream().map(com.nageoffer.ai.ragent.research.model.EvidenceRecord::evidenceId).toList());
+        assertThrows(ClientException.class, () -> evidence.readSources(run.id(), "foreign"));
+    }
+
+    @Test
     void serviceRunsWithoutAdvanceDoesNotHoldTransactionAndCancelledModelCannotOverwrite() throws Exception {
         var entered = new CountDownLatch(1);
         var returnModel = new CountDownLatch(1);
@@ -245,7 +259,7 @@ class ResearchRunPostgresIT {
             catch (InterruptedException e) { throw new RuntimeException(e); }
             return new ResearchSession.Outcome(null, new SubtaskResult("main", List.of(), List.of("unavailable"), List.of(), SubtaskResult.Status.COMPLETED));
         };
-        var service = new ResearchRunService(store, runner, new ResearchProperties(), jdbc, json, completion());
+        var service = new ResearchRunService(store, runner, new ResearchProperties(), jdbc, json, completion(), new ResearchEvidenceStore(jdbc, json));
         try {
             var request = new ResearchRunService.CreateRequest(conversation, "same", "compare", ResearchBrief.OutputType.REPORT, List.of(), List.of(kb), List.of());
             var created = service.create(request);
@@ -264,7 +278,7 @@ class ResearchRunPostgresIT {
 
     @Test
     void servicePersistsModelFailureAndRejectsForeignConversationOrScope() throws Exception {
-        var service = new ResearchRunService(store, session -> { throw new IllegalStateException("provider failed"); }, new ResearchProperties(), jdbc, json, completion());
+        var service = new ResearchRunService(store, session -> { throw new IllegalStateException("provider failed"); }, new ResearchProperties(), jdbc, json, completion(), new ResearchEvidenceStore(jdbc, json));
         try {
             var created = service.create(new ResearchRunService.CreateRequest(conversation, "failed", "compare", ResearchBrief.OutputType.REPORT, List.of(), List.of(kb), List.of()));
             await(() -> store.get(created.id(), owner).status().terminal());

@@ -23,6 +23,10 @@ export interface Session {
 }
 
 export interface SourceRef {
+  evidenceId?: string;
+  sourceLocation?: Record<string, unknown>;
+  sourceExtent?: string;
+  truncated?: boolean;
   index?: number;
   docId: string;
   docName?: string;
@@ -37,6 +41,7 @@ export interface SourceRef {
 }
 
 export interface Message {
+  researchRunId?: string;
   id: string;
   role: Role;
   content: string;

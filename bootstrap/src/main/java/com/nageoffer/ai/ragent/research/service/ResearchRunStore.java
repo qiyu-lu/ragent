@@ -315,7 +315,7 @@ public class ResearchRunStore {
                 parse(rs.getString("brief"), ResearchBrief.class), Status.valueOf(rs.getString("status")),
                 rs.getLong("revision"), rs.getLong("epoch"), decode(rs.getString("state")),
                 rs.getString("artifact") == null ? null : decode(rs.getString("artifact")),
-                decode(rs.getString("usage")), rs.getString("error_summary"), instant(rs, "started_at"), instant(rs, "completed_at"));
+                decode(rs.getString("usage")), rs.getString("error_summary"), instant(rs, "started_at"), instant(rs, "completed_at"), instant(rs, "create_time"));
     }
 
     private Instant instant(ResultSet rs, String column) throws SQLException {

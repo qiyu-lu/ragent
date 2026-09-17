@@ -83,7 +83,7 @@ class ResearchArtifactGeneratorTest {
         response(report("ev-a"));
         var artifact = generator.generate(session, result());
         assertEquals(List.of("doc-a", "doc-b"), artifact.citations().stream().map(ResearchArtifact.Citation::docId).toList());
-        assertTrue(artifact.markdown().contains("[1][2]"));
+        assertTrue(artifact.markdown().contains("[1](#cite-1)[2](#cite-2)"));
         assertEquals("user_input", artifact.userConstraints().get(0).source());
         assertEquals(result().gaps(), artifact.gaps()); assertEquals(result().conflicts(), artifact.conflicts());
         var request = json.readTree(server.takeRequest().getBody().readUtf8());
@@ -146,5 +146,15 @@ class ResearchArtifactGeneratorTest {
         when(evidence.find("run", "owner", "ev-a")).thenReturn(new EvidenceSnapshot(unread, "snapshot", "metadata"));
         assertThrows(IllegalArgumentException.class, () -> generator.generate(session, result()));
         assertEquals(0, server.getRequestCount());
+    }
+
+    @Test void failedFinalizationHttpCallIsCountedWithoutRetryOrInventedUsageAndReleasesQuota() {
+        server.enqueue(new MockResponse().setResponseCode(400).setBody("fixture rejected"));
+        assertThrows(RuntimeException.class, () -> generator.generate(session, result()));
+        assertEquals(1, server.getRequestCount());
+        assertEquals(1, session.budget.snapshot().get("modelCalls"));
+        var call = ((List<Map<String, Object>>) session.budget.snapshot().get("calls")).get(0);
+        assertEquals("FAILED", call.get("status")); assertEquals("unknown", call.get("usageStatus"));
+        assertEquals(limits.getMaxConcurrentModelCalls(), models.quota().availablePermits());
     }
 }

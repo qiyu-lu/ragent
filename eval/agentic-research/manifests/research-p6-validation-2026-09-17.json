@@ -1,0 +1,392 @@
+{
+  "phase": "P6",
+  "starting_commit": "3507d9e",
+  "tests": {
+    "classes": 23,
+    "total": 168,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "backend_clean_package": true,
+  "frontend_vite_build": true,
+  "typescript": {
+    "node": "passed",
+    "app": "24_existing_diagnostics_unchanged_from_P0",
+    "new_research_diagnostics": 0
+  },
+  "real_provider_calls": 0,
+  "real_provider_validation": "not_run_auto_review_rejected",
+  "semantic_scoring": false,
+  "browser": {
+    "directory": "local-data/agentic-research/runs/20260917T131200_P6_browser_M",
+    "success": true,
+    "checks": [
+      "ordinary QA mode keeps existing /rag/v3/chat request",
+      "REPORT uses native workers and validated two-document citation mapping",
+      "PLAN card shows grounded parameter and missing parameter, source panel uses same two citations",
+      "regeneration creates one new run using shared service and preserves old artifacts",
+      "refresh restores REPORT/PLAN from database with no model restart",
+      "WAITING_INPUT resumes through revision and displays user_input separately",
+      "cancel endpoint ends native worker requests without publishing artifact",
+      "successful creation continues when conversation list refresh fails",
+      "progress connection failure reconnects by GET while same run continues"
+    ],
+    "controlled_components": [
+      "authentication",
+      "knowledge search",
+      "source reader",
+      "model responses",
+      "ordinary QA"
+    ],
+    "real_components": [
+      "React browser",
+      "research controller/service",
+      "AgentScope SDK HTTP",
+      "run/evidence/event PostgreSQL"
+    ],
+    "fixture_model_calls": 49,
+    "run_statuses": [
+      "COMPLETED",
+      "COMPLETED",
+      "COMPLETED",
+      "COMPLETED",
+      "CANCELLED",
+      "COMPLETED"
+    ],
+    "research_creation_posts": 5,
+    "research_regeneration_posts": 1,
+    "research_event_gets": 8,
+    "isolated_database_and_processes_removed": true,
+    "remote_compute_stop": "unknown",
+    "known_logs": "worker cancellation retains existing Reactor blocking InterruptedException onErrorDropped; no final SSE conversion error"
+  },
+  "logs": "local-data/agentic-research/runs/20260917T125800_P6_validation",
+  "frozen_P5_source_and_logs": "verified_against_3507d9e",
+  "source_sha256": {
+    "bootstrap/pom.xml": "7a18e56ee4245538c95c2717f00b2e601266036ed35900249a45ba62ffdfd38a",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/config/ResearchProperties.java": "50bda019eefed2808e12042a249a4c9b0928e3e0d7b80be6bd05a1b0bf6383bb",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/controller/ResearchRunController.java": "594b3ec2da0fe0e401e3800cc6ca5d89930c4f8e87573000a5ff5efc8a310e47",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/eval/ResearchCorpusCommand.java": "1ccc9a22fca3ae6c0696fc692e71cddb22711a805c20acb35b43103fd97088a6",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/eval/ResearchRunCommand.java": "35ceb5a55236bd8fc82880ac4cbb0268fd724547ab2f87dcf3cd9059069abce0",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/model/EvidenceRecord.java": "a93fc7f4d654a048c3e633dd77c8c8f05a3af1f689661486ed4491f8fb87d225",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/model/EvidenceSnapshot.java": "5b8b7f836aaf887a2bd474320dd37541271c1d00a4eb247345a75f083ead3ebd",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/model/KnowledgeSearchHit.java": "34f146c5189d80f7c286a8ea7513af4ca9fac5de28b20625a4ee769fbaf28ab8",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/model/PlanDraft.java": "db734a7f4fbc54e945be256b80fbdc5f6b9ef5344a19a93bc4d1010690cc5166",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/model/ResearchArtifact.java": "1ec4a72e186671e267564e808f2ed4e7152e780e05c735013df282868bd0bf04",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/model/ResearchBrief.java": "8b71d80fbcdb3cb9de28a55a524d04e7e5a1d51e68245bb4f27a292cff2571a6",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/model/ResearchEvent.java": "3d9008afbefb6c1d7504ce9d4226ee8f79d9fe573978970fe076486bfdce8f2c",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/model/ResearchRun.java": "dc383bca9bceef817de4fd0fa1c676b7efb31a98e3a0760d51697c71612719df",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/model/SourceReadResult.java": "2d08afd1fa2b9ee433fd3e5cc3f969f59322318b42c0fa13437852a314a5e5be",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/model/SubtaskResult.java": "0289f7f7cf7664b4c5f6f4bfea9fe09cc3a6cd500b040a24ad1471a4e6b39479",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/runtime/BoundedResearchModel.java": "2dd4dfce32422354b27e03a13a48859f3c9f09a87d41db91d1419f93ad94e49c",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/runtime/ResearchAgentFactory.java": "00e806053e50a04098a0cb30cbdeac1792cc148d5be6c3f0fdbeb3d703c7d9b2",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/runtime/ResearchBudget.java": "4a2118594aa3ab5fff76dea756e1a67b5340f35fe019e52874421a5fe66d58e7",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/runtime/ResearchControl.java": "ba2158517848fb4059925f98b3dd9cf1c5757bef3b8ce09caf3a9095390434d5",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/runtime/ResearchModelFactory.java": "d43b3fad4c7943f99a4213caed93ca83bb358206a0995073708dd9ceeb584a70",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/runtime/ResearchRunner.java": "4bca1e74778e62ecaf5f93cb115879d68d10ff5c332045c741d4205eeac32c6b",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/runtime/ResearchSession.java": "5005457abdb87f08ccc13c447761c9ac7979bb51ac018b9a530ce7a6fa4473a4",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/runtime/ResearchTask.java": "fe90da6d34cf0d82ed0d5ff362577bb3307b4b816781af3956a120de7f224c2a",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/runtime/ResearchTools.java": "651856c976ca827f96af9df963345ab351f659a82815d984a03f967b5fbd87cb",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/runtime/ResearchWorkerCoordinator.java": "569b4da6bac57198647a2955899737670cd85ec258c72ec831f1fdf653cab154",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/runtime/ResearchWorkerTools.java": "3f8feeefcbe72ab1e23d5601c380581710f0b48241535a6b0b1449b328fb99f2",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/EvidenceSnapshotFactory.java": "f2fe6131ccec9f857fcf39b362e84a361c9e29fc9f82f419f024afe7a270e55c",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/EvidenceText.java": "f4ec0a84dc72defc415d0ea4165a359e6f3692d42df44f7e9645e68af13e3d0b",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/KnowledgeSearchService.java": "25c0866cb45655127d0d539504636e0fbf34e8d34e189039909300d10fef19a7",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/PlanDraftValidator.java": "2ea67d58ebd4add2a2d9fbb905b28d76081a8e52ad7de72651c79451fe6adeb3",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/ResearchArtifactGenerator.java": "f679fcdccc13a55e2e7e757b44757cc5578462d9576171288f38a6f873368d63",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/ResearchCompletionService.java": "1821831aa714205462030df6b2ba409a82bdcf6c31ded901a4c5f298558936ee",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/ResearchCorpusImporter.java": "dc9f0d0120a9dd6c0d5138ffb22acd675c5d7b7ae87ea6a673a07b64cb36c247",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/ResearchEventStreamService.java": "33dc0ac2b7fdfe11fc5950ee0fd4255e418730c5bae5979ea13250cb271b9924",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/ResearchEvidenceStore.java": "34f08661d659ae1a4b665d74c2e78b6ef7325d0c89b23e179ef871c0b6e7c391",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/ResearchRunService.java": "26978192634d5b3778d7fc747a854666ca841aad5a447db2632d9e787f2dc521",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/ResearchRunStore.java": "12a99fcfc6a622bae6fcceec67219d77fb60490db1c6b15ca98e1028d4520334",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/ResearchSourceCatalog.java": "17945f78d4f835b7f61aa70c6d1e0244d1613af2493196b2ffc2724fc41746db",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/SourceReader.java": "7d68efa5390554b0a6d7de4e0dbb5b6d2300e0c25788895434f25a3cb3b2eaeb",
+    "bootstrap/src/main/resources/application.yaml": "d791466426b9c5a707edf529ae69007dacb1cd1d80314ea8c82d8b2fd0422de5",
+    "bootstrap/src/main/resources/prompts/research-artifact-v1.txt": "446fd12e4cabced5be34a06fb61053cf60c45823ecd749664e19e7d12803d90d",
+    "bootstrap/src/main/resources/prompts/research-main-v1.txt": "36a6bd192820879341495bfad853dbb7047c189d93195bf992ad6e54f6fbaf7a",
+    "bootstrap/src/main/resources/prompts/research-main-v2.txt": "6847423d8aecb314241fed00cd73b712371cd42cf07df1b1874d4373a395b134",
+    "bootstrap/src/main/resources/prompts/research-main-v3.txt": "c8c357159eab53fa9804fdd9882fb62c66adda852ef584bafb2a3b77f5916c23",
+    "bootstrap/src/main/resources/prompts/research-worker-v1.txt": "0dd42bd127660b5e3a2c27ccb877a6161034cda49ab96307f1f1b05735fddbdf",
+    "bootstrap/src/main/resources/prompts/research-worker-v2.txt": "4db159e701b3e99b532d03d252c7472e9c8f275281327d4464395ba78d0f4611",
+    "bootstrap/src/test/java/com/nageoffer/ai/ragent/research/controller/ResearchRunControllerTest.java": "672a6b53a4531a9d23ce595d1236f7f8423229bd98fbc745b703754a9b8fc465",
+    "bootstrap/src/test/java/com/nageoffer/ai/ragent/research/runtime/ResearchBudgetTest.java": "459d0e1b7f40f85de1a39b2ebdc41c88cb07b814d3500c09cc73c9130812852e",
+    "bootstrap/src/test/java/com/nageoffer/ai/ragent/research/runtime/ResearchNativeToolsTest.java": "f2bc0bfcdf43c59ad73a2fd08ff0a7c9b0b629d0cd22cc4bb357ccb3a04206a1",
+    "bootstrap/src/test/java/com/nageoffer/ai/ragent/research/runtime/ResearchWorkerCoordinatorTest.java": "c9178beb20b0c0d496449f74abb5c5006e7907e8b932b37dc4822daf5f9543d9",
+    "bootstrap/src/test/java/com/nageoffer/ai/ragent/research/runtime/ResearchWorkerNativeTest.java": "b7d1e06169bb11217d2026d13773f57a7e11998aad17ea1f0306d747e4ea506a",
+    "bootstrap/src/test/java/com/nageoffer/ai/ragent/research/service/ResearchArtifactGeneratorTest.java": "2c2ff3b3f18f1a23479317498c13a8140c0c6f667711e4f0d01e2e806d38c2f3",
+    "bootstrap/src/test/java/com/nageoffer/ai/ragent/research/service/ResearchEventStreamServiceTest.java": "f109f241abec4270b3be118953795c6d835e068da4d9b371a63e4c80ea1fbfd6",
+    "bootstrap/src/test/java/com/nageoffer/ai/ragent/research/service/ResearchEvidencePostgresIT.java": "340419484d6c8d11626bcf808e6f00f94dc0f15a6dcef3a02e49439ff6fd5861",
+    "bootstrap/src/test/java/com/nageoffer/ai/ragent/research/service/ResearchEvidenceStoreTest.java": "090683edc35c31e5b5db3617d92c7e610a12a2a17aead835d74a586c11420b8b",
+    "bootstrap/src/test/java/com/nageoffer/ai/ragent/research/service/ResearchEvidenceToolsTest.java": "dae47c0a4f09e117b0bd8b0cd41abbeff09f374cae3ca8278630c7a05e35ce9f",
+    "bootstrap/src/test/java/com/nageoffer/ai/ragent/research/service/ResearchRunPostgresIT.java": "d01874b4afc7dc1ed3e3b38c9b4c73e509413b0070a126f20bfe0524a414e985",
+    "bootstrap/src/test/java/com/nageoffer/ai/ragent/research/web/ResearchBrowserFixture.java": "a2d10250795e9a8aaf7d20128a28a4db0f427d0e66923e8a437a8fc91b1d5c0d",
+    "eval/agentic-research/browser_research.py": "550522880c9e6338677afa044f033b3d01a3de619a02e0e314177ea3ce3b4599",
+    "frontend/package-lock.json": "cd6d9e7328591c11b7e9f9f549fa94743d3e63cd861171300ad23c4f2770f730",
+    "frontend/package.json": "54a3dbcbac07a18fb6c16308cc0a800c001912d6a6cda011225b426124dd416e",
+    "frontend/src/components/chat/ChatInput.tsx": "de427937648b619f0e107d089338d779d472c4edab5f2932125f27c094d385dc",
+    "frontend/src/components/chat/ChatModeSelector.tsx": "7249a95770215c618b92c952dfb93aaf1eb9c1558658cd200033e7fad8c38e4e",
+    "frontend/src/components/chat/MessageItem.tsx": "ea84538ef231f0b893b2b45d8c38f80cc71d20cad79b0ea3200413d8954d415f",
+    "frontend/src/components/chat/PlanDraftCard.tsx": "9c160da2c9e13a0fd208d66df0768a08cfd199f0fbf38e519f67ba2d5a595b84",
+    "frontend/src/components/chat/ResearchProgress.tsx": "909094d1f1918a107e619324a9b3e3abdf097cf4d152e7677618fdccbf38feb5",
+    "frontend/src/components/chat/SourcesPanel.tsx": "e083492cca1ec9557ba278f689d84897adec6bad0588accc84f63516933b9923",
+    "frontend/src/components/chat/WelcomeScreen.tsx": "6ca5caafbb177c851886e20b97c099e7dca365611455bbe7557b5fea1d1f7404",
+    "frontend/src/hooks/useChatInputActions.ts": "e16db4ca9cb233201a45654851585c72ab3b04a3ae475ffc00e75e710ba3e01c",
+    "frontend/src/lib/source.ts": "7715222f8cd332af7fb80eebcdcfb63bd454cc4b8585ae01d63c21d737804a9c",
+    "frontend/src/pages/ChatPage.tsx": "fde1749aa32584e7e6b6e69a2c6a360e6a8b46f62fba9913e31880ec9cc9584a",
+    "frontend/src/services/researchService.ts": "6f128ef3eef17bc13d30f3233c64c76632fa3b920841fc6c6712c7ee42f5120b",
+    "frontend/src/stores/researchStore.ts": "fca25bc6cee7643f6e3dd7ec87cd68afc5d2cf28374978189f0ded0549b1fc76",
+    "frontend/src/types/index.ts": "af8d7b88c1d1f64b1c1459949b18c1c37b77d2d8babc4bc05252852be43a34f3",
+    "frontend/src/types/research.ts": "c3486839538aef2cadba22b5c8986bbed4dbb2ef05c353fc6473e6c4437e91e6",
+    "frontend/vite.config.ts": "96b69b430943305c26b515879510156f0d5828a0027fbe63bfd7d2642b2c7d5b",
+    "pom.xml": "eb412af66327da88a529b4f31bcdad8140044e95b8b88597bd55b9d803a2287c",
+    "resources/database/schema_pg.sql": "1742bbf5e4d46c409f69f65f6557ea1d24b25bf9ef9cfd32b13374b726d72b56",
+    "scripts/validate-agentic-research-p6.sh": "b046b608e7e390baa70baec4d46791421692d2fda97b08ed0b8e51bd3436e4cb"
+  },
+  "validation_artifact_sha256": {
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/app-types.log": "43bae66c9de85ea312becbfd7a36016a64b9adc4bd190fb0f8439c31bd2b39b0",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/browser-final.log": "ee0e572146de914b45c81a85c95c3335858ce23e19371afa4ced8ec637b77ebb",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/build-initial.log": "6d8004fa949175d36fe35fca8d7bec848f877a8a58fc51111b7ce3c793174792",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/build.log": "d52e2d905d3ba876de66115fb485236fe8f6d6af3982566caae45a587fb30338",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/fixture-test-compile.log": "436919e34aadaae57fa05215a51b51a0ca37506e821423503791797116b02f50",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/format.log": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/frontend-build.log": "5c9eb6dbd68b1a92916dc6dd84574dc1c3d2a4d14a0ac538fb2bb3d77eaf6080",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit/TEST-com.nageoffer.ai.ragent.core.chunk.TableChunkerTest.xml": "49008e9fd388b2c9c9fceccfc9f34a637e42618acf65e8c65e13dc50e22639b8",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit/TEST-com.nageoffer.ai.ragent.ingestion.service.impl.IngestionTaskServiceImplTest.xml": "795c14292021719ba87cebcb34ea404979d0f00bb177399a412b2e868ed06450",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit/TEST-com.nageoffer.ai.ragent.ironore.service.WorkbookDiffServiceTest.xml": "e82a802cfc4090f0d26c10e802a901b6d5ca478b1bad66de644a871e64d6553c",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit/TEST-com.nageoffer.ai.ragent.rag.core.keyword.EsKeywordRetrieverServiceTest.xml": "c30a66fb144d843a6bc7c25e409f04ebdea32188c14c23655995cd471cf69d5d",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit/TEST-com.nageoffer.ai.ragent.rag.core.retrieval.MultiChannelRetrievalEngineTest.xml": "fafe647b638426d84c57234585a84180ae4f12ca434974fccc8de45c22ba5ce0",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit/TEST-com.nageoffer.ai.ragent.rag.core.retrieval.RetrievalEngineTest.xml": "5052a43e23ee1a3e34e0ca588ac1dab089d03586a6c4bdd14fcc2554aa38dcf4",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit/TEST-com.nageoffer.ai.ragent.rag.core.retrieval.channel.KeywordSearchChannelTest.xml": "84c3c9bbbebb49a7ce135b7e03206de0dd81a47815c084d03cf6d3777ea9ff5e",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit/TEST-com.nageoffer.ai.ragent.rag.core.retrieval.channel.RetrievalScopeResolverTest.xml": "d5e75125b5e1b68016b6d74d9de1d0778f1b980b870bbc03ad3608b5f9a94e4e",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit/TEST-com.nageoffer.ai.ragent.rag.core.retrieval.channel.VectorSearchChannelTest.xml": "89dd818951c6f68837871fbd5ce75e7cfac5f6fb12275c0db28b0f09642daef6",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit/TEST-com.nageoffer.ai.ragent.rag.core.vector.MilvusVectorRetrieverServiceTest.xml": "7b7361c2cb793293f67b9518ae406a05bfdc22114ddf0d07461af475947ca365",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit/TEST-com.nageoffer.ai.ragent.rag.core.vector.PgVectorRetrieverServiceTest.xml": "e2650ba61ab79a32f3161bd33ed34a09aa29799eacbfcdd5d7f51820ac8fe231",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit/TEST-com.nageoffer.ai.ragent.rag.service.handler.StreamTaskManagerCancelTraceTest.xml": "4228ed6cc635e2d97252d4248d2ed1c14e19e798fb2adc6afa20f0666686d902",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit/TEST-com.nageoffer.ai.ragent.rag.service.pipeline.StreamChatPipelineTest.xml": "32b30d1e446ad0767ce8f41b1ff50001caefec844efb9071f8c4802f60d2df0a",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit/TEST-com.nageoffer.ai.ragent.research.controller.ResearchRunControllerTest.xml": "447d420dc0a0d66bf2f619e688b6efa9e7c4c553437ed23ada48a4f30e8b4318",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit/TEST-com.nageoffer.ai.ragent.research.runtime.ResearchBudgetTest.xml": "6bde77c0aa5e3d93a0f5dfec1d8aa4fee77006e6a9cdbbadd16d97532e207c68",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit/TEST-com.nageoffer.ai.ragent.research.runtime.ResearchNativeToolsTest.xml": "8cd4dc8387c7c529a509dbbf67d0189b2770b2bbbb6078ab1e684d8d6039a482",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit/TEST-com.nageoffer.ai.ragent.research.runtime.ResearchWorkerCoordinatorTest.xml": "3ddf9b5cf2e6990615b4e320c7fb883c6bc0acec89c9608ceeb453d9186958a0",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit/TEST-com.nageoffer.ai.ragent.research.runtime.ResearchWorkerNativeTest.xml": "ebf13f72640bbd944d1fd9ad91d5012817a375a1a9a23b8d9e6da1e52ba22c7b",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit/TEST-com.nageoffer.ai.ragent.research.service.ResearchArtifactGeneratorTest.xml": "5f647b41a305d86a604874eb0b461b61823c948073bb85e5e5c5f220177d5387",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit/TEST-com.nageoffer.ai.ragent.research.service.ResearchEventStreamServiceTest.xml": "ac64642cc9f55e688d9041950be30a1b0e1a847af0ef1a15a38c8e200a09f2a9",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit/TEST-com.nageoffer.ai.ragent.research.service.ResearchEvidenceStoreTest.xml": "2f3e493fa85f644deb1305bbbc3246099053b6f2332ef8ce6439d4ce1b68f5ea",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit/TEST-com.nageoffer.ai.ragent.research.service.ResearchEvidenceToolsTest.xml": "b24e62c308b27f9534825c4a40a78acde2e246d9a797bbeb7426e711ae8fa844",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit/TEST-com.nageoffer.ai.ragent.research.service.ResearchRunPostgresIT.xml": "f21b914cbacf04deeebc1560e863ffeedf8a9fe9d5a031347229f38abbc1e210",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit-initial-167/TEST-com.nageoffer.ai.ragent.core.chunk.TableChunkerTest.xml": "76f0c3a7087bf476fc0c4ff604189b173f8612f585d52ff5dcd491d51e0c609f",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit-initial-167/TEST-com.nageoffer.ai.ragent.ingestion.service.impl.IngestionTaskServiceImplTest.xml": "33740b91adfb2c8bbf7670ee86be1c1d2b05d6ece890ed66aee7cde2a5a606a4",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit-initial-167/TEST-com.nageoffer.ai.ragent.ironore.service.WorkbookDiffServiceTest.xml": "580622db352a518864169e9db9a101e1a7eca104c357b850e785fed070ebff5e",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit-initial-167/TEST-com.nageoffer.ai.ragent.rag.core.keyword.EsKeywordRetrieverServiceTest.xml": "a1c95d5fe357504b510afc47676da40fa193d31b45b7e0cd44b604bc35360101",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit-initial-167/TEST-com.nageoffer.ai.ragent.rag.core.retrieval.MultiChannelRetrievalEngineTest.xml": "429f8a443a12b8c95e92015f4adccda8bbf0715e09620ed0248e74f5b28b729f",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit-initial-167/TEST-com.nageoffer.ai.ragent.rag.core.retrieval.RetrievalEngineTest.xml": "e01b5fd062eb5fc8ce0819a25e5705b24105e4af1349f968b65e4abd3652f19d",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit-initial-167/TEST-com.nageoffer.ai.ragent.rag.core.retrieval.channel.KeywordSearchChannelTest.xml": "09176b90db7b70ca2fa42615c360e221b808e327113e3e3f7fc86282a0133cac",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit-initial-167/TEST-com.nageoffer.ai.ragent.rag.core.retrieval.channel.RetrievalScopeResolverTest.xml": "454596291ccb7e209e572b64d0992bf4a0f318dc2e6e75ec844817b8d5d671ab",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit-initial-167/TEST-com.nageoffer.ai.ragent.rag.core.retrieval.channel.VectorSearchChannelTest.xml": "1bc55bce9eb6bace0ff15314695e444328bf7166b7d346590b0ff5ee8567b8c6",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit-initial-167/TEST-com.nageoffer.ai.ragent.rag.core.vector.MilvusVectorRetrieverServiceTest.xml": "e07d42d1380bb57f1e3f0a8f73778e08bedacee9147d0eaca7b5e4d4aed91207",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit-initial-167/TEST-com.nageoffer.ai.ragent.rag.core.vector.PgVectorRetrieverServiceTest.xml": "e23f6e12bb157f8c6ee56deb1f9b6035f84a43c74c58e422721eb2f46880d40e",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit-initial-167/TEST-com.nageoffer.ai.ragent.rag.service.handler.StreamTaskManagerCancelTraceTest.xml": "c03ba3af36b2895ec2de7b3622c19390c66dab689c1383058bdbfaf032acb6ce",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit-initial-167/TEST-com.nageoffer.ai.ragent.rag.service.pipeline.StreamChatPipelineTest.xml": "f0df627357e996324141b4a3d657a59eef97cb57e1bf7b2731e15139df6361ee",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit-initial-167/TEST-com.nageoffer.ai.ragent.research.controller.ResearchRunControllerTest.xml": "38e48a53cf9a64129e0d1c1d6c5bc5fc69f24a320b828b65355acc73cfd61dcd",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit-initial-167/TEST-com.nageoffer.ai.ragent.research.runtime.ResearchBudgetTest.xml": "839fca813240c028b1cee1bf68980af650df47de34613b820dddd1226a78b760",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit-initial-167/TEST-com.nageoffer.ai.ragent.research.runtime.ResearchNativeToolsTest.xml": "99396b65875535084e58c474405b99508d9f6569e5a3072cdc8d0720928146bb",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit-initial-167/TEST-com.nageoffer.ai.ragent.research.runtime.ResearchWorkerCoordinatorTest.xml": "dbc8200dabd934b61c1c31acc3b752ed3ea8b3526cba44627f376e82ca0f00e6",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit-initial-167/TEST-com.nageoffer.ai.ragent.research.runtime.ResearchWorkerNativeTest.xml": "0f1627d3100a6987bf3dbfdaaaca23ae6cdfcfe93f957c1b92cb5169f25cd8b2",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit-initial-167/TEST-com.nageoffer.ai.ragent.research.service.ResearchArtifactGeneratorTest.xml": "1aa165f7364a53a203caa316557e7a07fb52b4ff0f185fc5dff3ea3c52497e49",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit-initial-167/TEST-com.nageoffer.ai.ragent.research.service.ResearchEventStreamServiceTest.xml": "39361948ff7f7408e2dbc4d939decec6a047fbfd7972d422ef1ad5121b3c3083",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit-initial-167/TEST-com.nageoffer.ai.ragent.research.service.ResearchEvidenceStoreTest.xml": "0f137dc05c193683b1a166452bb395dbdd38d2b2391ee5f6c8b0923c613cf1d9",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit-initial-167/TEST-com.nageoffer.ai.ragent.research.service.ResearchEvidenceToolsTest.xml": "a0c18c7384df810157e95ddd4140d896d6542f9da98e47590194b0a76ed2ef83",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/junit-initial-167/TEST-com.nageoffer.ai.ragent.research.service.ResearchRunPostgresIT.xml": "4b14d559faac52df2a868f2db6b89bf6ab66c58415298b217cc16e6ce9fcbe4d",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/node-types.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/regression-initial-167.log": "003183abae66da4cafda890c0fc7b4dd527873f6c414c11f0eca34a286c853f9",
+    "local-data/agentic-research/runs/20260917T125800_P6_validation/regression.log": "01b09362248e7f813afda6171bd352959a55e3e13296e12059068ea83688dd5b"
+  },
+  "browser_batches": [
+    {
+      "directory": "local-data/agentic-research/runs/20260917T123600_P6_browser_A",
+      "success": false,
+      "checks_passed": 0,
+      "matches_final_runtime": false,
+      "artifact_sha256": {
+        "local-data/agentic-research/runs/20260917T123600_P6_browser_A/backend.log": "097d90a781407ad2066b8412df16728240ecd4b254b40e1f08e47f159f3ee53c",
+        "local-data/agentic-research/runs/20260917T123600_P6_browser_A/summary.json": "f55c84b4220c1d1acb8094f3d37fd7ce69f23d037cc74c6d946bea3a51cf7e48"
+      }
+    },
+    {
+      "directory": "local-data/agentic-research/runs/20260917T123800_P6_browser_B",
+      "success": false,
+      "checks_passed": 0,
+      "matches_final_runtime": false,
+      "artifact_sha256": {
+        "local-data/agentic-research/runs/20260917T123800_P6_browser_B/backend.log": "328a056982fb5f42ca6132161928d5c6f52b5e744c450d4558539619143ece7d",
+        "local-data/agentic-research/runs/20260917T123800_P6_browser_B/chrome.log": "e866de27f15c2405c587eee025aa95e192fde1008c3e00eebab3914552c1b341",
+        "local-data/agentic-research/runs/20260917T123800_P6_browser_B/frontend.log": "545a21348a985fe146b767e63d86265fdeccdb1600e6666be12ec4329db8aff0",
+        "local-data/agentic-research/runs/20260917T123800_P6_browser_B/summary.json": "ecbfc3e4606de4c9303efcfd92350e21de12adc07f9e76c2186baad8cac4499d"
+      }
+    },
+    {
+      "directory": "local-data/agentic-research/runs/20260917T124000_P6_browser_C",
+      "success": false,
+      "checks_passed": 0,
+      "matches_final_runtime": false,
+      "artifact_sha256": {
+        "local-data/agentic-research/runs/20260917T124000_P6_browser_C/backend.log": "b4b4859af962225fefa69a5d03b777f40bb2578277590c38da40b6eea95d5476",
+        "local-data/agentic-research/runs/20260917T124000_P6_browser_C/chrome.log": "95d26506b93c8bc1dcc71c79096c2b2337180aef34a2c6556af4b284a51d1b6b",
+        "local-data/agentic-research/runs/20260917T124000_P6_browser_C/frontend.log": "390b595a334f917bdcb74430cb2ae077798b00cc11ccdfc2450fd99119af0c03",
+        "local-data/agentic-research/runs/20260917T124000_P6_browser_C/summary.json": "fcfc3ac01ad8a6816cbea9e08579200da59427457c800d6d6cffc6054c192f95"
+      }
+    },
+    {
+      "directory": "local-data/agentic-research/runs/20260917T124200_P6_browser_D",
+      "success": false,
+      "checks_passed": 0,
+      "matches_final_runtime": false,
+      "artifact_sha256": {
+        "local-data/agentic-research/runs/20260917T124200_P6_browser_D/backend.log": "b8f37253f29e43f56afb26371a45807922360b701312b1379414af45f194b479",
+        "local-data/agentic-research/runs/20260917T124200_P6_browser_D/chrome.log": "421d06cd61e46c40818812f9f1b3e775b53c76c021a75e3b829a3dadd7ff51bd",
+        "local-data/agentic-research/runs/20260917T124200_P6_browser_D/frontend.log": "dbd08431f2a8379ccd6a1a34e4012d16705255bf186da97ee4becf1a092fdbda",
+        "local-data/agentic-research/runs/20260917T124200_P6_browser_D/summary.json": "50ac9677e3eb9befc23c1fe6e28966cf3af377eebad904281eadf6a4a47aaf10"
+      }
+    },
+    {
+      "directory": "local-data/agentic-research/runs/20260917T124500_P6_browser_E",
+      "success": false,
+      "checks_passed": 1,
+      "matches_final_runtime": false,
+      "artifact_sha256": {
+        "local-data/agentic-research/runs/20260917T124500_P6_browser_E/backend.log": "d5086dc5da61bc15020c3cfa1c99f8157658c6ad221dbf4b28bb67c30b04b8f0",
+        "local-data/agentic-research/runs/20260917T124500_P6_browser_E/chrome.log": "21eece0944c3cab99f3f304242f2770f60e0bd5324e1748409ac687b6bfa3655",
+        "local-data/agentic-research/runs/20260917T124500_P6_browser_E/frontend.log": "72e804a3676f04d3e61e5d58c3511114240355558b639d885e162ddf4f3b68dd",
+        "local-data/agentic-research/runs/20260917T124500_P6_browser_E/summary.json": "3621b1cca73e6659ce3f36f5a8bb75c3d7a07f13a916aa38b2df46a861d62f6a"
+      }
+    },
+    {
+      "directory": "local-data/agentic-research/runs/20260917T124900_P6_browser_F",
+      "success": false,
+      "checks_passed": 2,
+      "matches_final_runtime": false,
+      "artifact_sha256": {
+        "local-data/agentic-research/runs/20260917T124900_P6_browser_F/backend.log": "c4d8a03bb6977f14dd329e3ef35a5bbcd77ff253d25b7498da9bad932ccfe987",
+        "local-data/agentic-research/runs/20260917T124900_P6_browser_F/chrome.log": "5077e6b429e9b94d79ab0a0004d114097674ee90acfe4294bc09a481b6a70275",
+        "local-data/agentic-research/runs/20260917T124900_P6_browser_F/frontend.log": "8eac4e27114fddb79f10007eebdad1aa361fb0106105d4fdc2bcfabd4df46f25",
+        "local-data/agentic-research/runs/20260917T124900_P6_browser_F/summary.json": "bd0831aae8de5040fe7a10fede7548519bf279b62998c35048d8cce34eac5959"
+      }
+    },
+    {
+      "directory": "local-data/agentic-research/runs/20260917T125200_P6_browser_G",
+      "success": false,
+      "checks_passed": 4,
+      "matches_final_runtime": false,
+      "artifact_sha256": {
+        "local-data/agentic-research/runs/20260917T125200_P6_browser_G/backend.log": "fd7398cfbb0b4e837dd273858abf55423691947cc5ebf0793b63c631cbdaf7db",
+        "local-data/agentic-research/runs/20260917T125200_P6_browser_G/chrome.log": "0019e6ca645f05bb569978f679699950822a2b9a0880beef5c254b5d93199ad9",
+        "local-data/agentic-research/runs/20260917T125200_P6_browser_G/frontend.log": "8a856b62f3d86b77bb1e0f78201531cb6924bd0aa710f439c6900f0ef8835007",
+        "local-data/agentic-research/runs/20260917T125200_P6_browser_G/plan.png": "e8d8ac82dca19911d63086aee4c7700530f5d0856ad58b2c72093f4bc3017f07",
+        "local-data/agentic-research/runs/20260917T125200_P6_browser_G/summary.json": "c805b985e826716461ac4ec5952d93ffd8afce442273bd87caf16017be8543ac"
+      }
+    },
+    {
+      "directory": "local-data/agentic-research/runs/20260917T125400_P6_browser_H",
+      "success": false,
+      "checks_passed": 4,
+      "matches_final_runtime": false,
+      "artifact_sha256": {
+        "local-data/agentic-research/runs/20260917T125400_P6_browser_H/backend.log": "9a937a527e8be84679f64e6a65ddcd181cce733df5ccf539403713046f1d46ba",
+        "local-data/agentic-research/runs/20260917T125400_P6_browser_H/chrome.log": "48bc5b92e3fc4fd453cfdfd13f7bbf549f26b8ac790cd60065c39fec811a564f",
+        "local-data/agentic-research/runs/20260917T125400_P6_browser_H/frontend.log": "478910623855f60222b02ac6d300352a9e405afbbfe3728fda11c46cf1e53f68",
+        "local-data/agentic-research/runs/20260917T125400_P6_browser_H/plan.png": "4130903585beb4fe72e82e52b377abe2e2e43f054bef49eba494f5650e8a9918",
+        "local-data/agentic-research/runs/20260917T125400_P6_browser_H/summary.json": "5805fde224432bacf1a0e4733a3eefd8bcdfb4d2e88a63e35dcdba1d342aaa12"
+      }
+    },
+    {
+      "directory": "local-data/agentic-research/runs/20260917T125600_P6_browser_I",
+      "success": true,
+      "checks_passed": 8,
+      "matches_final_runtime": false,
+      "artifact_sha256": {
+        "local-data/agentic-research/runs/20260917T125600_P6_browser_I/backend.log": "0493c6770fdac655e3bb4d80f23b9f35cfa5dfa8ea0ea533c08576eb4d6736c1",
+        "local-data/agentic-research/runs/20260917T125600_P6_browser_I/chrome.log": "a9358c1f8d5b18fec47c8dfb5b2ce0bcb7ba03cd1062e0ca74521d5d6ab10375",
+        "local-data/agentic-research/runs/20260917T125600_P6_browser_I/frontend.log": "1c1935bc154a05bae906101d89cd3bc11605667f2768bc5ce7b831a210daa103",
+        "local-data/agentic-research/runs/20260917T125600_P6_browser_I/plan.png": "6cfe4704a3109a116cb61b315873d87886e33a7710baf9340012d0c48d3fa74f",
+        "local-data/agentic-research/runs/20260917T125600_P6_browser_I/summary.json": "09af19bed1827477f395262febf1cb91986915d83f2f75212b1852d4a98ae7ca"
+      }
+    },
+    {
+      "directory": "local-data/agentic-research/runs/20260917T125900_P6_browser_J",
+      "success": true,
+      "checks_passed": 8,
+      "matches_final_runtime": false,
+      "artifact_sha256": {
+        "local-data/agentic-research/runs/20260917T125900_P6_browser_J/backend.log": "337ec134e87fa7f91bb393e8845ee92fbe94199cefe78de332c8e28dce41a20d",
+        "local-data/agentic-research/runs/20260917T125900_P6_browser_J/chrome.log": "4e5e959ec8ab7850721cc757086c773581ea9d5ad287b001e702391fc47e0d5e",
+        "local-data/agentic-research/runs/20260917T125900_P6_browser_J/frontend.log": "77e8e72ca0de9b3c2d211d67edd21091f4d03ec8b3b8fbd826842dfcf8cd255f",
+        "local-data/agentic-research/runs/20260917T125900_P6_browser_J/plan.png": "cc6a1dc4755556d4c02bbe63e164f8a1b641d7112f410be3fbfcffe155ecf45f",
+        "local-data/agentic-research/runs/20260917T125900_P6_browser_J/summary.json": "76ff362d782d58803d4fc71d247e844d28c7f4a23b7758d0fed1a95e50d67ddb"
+      }
+    },
+    {
+      "directory": "local-data/agentic-research/runs/20260917T130600_P6_browser_K",
+      "success": false,
+      "checks_passed": 7,
+      "matches_final_runtime": false,
+      "artifact_sha256": {
+        "local-data/agentic-research/runs/20260917T130600_P6_browser_K/backend.log": "4aed701409f552f55301f684697be865a7cbb7e174fbb0401a018d8b6ade62ef",
+        "local-data/agentic-research/runs/20260917T130600_P6_browser_K/chrome.log": "196d33563781597bb305d8bd5970a1e043d10a3593eb4b628ff6d36b710b3a62",
+        "local-data/agentic-research/runs/20260917T130600_P6_browser_K/frontend.log": "43d5cef8f631cfcdce5504b8ce7b4717a218f9e5ab78f1c9e7c3b826d9696860",
+        "local-data/agentic-research/runs/20260917T130600_P6_browser_K/plan.png": "cc6a1dc4755556d4c02bbe63e164f8a1b641d7112f410be3fbfcffe155ecf45f",
+        "local-data/agentic-research/runs/20260917T130600_P6_browser_K/summary.json": "63efbfea5035ada491f423f8e0a876947d00113a0ba2a00af6ab6e5ea939bc77"
+      }
+    },
+    {
+      "directory": "local-data/agentic-research/runs/20260917T131000_P6_browser_L",
+      "success": true,
+      "checks_passed": 9,
+      "matches_final_runtime": false,
+      "artifact_sha256": {
+        "local-data/agentic-research/runs/20260917T131000_P6_browser_L/backend.log": "880bfe583fc93b7d22877f5214635233dc7352842791a9415ae2ee8b9cfb593d",
+        "local-data/agentic-research/runs/20260917T131000_P6_browser_L/chrome.log": "b1a65b5563c5bebf922001b4fb269a9a68128ca8b1ed6bbe1b5d406fbd67a9a2",
+        "local-data/agentic-research/runs/20260917T131000_P6_browser_L/frontend.log": "488ef818041fb53e8617dc14e9c8e2a3d9b2b65be71f1a6362dc706a6528206c",
+        "local-data/agentic-research/runs/20260917T131000_P6_browser_L/plan.png": "cc6a1dc4755556d4c02bbe63e164f8a1b641d7112f410be3fbfcffe155ecf45f",
+        "local-data/agentic-research/runs/20260917T131000_P6_browser_L/summary.json": "e2fe88c27922a5e389d267a9917a5bf67ffb58c4b15e5695ecfc6fe53643f9af"
+      }
+    },
+    {
+      "directory": "local-data/agentic-research/runs/20260917T131200_P6_browser_M",
+      "success": true,
+      "checks_passed": 9,
+      "matches_final_runtime": true,
+      "artifact_sha256": {
+        "local-data/agentic-research/runs/20260917T131200_P6_browser_M/backend.log": "637d1618d16b46976b1b956398cb97d61def92a65b17f127fe5f39286936630c",
+        "local-data/agentic-research/runs/20260917T131200_P6_browser_M/chrome.log": "07c93419c3b974dbf8bc2264b1022ae144ce0bb1a3a511b1f268a2af0e42464b",
+        "local-data/agentic-research/runs/20260917T131200_P6_browser_M/frontend.log": "65c650da123b35ef5a03ce78b5f5a8be599b2a719bdd74f36c07765c9763b32a",
+        "local-data/agentic-research/runs/20260917T131200_P6_browser_M/plan.png": "cc6a1dc4755556d4c02bbe63e164f8a1b641d7112f410be3fbfcffe155ecf45f",
+        "local-data/agentic-research/runs/20260917T131200_P6_browser_M/summary.json": "be469da0e6d03b5e2a1cccc9daab3a9f59f4a0bc9c6715d669893606a9faa725"
+      }
+    }
+  ],
+  "static_checks": {
+    "path": "local-data/agentic-research/runs/20260917T125800_P6_validation/checks.json",
+    "sha256": "9e8b6e323f168bf041a39aa25402c3c88f7324550a55fa9d73493a4fa0e9cf56",
+    "summary": {
+      "named_markdown_files": 5,
+      "local_links_and_anchors": 100,
+      "markdown_fences": "passed",
+      "whitespace": "passed",
+      "stage_files": 35,
+      "scope": "passed",
+      "fingerprints_verified": 192,
+      "upgrade_sql_unchanged_by_baseline": {
+        "af28188": 16,
+        "a7ef618": 12
+      },
+      "shell_python_syntax": "passed",
+      "frozen_P5": "verified_against_3507d9e",
+      "typescript_baseline": "24_existing_diagnostics_unchanged_from_P0"
+    },
+    "artifacts_sha256": {
+      "local-data/agentic-research/runs/20260917T125800_P6_validation/static-check.py": "1aa5fc1bf41227bfa4e4b876b3e3e1edc15ddac3db2305cca40b05c25505e735",
+      "local-data/agentic-research/runs/20260917T125800_P6_validation/static-check.log": "9e8b6e323f168bf041a39aa25402c3c88f7324550a55fa9d73493a4fa0e9cf56"
+    }
+  }
+}

@@ -57,6 +57,9 @@ class ResearchEventStreamServiceTest {
     @Test void publicEventsExcludeToolHistoryAndInternalModelMetadata() {
         var source = new ResearchEvent(1, "main", "TOOL_STARTED", "查阅", Map.of("tool", "read_source", "arguments", Map.of("internal", "value"), "output", "raw history", "model", "fixture"), Instant.now());
         assertEquals(Map.of("tool", "read_source"), ResearchEventStreamService.publicEvent(source).payload());
+        var invalid = new ResearchEvent(2, "main", "FINALIZATION_VALIDATION_FAILED", "校验失败",
+                Map.of("reason", "EVIDENCE_IDS_REQUIRED", "rawOutput", "invalid private draft", "rawOutputTruncated", true), Instant.now());
+        assertEquals(Map.of("reason", "EVIDENCE_IDS_REQUIRED"), ResearchEventStreamService.publicEvent(invalid).payload());
     }
     @Test void invalidCursorOrWrongOwnerCannotOpenStream() {
         var store = mock(ResearchRunStore.class);

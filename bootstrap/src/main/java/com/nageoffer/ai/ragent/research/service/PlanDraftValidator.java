@@ -27,9 +27,9 @@ import java.util.Set;
 public class PlanDraftValidator {
     public void validate(PlanDraft draft, Set<String> readIds) {
         if (draft == null) throw new IllegalArgumentException("PLAN_REQUIRED");
-        requirements(draft.prerequisites(), readIds);
-        requirements(draft.resources(), readIds);
-        requirements(draft.cautions(), readIds);
+        requirements(draft.prerequisites(), readIds, "plan.prerequisites");
+        requirements(draft.resources(), readIds, "plan.resources");
+        requirements(draft.cautions(), readIds, "plan.cautions");
         bounded(draft.steps(), 40);
         strings(draft.pendingItems(), 40);
         int order = 1;
@@ -37,16 +37,18 @@ public class PlanDraftValidator {
             if (step == null || step.order() == null || step.order() != order++) {
                 throw new IllegalArgumentException("STEP_ORDER_MUST_BE_CONTIGUOUS");
             }
+            String path = "plan.steps[" + (step.order() - 1) + "]";
             text(step.action());
-            references(step.evidenceIds(), readIds, true);
+            references(step.evidenceIds(), readIds, true, path + ".evidenceIds");
             bounded(step.parameters(), 20);
-            for (var parameter : step.parameters()) {
+            for (int index = 0; index < step.parameters().size(); index++) {
+                var parameter = step.parameters().get(index);
                 if (parameter == null) throw new IllegalArgumentException("PARAMETER_REQUIRED");
                 text(parameter.name());
                 if (parameter.unit() != null && parameter.unit().length() > 100) throw new IllegalArgumentException("UNIT_TOO_LONG");
                 boolean supplied = parameter.value() != null && !parameter.value().isBlank();
                 if (supplied) text(parameter.value());
-                references(parameter.evidenceIds(), readIds, supplied);
+                references(parameter.evidenceIds(), readIds, supplied, path + ".parameters[" + index + "].evidenceIds");
                 if (!supplied && (!parameter.evidenceIds().isEmpty() || parameter.unit() != null && !parameter.unit().isBlank())) {
                     throw new IllegalArgumentException("MISSING_PARAMETER_MUST_HAVE_NULL_VALUE_UNIT_AND_NO_CITATION");
                 }
@@ -54,19 +56,25 @@ public class PlanDraftValidator {
         }
     }
 
-    private void requirements(List<PlanDraft.Requirement> items, Set<String> ids) {
+    private void requirements(List<PlanDraft.Requirement> items, Set<String> ids, String path) {
         bounded(items, 40);
-        for (var item : items) {
+        for (int index = 0; index < items.size(); index++) {
+            var item = items.get(index);
             if (item == null) throw new IllegalArgumentException("REQUIREMENT_REQUIRED");
             text(item.text());
-            references(item.evidenceIds(), ids, true);
+            references(item.evidenceIds(), ids, true, path + "[" + index + "].evidenceIds");
         }
     }
 
-    static void references(List<String> ids, Set<String> allowed, boolean required) {
+    static void references(List<String> ids, Set<String> allowed, boolean required, String path) {
         bounded(ids, 12);
-        if (required && ids.isEmpty() || ids.stream().anyMatch(id -> id == null || !allowed.contains(id))) {
-            throw new IllegalArgumentException("REFERENCE_MUST_BELONG_TO_THIS_RUN_AND_HAVE_READ_PROOF");
+        if (required && ids.isEmpty()) {
+            throw new IllegalArgumentException("EVIDENCE_IDS_REQUIRED at " + path);
+        }
+        List<String> unknown = ids.stream().filter(id -> !allowed.contains(id))
+                .map(id -> EvidenceText.preview(id, 128)).toList();
+        if (!unknown.isEmpty()) {
+            throw new IllegalArgumentException("REFERENCE_MUST_BELONG_TO_THIS_RUN_AND_HAVE_READ_PROOF at " + path + "; unknown evidenceIds: " + unknown);
         }
         if (Set.copyOf(ids).size() != ids.size()) throw new IllegalArgumentException("DUPLICATE_REFERENCE");
     }

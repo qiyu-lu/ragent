@@ -420,7 +420,7 @@ P2 第三批已新增 [eval/agentic-research/](../../eval/agentic-research/READM
 
 ### P5：统一报告与计划草稿输出
 
-**当前状态：已实现，程序验证通过，真实供应商联调待明确授权。** 共用 ResearchArtifactGenerator + PlanDraftValidator；不再设独立计划 Agent。实际实现和验证边界见执行记录 P5。
+**当前状态：已实现，170 个程序回归通过；真实联调最新 REPORT 超时失败、PLAN 为 PARTIAL，未完成质量验收。** 共用 ResearchArtifactGenerator + PlanDraftValidator；不再设独立计划 Agent。失败样例、有限修复及原文支持边界见执行记录 P5/P6 补充记录。
 
 **工作：**
 
@@ -607,8 +607,8 @@ npm --prefix frontend run build
 | P2 数据与工具 | 已完成：证据工具、转换抽样、完整训练/开发摄取及真实联调 | 4b8a328、365d3e4、943c11a、4b06f21；验收见执行记录 |
 | P3 单研究运行 | 已完成：原生工具、持久化运行闭环与真实联调 | `feat: implement bounded research runs with native tool calls`；见执行记录与验证报告 |
 | P4 多 Agent | 已完成 | conduct_research、2/4 worker 限制、隔离上下文与共享额度；真实复测和 165 个定向测试；见[执行记录](agentic-research-execution-log.md) |
-| P5 报告与计划 | 已实现；程序验证通过，真实联调待授权 | 3507d9e；见执行记录 |
-| P6 前端整合 | 已实现；168 个回归及本地受控浏览器流程通过 | `feat: integrate research and plan modes into chat`；见执行记录 |
+| P5 报告与计划 | 已实现；170 个回归通过；真实最新 REPORT 失败、PLAN 部分完成 | 3507d9e；见执行记录 |
+| P6 前端整合 | 已实现；本地受控浏览器流程通过，后续回归 170/170 | f79b9e6；见执行记录 |
 | P7 对照与可靠性 | 未开始 | — |
 | P8 清理与交接 | 未开始 | — |
 

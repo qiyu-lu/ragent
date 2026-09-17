@@ -65,7 +65,8 @@ import java.util.concurrent.*;
 /** 小规模真实研究 联调：语料连接只读，运行/证据写入随机隔离库，禁止用作批量评分器。 */
 public class ResearchRunCommand {
     public record Case(String id, String collection, List<String> sourceDocumentIds, String goal,
-                        ResearchBrief.OutputType outputType, long cancelAfterMillis, String reply, Boolean cancelWhenWorkersRunning) { }
+                        ResearchBrief.OutputType outputType, long cancelAfterMillis, String reply, Boolean cancelWhenWorkersRunning,
+                        List<String> constraints) { }
     public record Job(String runDir, List<Case> cases, Boolean generateArtifacts) { }
     @Configuration(proxyBeanMethods = false)
     @EnableTransactionManagement
@@ -121,6 +122,7 @@ public class ResearchRunCommand {
             var targetCandidate = models.getEmbedding().getCandidates().stream().filter(c -> "qwen-emb-8b".equals(c.getId())).findFirst().orElseThrow();
             var target = new ModelTarget(targetCandidate.getId(), targetCandidate, models.getProviders().get(targetCandidate.getProvider()), null);
             var client = new SiliconFlowEmbeddingClient(new okhttp3.OkHttpClient.Builder()
+                    .readTimeout(properties.getToolTimeoutSeconds(), TimeUnit.SECONDS)
                     .callTimeout(properties.getToolTimeoutSeconds(), TimeUnit.SECONDS).build());
             var embedding = new EmbeddingService() {
                 public List<Float> embed(String text) { return embedBatch(List.of(text)).get(0); }
@@ -151,7 +153,8 @@ public class ResearchRunCommand {
                         "SELECT doc_id FROM t_research_corpus_document WHERE kb_id = ? AND source_document_id = ?", String.class, kb, sourceId));
                 String goal = example.goal();
                 for (int i = 0; i < documents.size(); i++) goal = goal.replace("[[DOC_" + i + "]]", documents.get(i));
-                var brief = new ResearchBrief(goal, example.outputType(), List.of(), List.of(kb), documents);
+                var brief = new ResearchBrief(goal, example.outputType(),
+                        example.constraints() == null ? List.of() : example.constraints(), List.of(kb), documents);
                 var run = store.create("p3-real-smoke", "p3-smoke", example.id(), brief);
                 execute(store, runner, finalization, run, properties, example.cancelAfterMillis(), Boolean.TRUE.equals(example.cancelWhenWorkersRunning()), cancels);
                 run = store.get(run.id(), "p3-real-smoke");

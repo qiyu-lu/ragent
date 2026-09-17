@@ -1,6 +1,6 @@
 # 统一研究工作流验证报告
 
-日期：2026-09-17。P0—P6 已实现；最新 168/168 个程序回归、后端 clean package 和前端 build 通过。三种聊天入口、来源/计划卡、只读 SSE、刷新、补充输入、取消与重连已通过本地受控浏览器验收。真实供应商产物联调被自动审批拒绝未执行，质量评分不在本批结论内；P7 A/B/C、P8 未开始。下方保留历史批次，最新边界见 P6。
+日期：2026-09-17。P0—P6 已实现；最新 170/170 个程序回归、后端 clean package 通过；P6 前端 build 已通过。三种聊天入口、来源/计划卡、只读 SSE、刷新、补充输入、取消与重连已通过本地受控浏览器验收。用户后续明确授权的真实供应商开发联调保留失败和原文支持问题，见下方补充记录；质量评分、P7 A/B/C、P8 未开始。下方保留历史批次。
 
 ## P0 基线
 
@@ -298,8 +298,28 @@ P5 提交 `3507d9e` 后接入聊天三模式、ResearchProgress / PlanDraftCard�
 | 受控部分 | 认证、知识搜索、原文读取、模型内容与普通问答响应，均非真实供应商/完整普通 RAG；没有登录与文档下载预览 E2E |
 | 开发失败及修复 | A—H/K 失败、I/J 首轮通过、L/M 补充场景通过原始日志保留；REPORT 改 canonical 引用、研究滚动接入已有 MessageList、SSE IOException 不进入 JSON 返回；fixture/虚拟列表断言修正单列 |
 | 已知日志边界 | J 无 SSE 转换异常；取消 worker 的现有 Reactor 阻塞中断 / onErrorDropped 日志保留。持久取消/HTTP 本地结束与无产物通过，不代表远端停止计算 |
-| 未执行 | 本轮真实供应商产物联调被自动审批拒绝；无 A/B/C、EM/F1、引用语义评分、完整生产 RAG 或全服务 E2E；P7/P8 未实施 |
+| 未执行 | 本阶段交付时真实供应商产物联调被自动审批拒绝，后续授权后的开发复测见补充记录；无 A/B/C、EM/F1、引用语义评分、完整生产 RAG 或全服务 E2E；P7/P8 未实施 |
 
 程序日志/JUnit 在 `local-data/agentic-research/runs/20260917T125800_P6_validation/`，最终浏览器日志/summary/plan.png 在 `20260917T131200_P6_browser_M/`。本批没有付费供应商请求，随机测试库与进程已清理，历史 SQL 和业务数据库未改变。COMPLETED 表示合法产物形成，不能作为计划可执行、事实正确或资料完整的保证。
 
 最终静态验收通过：5 份入口 Markdown 的 100 个本地链接/锚点、围栏、whitespace 与 shell/Python 语法；35 个阶段文件在约定范围，79 份源码/配置/测试及原始验证产物共 192 个指纹一致。P5 按冻结提交 3507d9e 核验，16 份历史升级 SQL 不变。检查记录与脚本在 P6 validation 目录，指纹由 P6 manifest 引用。
+
+
+## P5/P6 授权后真实供应商补充验证
+
+起始提交 `f79b9e6`，仅对原有 REPORT/PLAN 开发样例执行三批运行；完整命令、修复和边界见[执行记录](agentic-research-execution-log.md)，指纹见[artifact smoke 清单](../../eval/agentic-research/manifests/research-p5-artifact-smoke-2026-09-17.json)。这批已获具体语料外发/付费授权，不是 P7 架构或质量评测。
+
+| 检查 | 实际结果 |
+| --- | --- |
+| A / v1 | REPORT、PLAN 均因连续两次引用校验失败落 FAILED，无非法产物发布；31 次调用保留 |
+| B / v2 | REPORT/PLAN 均经一次修复落 COMPLETED；比较仅有论文 A 的 3 条引用，论文 B 未读取；PLAN 的唯一 Conclusion 引用不支持生成的数据集、初始种子集及计算资源项，作为语义负例保留 |
+| C / v3 | REPORT 因 embedding 超时落 FAILED / RESEARCH_TIMEOUT，无产物；PLAN 落 PARTIAL，4 条实际已读引用，保留 worker 失败，未使用修复调用 |
+| C 原文核对 | 数据集、主动学习与 batch-size 定义、停止窗口/批次影响、无停止方法的限制分别对应真实 Introduction/Conclusion 段；引用范围、读取证明、来源段落及 hash 回查通过；batch_size/window_size 为 null；500 条为独立 user_input |
+| C 验收边界 | 计划仍为概述，关键操作、评估值与预算分配不足，只有单篇论文来源；最终两条真实供应商路径没有同时通过成功验收，不声称可执行计划或真实多文档产物验收 |
+| 最新程序回归 | 23 类 170/170，0 失败/错误/跳过；后端 clean package 通过；模型为本地 HTTP fixture；新增错误定位、缺口修复和受限原始输出检查，SSE 过滤通过 |
+| 实际用量 | 模型 79 请求，已知输入 321707 / 输出 26002 token，0 unknown；embedding 去重 30 请求，已知 total_tokens 60，23 usage unknown；失败与修复保留，未核对金额 |
+| 隔离与留档 | 只读语料、三批随机运行库已清理，无业务升级/删除；P5/P6 旧清单按各自提交冻结核验，原始日志不改写 |
+
+原始程序/核对记录在 `local-data/agentic-research/runs/20260917T133300_P5_followup_validation/`，三批真实请求位置见执行记录。没有新增前端改动或重跑浏览器；P6 的构建、9 个受控页面检查及原有 24 个类型诊断沿用该阶段证据。未开展 A/B/C、EM/F1、正式语义支持评分或完整生产服务 E2E。
+
+本次最终静态验收通过：5 份入口 Markdown 的 105 个本地链接/锚点、围栏、whitespace、14 个变更文件范围与 Python 语法；301 个源码/留档指纹匹配，P5/P6 分别按 3507d9e / f79b9e6 冻结核验，16 份历史升级 SQL 不变。clean JAR 仅含 research-artifact-v3；静态检查首次因旧 P5 清单没有 static_checks 字段失败，调整检查器后通过，首次日志保留。

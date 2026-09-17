@@ -115,8 +115,45 @@ class ResearchArtifactGeneratorTest {
         assertEquals(16, session.budget.snapshot().get("modelCalls")); assertEquals(2, artifact.citations().size());
         server.takeRequest(); var repair = json.readTree(server.takeRequest().getBody().readUtf8());
         assertTrue(repair.toString().contains("REFERENCE_MUST_BELONG"));
+        assertTrue(repair.toString().contains("sections[0].evidenceIds"));
+        assertTrue(repair.toString().contains("unknown evidenceIds: [unread-or-foreign]"));
+        assertTrue(repair.toString().contains("Allowed evidenceIds:"));
         assertEquals(0, session.budget.explorationCallsRemaining());
         assertThrows(ResearchBudget.Exhausted.class, () -> session.budget.acquireModel(true));
+    }
+
+    @Test void uncitedComparisonGapCanBeMovedOutOfSectionsOnTheSingleRepair() throws Exception {
+        var initial = Map.of("title", "比较报告", "sections", List.of(
+                Map.of("heading", "论文 A", "text", "参数是 7 ms", "evidenceIds", List.of("ev-a")),
+                Map.of("heading", "论文 B", "text", "论文 B 的资料不可用", "evidenceIds", List.of())), "gaps", List.of());
+        var corrected = Map.of("title", "比较报告", "sections", List.of(
+                Map.of("heading", "论文 A", "text", "参数是 7 ms", "evidenceIds", List.of("ev-a"))),
+                "gaps", List.of("论文 B 的资料不可用，无法比较"));
+        response(initial); response(corrected);
+        var artifact = generator.generate(session, result());
+        assertEquals(1, artifact.sections().size()); assertEquals(1, artifact.citations().size());
+        assertTrue(artifact.gaps().contains("论文 B 的资料不可用，无法比较"));
+        assertEquals(2, server.getRequestCount());
+        server.takeRequest(); var repair = json.readTree(server.takeRequest().getBody().readUtf8());
+        assertTrue(repair.toString().contains("EVIDENCE_IDS_REQUIRED at sections[1].evidenceIds"));
+        assertTrue(repair.toString().contains("remove uncited sections/items"));
+        verify(store).event(any(), eq("FINALIZATION_VALIDATION_FAILED"), anyString(), argThat(data ->
+                data.get("rawOutput").toString().contains("论文 B") && Boolean.FALSE.equals(data.get("rawOutputTruncated"))), anyMap());
+    }
+
+    @Test void parameterReferenceFailureIdentifiesItsPathAndBoundsInternalInvalidOutput() throws Exception {
+        session = session(ResearchBrief.OutputType.PLAN, Map.of()); session.delivered(item("ev-a"));
+        var plan = Map.of("prerequisites", List.of(), "resources", List.of(), "cautions", List.of(), "pendingItems", List.of(),
+                "steps", List.of(Map.of("order", 1, "action", "按资料准备", "evidenceIds", List.of("ev-a"), "parameters", List.of(
+                        Map.of("name", "延迟", "value", "7", "unit", "ms", "evidenceIds", List.of("foreign"))))));
+        String invalid = json.writeValueAsString(Map.of("title", "计划", "sections", List.of(), "plan", plan, "gaps", List.of())) + " ".repeat(20000);
+        response(invalid); response(invalid);
+        assertThrows(IllegalStateException.class, () -> generator.generate(session, result()));
+        assertEquals(2, server.getRequestCount());
+        verify(store, times(2)).event(any(), eq("FINALIZATION_VALIDATION_FAILED"), anyString(), argThat(data ->
+                data.get("reason").toString().contains("plan.steps[0].parameters[0].evidenceIds")
+                        && data.get("rawOutput").toString().length() <= 16000 && Boolean.TRUE.equals(data.get("rawOutputTruncated"))), anyMap());
+        verify(store, never()).finish(any(), any(), anyMap(), anyMap(), anyMap(), any());
     }
 
     @Test void twoInvalidJsonResponsesFailWithoutPublishingArtifact() throws Exception {

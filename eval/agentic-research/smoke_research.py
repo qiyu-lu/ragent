@@ -93,6 +93,10 @@ def main():
                       'outputType': 'REPORT', 'cancelAfterMillis': 0, 'reply': None})
     if args.case:
         cases = [case for case in cases if case['id'] in args.case]
+    if args.phase == 'p5':
+        for case in cases:
+            if case['id'] == 'plan-workers':
+                case['constraints'] = ['Maximum budget: 500 manually annotated training examples.']
     if not cases:
         raise ValueError('The selected case does not belong to the selected phase')
     args.run_dir.mkdir(parents=True, exist_ok=False)
@@ -110,7 +114,8 @@ def main():
               'config_sha256': digest(REPO / 'bootstrap/src/main/resources/application.yaml'),
               'prompt_sha256': digest(REPO / 'bootstrap/src/main/resources/prompts/research-main-v3.txt'),
               'worker_prompt_sha256': digest(REPO / 'bootstrap/src/main/resources/prompts/research-worker-v2.txt'),
-              'artifact_prompt_sha256': digest(REPO / 'bootstrap/src/main/resources/prompts/research-artifact-v1.txt'), 'harness_sha256': digest(Path(__file__)), 'command': sys.argv, 'paid_generation': bool(args.execute), 'scoring': False}
+              'artifact_prompt_version': 'research-artifact-v3',
+              'artifact_prompt_sha256': digest(REPO / 'bootstrap/src/main/resources/prompts/research-artifact-v3.txt'), 'harness_sha256': digest(Path(__file__)), 'command': sys.argv, 'paid_generation': bool(args.execute), 'scoring': False}
     (args.run_dir / 'run.json').write_text(json.dumps(record, indent=2) + '\n')
     if not args.execute:
         print('Prepared {} smoke probes; no API or database calls made.'.format(len(cases)))

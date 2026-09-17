@@ -35,7 +35,7 @@ import java.util.*;
 /** 同一研究的末尾生成调用；结构/引用失败最多修复一次，不另起 Agent。 */
 @Component
 public class ResearchArtifactGenerator {
-    public static final String PROMPT_VERSION = "research-artifact-v1";
+    public static final String PROMPT_VERSION = "research-artifact-v3";
     private final ResearchModelFactory models;
     private final ResearchProperties properties;
     private final ResearchEvidenceStore evidenceStore;
@@ -89,11 +89,18 @@ public class ResearchArtifactGenerator {
                 return validate(session.claim.run().brief(), payload, result, session.results(), evidence);
             } catch (Exception invalid) {
                 String reason = invalid instanceof IllegalArgumentException ? invalid.getMessage() : "ARTIFACT_JSON_INVALID";
-                session.event("FINALIZATION_VALIDATION_FAILED", "产物结构或引用校验失败", Map.of("attempt", attempt + 1, "reason", reason));
+                session.event("FINALIZATION_VALIDATION_FAILED", "产物结构或引用校验失败", Map.of(
+                        "attempt", attempt + 1, "reason", reason,
+                        "rawOutput", EvidenceText.preview(raw.toString(), 16000), "rawOutputTruncated", raw.length() > 16000));
                 if (attempt == 1) throw new IllegalStateException("ARTIFACT_VALIDATION_FAILED", invalid);
                 List<Msg> repair = new ArrayList<>(messages);
                 repair.add(Msg.builder().role(MsgRole.ASSISTANT).textContent(raw.toString()).build());
-                repair.add(Msg.builder().role(MsgRole.USER).textContent("Return the corrected complete JSON only. Validation error: " + reason).build());
+                repair.add(Msg.builder().role(MsgRole.USER).textContent(
+                        "Return the corrected complete JSON only. Validation error: " + reason
+                                + ". Each factual claim requires non-empty evidenceIds copied exactly from the supplied evidence. "
+                                + "Put unsupported claims and missing information only in gaps or pendingItems; remove uncited sections/items. "
+                                + "Never choose an unrelated reference just to pass validation. Allowed evidenceIds: "
+                                + json.valueToTree(evidence.keySet())).build());
                 // 必须完整保留目标、证据和修复对象；无法容纳时停止，不能裁掉证据后继续引用。
                 if (estimate(repair) > properties.getMaxInputTokens()) throw new ResearchBudget.Exhausted("ARTIFACT_REPAIR_CONTEXT_BUDGET");
                 messages = repair;
@@ -133,10 +140,11 @@ public class ResearchArtifactGenerator {
         LinkedHashSet<String> referenced = new LinkedHashSet<>();
         if (brief.outputType() == ResearchBrief.OutputType.REPORT) {
             if (payload.plan() != null) throw new IllegalArgumentException("REPORT_MUST_NOT_CONTAIN_PLAN");
-            for (var section : payload.sections()) {
+            for (int index = 0; index < payload.sections().size(); index++) {
+                var section = payload.sections().get(index);
                 PlanDraftValidator.text(section.heading());
                 PlanDraftValidator.text(section.text());
-                PlanDraftValidator.references(section.evidenceIds(), evidence.keySet(), true);
+                PlanDraftValidator.references(section.evidenceIds(), evidence.keySet(), true, "sections[" + index + "].evidenceIds");
                 referenced.addAll(section.evidenceIds());
             }
         } else {

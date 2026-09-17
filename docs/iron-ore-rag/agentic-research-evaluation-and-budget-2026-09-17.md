@@ -10,7 +10,7 @@
 
 | 用途 | 当前配置 | 本轮建议 |
 | --- | --- | --- |
-| 研究主 Agent、worker、最终回答/计划生成 | P3 主 Agent 使用 research-flash / qwen3.7-flash-2026-07-15；worker 与最终产物生成在 P4/P5 接续 | 首期统一使用 qwen3.7-flash-2026-07-15，复用 BAILIAN_API_KEY |
+| 研究主 Agent、worker、最终回答/计划生成 | 主 Agent、worker、最终产物统一使用 research-flash / qwen3.7-flash-2026-07-15 | 首期统一使用 qwen3.7-flash-2026-07-15，复用 BAILIAN_API_KEY |
 | A/B/C 架构对照 | 现有普通问答和 FAST 路由使用不同模型候选 | 用独立评测配置固定相同生成模型，记录实际调用；保留生产默认行为的历史成绩为单独一组 |
 | 少量难题的模型对照 | 已有 qwen3-max 候选 | 按需要增加小规模、单独标记的模型对照，不混入 Flash 主实验成绩 |
 | 向量化 | SiliconFlow 的 Qwen/Qwen3-Embedding-8B，1536 维 | 沿用 SILICONFLOW_API_KEY；相同语料与配置复用向量 |
@@ -94,3 +94,10 @@ MuSiQue Full 包含 Ans 的可回答样本，两个版本不能累计成独立�
 三批开发 probe 累计 **83 个模型请求记录，已知输入 496671 / 输出 22935 token，2 个取消请求 usage unknown**。query embedding 按 call_id 去重为 25 次，23 次供应商已知 total_tokens 合计 196，2 次超时 usage unknown；没有 rerank。A 保留比较/PLAN 的预算退出和 embedding 超时，B 当前 worker-v2 比较/PLAN 闭环，C 补查压力保留一成功一预算退出并形成 PARTIAL。三批名称不是架构 A/B/C，不用于校准正式每题成本、语义支持率或效果增益。
 
 金额和余额未核对，前文价格/预算仍是制定时假设，不能用 token 留档冒充账单。详细状态、原始路径及指纹见[执行记录](agentic-research-execution-log.md)和 [P4 manifest](../../eval/agentic-research/manifests/research-p4-smoke-2026-09-17.json)。P5 生成/修复仍应使用同一预算和模型配额，正式质量计分从 P7 接续。
+
+
+## 6. P5/P6 真实产物开发联调用量
+
+用户在明确公开语料外发和付费范围后授权 REPORT/PLAN 两条开发样例及受影响复测。三批共 79 个研究模型请求，已知输入 321707 / 输出 26002 token，模型 usage unknown 为 0；query embedding 按 call_id 去重 30 个请求，已知 total_tokens 60，23 请求 usage unknown。失败和修复调用都包含在内，unknown 不是零费用，金额/余额未核对。
+
+A 两类产物均校验失败；B 形成报告和计划，但报告只有一篇论文引用，计划含 ID 合法而原文不支持的负例；C 收紧原文核对提示并对齐 30 秒读取超时后，报告因 embedding 超时失败，计划形成 4 条引用支持的 PARTIAL 概述，未知 batch_size/window_size 保留 null，500 条为 user_input。不能把 B 的 COMPLETED 或 C 的部分结果称为完整质量验收，也不据反复调试样例估计正式评测每题成本。逐请求状态、定性原文核对、源码和产物指纹见[真实产物联调清单](../../eval/agentic-research/manifests/research-p5-artifact-smoke-2026-09-17.json)；P7 A/B/C 与质量计分未开展。

@@ -82,7 +82,7 @@ GET `/{runId}/events` 按 Accept 返回分页 JSON 或 `text/event-stream`。SSE
 # 本地模型 HTTP 和随机 PostgreSQL 隔离库回归，不消耗供应商额度
 bash scripts/validate-agentic-research-p6.sh
 
-# P5 完整生成 smoke 请求准备；未执行付费联调
+# P5 完整生成 smoke 请求准备；不加 --execute 时无付费请求
 python3 eval/agentic-research/smoke_research.py --phase p5 --case comparison-workers --case plan-workers --run-dir local-data/agentic-research/runs/<new-id>
 
 # 浏览器 fixture 需要现有 Chrome、Python websocket-client、frontend/node_modules 和开发 PostgreSQL
@@ -91,7 +91,11 @@ python3 eval/agentic-research/smoke_research.py --phase p5 --case comparison-wor
 python3 eval/agentic-research/browser_research.py --run-dir local-data/agentic-research/runs/<new-id>
 ```
 
-浏览器 fixture 使用真实 React、研究 HTTP/服务、SDK 原生工具协议和随机 PostgreSQL；认证、检索、原文读取、模型回答和普通问答响应受控。它核对三种入口、来源映射、重新生成、刷新不增加调用、等待输入、取消无产物及断线重连不重复创建，退出后清理测试库与进程。不会读取模型凭证或访问供应商；不能据此声称真实 RAG 检索、登录、文档预览下载或引用语义质量通过。程序与页面验证清单见 [P5 manifest](manifests/research-p5-validation-2026-09-17.json) 和 [P6 manifest](manifests/research-p6-validation-2026-09-17.json)。P5 真实供应商联调因自动审批拒绝未执行，授权后再使用相同命令追加 `--execute`，保留独立批次。
+浏览器 fixture 使用真实 React、研究 HTTP/服务、SDK 原生工具协议和随机 PostgreSQL；认证、检索、原文读取、模型回答和普通问答响应受控。它核对三种入口、来源映射、重新生成、刷新不增加调用、等待输入、取消无产物及断线重连不重复创建，退出后清理测试库与进程。不会读取模型凭证或访问供应商；不能据此声称真实 RAG 检索、登录、文档预览下载或引用语义质量通过。程序与页面验证清单见 [P5 manifest](manifests/research-p5-validation-2026-09-17.json) 和 [P6 manifest](manifests/research-p6-validation-2026-09-17.json)。
+
+P5/P6 初次交付时付费联调被自动审批拒绝，用户后续已明确授权两条 REPORT/PLAN 开发样例；实际失败、修复和原文核对见 [artifact smoke manifest](manifests/research-p5-artifact-smoke-2026-09-17.json)。
+
+`--phase p5` 的计划样例将 500 条标注上限作为独立用户约束传入；生成使用 research-artifact-v3，CLI embedding 读取超时与 30 秒工具配置对齐。产物校验错误包含字段位置，内部最多保存 16000 个 Java 字符的失败生成输出，SSE 不发送该原始草稿；不得把引用身份检查当成语义支持。
 
 ## 产物与标注隔离
 

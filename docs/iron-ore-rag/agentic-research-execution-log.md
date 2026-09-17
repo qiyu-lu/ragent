@@ -4,7 +4,7 @@
 
 ## 当前接续点
 
-P0—P6 已实现，P7—P8 未开始。P5 提交 `3507d9e` 接入统一 REPORT/PLAN 生成、有限修复、结构/引用校验及产物原子落库，旧草稿/审批入口退役；P6 接入三种聊天模式、只读 SSE、来源/计划卡、输入/取消、重新生成和会话恢复。最终 168 个定向程序用例、后端 clean package、前端 build 与本地受控浏览器流程通过；app 保留原有 24 个类型诊断。两条真实供应商产物样例因自动审批拒绝未执行，待明确外发/付费授权。下一步 P7 做固定语料/模型/检索配置的架构对照与原文评分，不把本地 fixture 当作模型效果。
+P0—P6 已实现，P7—P8 未开始。P5 提交 `3507d9e` 接入统一 REPORT/PLAN 生成、有限修复、结构/引用校验及产物原子落库，旧草稿/审批入口退役；P6 接入三种聊天模式、只读 SSE、来源/计划卡、输入/取消、重新生成和会话恢复。最新 170 个定向程序用例及后端 clean package 通过；P6 前端 build 与本地受控浏览器流程已通过，app 保留原有 24 个类型诊断。用户随后明确授权语料外发和付费 REPORT/PLAN 开发联调，失败、修复及原文核对见下方补充记录。P7 的固定配置架构对照与质量评分尚未开展，不把 fixture 或反复调试样例当作模型效果。
 
 ## P0：基线、分支与接入准备（2026-09-17，已完成）
 
@@ -302,7 +302,7 @@ REPORT 为 sections + evidenceIds，PLAN 为前置条件、顺序步骤、材料
 
 ## P6：聊天入口、持久进度与来源展示（2026-09-17）
 
-起始提交 `3507d9e`（P5），分支 `feat/agentic-research`，开始时工作区干净。本阶段提交标题 `feat: integrate research and plan modes into chat`，SHA 可通过 Git log 定位；不自动 push/合并。P5/P6 的代码实现与程序验证已完成，真实供应商产物联调仍待明确授权。
+起始提交 `3507d9e`（P5），分支 `feat/agentic-research`，开始时工作区干净。本阶段提交标题 `feat: integrate research and plan modes into chat`，SHA 可通过 Git log 定位；不自动 push/合并。P5/P6 的代码实现与程序验证已完成；本阶段交付时真实供应商产物联调待授权，后续用户授权后的开发复测见下方补充记录。
 
 ### 实现与交接入口
 
@@ -335,6 +335,43 @@ A—H 开发失败批次、I/J 首轮完整通过、K 错误的 toast 断言失�
 
 最终浏览器原始记录/截图在 `local-data/agentic-research/runs/20260917T131200_P6_browser_M/`；程序日志与 JUnit XML 在 `20260917T125800_P6_validation/`。[P6 清单](../../eval/agentic-research/manifests/research-p6-validation-2026-09-17.json)记录源码/模板/测试/日志 SHA-256、各批次与受控边界。P5 manifest 按冻结提交 3507d9e 核验，不能用 P6 引用渲染改动误判 P5 留档被改写；16 份历史升级 SQL 不变。未升级业务库或清理业务数据。
 
-真实供应商 REPORT/PLAN 产物联调仍因本轮自动审批拒绝未执行（具体语料外发与付费授权不足）；本地浏览器不能替代真实检索/模型、正式登录、文档预览下载或语义支持评分。P7/P8 未实施。下一阶段 P7 按相同语料、模型和检索设置做普通 RAG / 单研究 / 按需委派对照，先完成付费联调授权和产物原文核对，再记录答案、证据、资源与故障结果；不把本批程序机制作为效果数字。
+P6 交付时真实供应商 REPORT/PLAN 产物联调因自动审批拒绝未执行（具体语料外发与付费授权不足），后续用户明确授权后的开发复测见下方补充记录；本地浏览器不能替代真实检索/模型、正式登录、文档预览下载或语义支持评分。P7/P8 未实施。下一阶段 P7 按相同语料、模型和检索设置做普通 RAG / 单研究 / 按需委派对照，以独立固定样本核对产物原文，再记录答案、证据、资源与故障结果；不把本批程序机制作为效果数字。
 
 最终静态验收通过：5 份入口 Markdown 的 100 个本地链接/锚点、围栏、whitespace 与 shell/Python 语法；35 个阶段文件在约定范围，79 份源码/配置/测试及原始验证产物共 192 个指纹一致。P5 按冻结提交 3507d9e 核验，16 份历史升级 SQL 不变。检查记录与脚本在 P6 validation 目录，指纹由 P6 manifest 引用。
+
+
+## P5/P6 补充：授权后的真实供应商产物联调（2026-09-17）
+
+起始提交 `f79b9e6`（P6），开始时工作区干净。用户在得知具体公开 QASPER 语料外发和付费范围后明确回复“授权”。本次仅执行原有 comparison-workers / plan-workers 两条开发样例及受影响复测，不扩展 P7 批量评测，不 push/合并。后续提交标题为 `fix: improve evidence feedback for research artifacts`，SHA 可通过 Git log 定位。
+
+### 实际结果与修复
+
+| 批次 | 最终模板 | REPORT 比较 | PLAN 草稿 | 模型调用 |
+| --- | --- | --- | --- | ---: |
+| A | research-artifact-v1 | FAILED；两次引用校验失败，无产物 | FAILED；两次引用校验失败，无产物 | 31 |
+| B | research-artifact-v2 | COMPLETED；一次修复，3 条引用仅来自论文 A，论文 B 无检索结果 | COMPLETED；一次修复，1 条引用；原文核对发现不支持的字段，保留为负例 | 30 |
+| C | research-artifact-v3 | FAILED / RESEARCH_TIMEOUT；未读到证据，无产物 | PARTIAL；一次生成，4 条已读引用，保留 worker 超时与缺口 | 18 |
+
+A 的历史输出只有通用错误码，不能证明具体是空引用还是错误 ID。B 增加诊断后，实际捕获报告中的无引用目标/缺口章节和计划中无引用的 500 条用户预算资源。校验现区分空引用与未知引用并给出字段位置；一次修复同时列出允许的精确 evidenceIds，要求无支持字段移入 gaps/pendingItems，不随意配上引用。内部失败事件保存最多 16000 个 Java 字符的生成输出并标注截断，不保存 thinking；SSE 仍过滤该原始草稿。引用身份、读取证明和一次修复上限没有放宽。
+
+联调 Case 新增可选 constraints；仅 P5 plan-workers 将“最多手工标注 500 条”显式传入 Brief，产物由服务端保存为 user_input，不作为文档参数。旧 P3/P4 请求不传时仍为空。CLI embedding 原来只有 callTimeout=30 秒，实际受默认 readTimeout=10 秒限制；C 将读取超时对齐现有 30 秒工具配置及线上同步客户端，没有增加总预算。
+
+B 的 PLAN 所引唯一 Conclusion 段没有 20Newsgroups、初始标注种子集或计算资源要求，仍生成了这些字段。这是“ID 合法但原文不支持”的真实负例，未写为质量通过。v3 将压缩 findings 限为研究线索，要求逐项核对所引正文，不从概括性结论补齐常识流程。C 的数据集引用已指向实际 Introduction 段，不再出现 B 的初始种子集细节和计算资源项；4 条引用逐项回查了真实来源段落、hash、范围及读取证明。batch_size / window_size 都为 null，500 条仍为独立用户约束。C 的步骤只构成研究概述，初始分配、标注操作、评估数值及如何满足 500 条预算尚缺，且只引用一篇论文，不能据此称为可执行方案或真实多文档 PLAN 验收。
+
+30 秒配置下仍发生 embedding 请求超时。C 的比较没有通过成功验收；计划有一个 worker 已读两段后超时，主任务保留来源并补读，最终正确落 PARTIAL。旧 B 产物不能冒充 v3 比较通过。上游 gaps 的重复表述和预算适用性疑问仍保留在原始结果中；正式质量评测在 P7 接续。
+
+### 复现、用量和程序边界
+
+每批使用以下命令，run-dir 必须为新目录；A/B 回放使用各自 source-snapshot，当前源码为 C。所有运行只读既有 `research_corpus_v1`，运行/证据/事件写随机隔离库，三批测试库均已清理。
+
+```bash
+python3 eval/agentic-research/smoke_research.py --phase p5 --case comparison-workers --case plan-workers --run-dir local-data/agentic-research/runs/<new-id> --execute
+```
+
+三个开发批次累计 **79 个研究模型请求**，供应商已知输入 **321707** / 输出 **26002** token，模型 usage unknown 为 0；query embedding 按 call_id 去重 **30 请求**，已知 total_tokens **60**，另 **23 请求 usage unknown**。失败/超时及修复均计入，没有将 unknown 计作零费用；金额和余额未核对。模型始终为 `qwen3.7-flash-2026-07-15`，关闭 thinking；embedding 为 `Qwen/Qwen3-Embedding-8B`、1536 维，无 rerank。没有读取 gold，也没有跑 A/B/C、EM/F1 或正式语义评分。
+
+修复后当前 **23 类 170/170**，0 失败/错误/跳过；后端 clean package 通过。新增 2 个本地 HTTP 用例覆盖无引用比较缺口的一次修复、参数错误字段定位及失败输出截断；扩充 SSE 过滤检查。当前未修改前端，不重复前端/浏览器检查，P6 的 build、9 个受控浏览器检查及 24 个既有类型诊断仍是该阶段证据。
+
+A/B/C 原始目录分别为 `20260917T132700_P5_real_A/`、`20260917T133500_P5_real_B/`、`20260917T133900_P5_real_C/`，均位于 `local-data/agentic-research/runs/`。程序日志、JUnit、逐字段定性原文核对及检查脚本位于 `20260917T133300_P5_followup_validation/`；运行源码与 v1/v2/v3 模板各自冻结，既有 P5/P6 清单和原始留档不改写。[真实产物联调清单](../../eval/agentic-research/manifests/research-p5-artifact-smoke-2026-09-17.json)保存请求/状态、实际用量、源码及原始产物 SHA-256。历史升级 SQL 和业务数据库未修改；P7/P8 未开始。
+
+本次最终静态验收通过：5 份入口 Markdown 的 105 个本地链接/锚点、围栏、whitespace、14 个变更文件范围与 Python 语法；301 个源码/留档指纹匹配，P5/P6 分别按 3507d9e / f79b9e6 冻结核验，16 份历史升级 SQL 不变。clean JAR 仅含 research-artifact-v3；静态检查首次因旧 P5 清单没有 static_checks 字段失败，调整检查器后通过，首次日志保留。

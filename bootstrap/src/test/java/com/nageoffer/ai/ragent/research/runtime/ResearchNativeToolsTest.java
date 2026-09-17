@@ -99,6 +99,19 @@ class ResearchNativeToolsTest {
     private EvidenceRecord evidence(String id) { return new EvidenceRecord("run", id, "kb", "doc", "paper", "V1", List.of("chunk"), "hash", "X identifies Mercury; the dependent source gives a parameter of 7 ms.", Map.of(), "main", false, true, EvidenceRecord.SourceExtent.CHUNK); }
 
     @Test
+    void singleResearcherCannotDelegateAndKeepsNativeFinishProtocol() throws Exception {
+        tool("finish", "finish_research", Map.of("findings", List.of(), "gaps", List.of("No supported answer"), "conflicts", List.of()));
+        try (var serial = new ResearchAgentFactory(models, limits, search, reader, json, new HeuristicTokenCounterService(), false)) {
+            assertEquals("No supported answer", serial.run(session).result().gaps().get(0));
+        }
+        var body = json.readTree(server.takeRequest(5, TimeUnit.SECONDS).getBody().readUtf8());
+        assertEquals(4, body.path("tools").size());
+        for (var schema : body.path("tools")) assertNotEquals("conduct_research", schema.path("function").path("name").asText());
+        assertEquals("required", body.path("tool_choice").asText());
+        assertEquals(1, session.budget.snapshot().get("modelCalls"));
+    }
+
+    @Test
     void nativeSearchReadAndDependentSearchPreserveToolCallIdsAndUsage() throws Exception {
         tool("search-1", "search_knowledge", Map.of("query", "X", "limit", 1));
         tool("read-1", "read_source", Map.of("evidence_id", "ev-one", "mode", "CHUNK"));

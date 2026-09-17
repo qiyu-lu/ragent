@@ -60,11 +60,21 @@ public class ResearchAgentFactory implements ResearchRunner, AutoCloseable {
     public static final String WORKER_PROMPT_VERSION = "research-worker-v2";
     private final String workerPrompt;
     private final ResearchWorkerCoordinator coordinator;
+    private final boolean delegationEnabled;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public ResearchAgentFactory(ResearchModelFactory models, ResearchProperties properties,
                                  KnowledgeSearchService search, SourceReader reader, ObjectMapper json,
                                  TokenCounterService tokens) {
+        this(models, properties, search, reader, json, tokens, true);
+    }
+
+    /** 离线对照可关闭委派，其他工具、预算和模型保持一致；在线入口默认启用。 */
+    public ResearchAgentFactory(ResearchModelFactory models, ResearchProperties properties,
+                                 KnowledgeSearchService search, SourceReader reader, ObjectMapper json,
+                                 TokenCounterService tokens, boolean delegationEnabled) {
         properties.validate();
+        this.delegationEnabled = delegationEnabled;
         this.models = models;
         this.properties = properties;
         this.search = search;
@@ -72,7 +82,9 @@ public class ResearchAgentFactory implements ResearchRunner, AutoCloseable {
         this.json = json;
         this.tokens = tokens;
         this.modelQuota = models.quota();
-        this.prompt = load(PROMPT_VERSION);
+        String mainPrompt = load(PROMPT_VERSION);
+        this.prompt = delegationEnabled ? mainPrompt : mainPrompt.substring(0, mainPrompt.indexOf("You are the main coordinator."))
+                + "\nYou are the single researcher. Only your own search/read/ask/finish tools are available. Research directly and sequentially; do not request delegation.\n";
         this.workerPrompt = load(WORKER_PROMPT_VERSION);
         this.coordinator = new ResearchWorkerCoordinator(properties, search, this::run, json);
     }
@@ -84,7 +96,7 @@ public class ResearchAgentFactory implements ResearchRunner, AutoCloseable {
         if (session.main()) {
             session.restoreResults(json);
             tools.registerTool(new ResearchTools(session, search, reader));
-            tools.registerTool(coordinator.tools(session));
+            if (delegationEnabled) tools.registerTool(coordinator.tools(session));
         } else tools.registerTool(new ResearchWorkerTools(session, search, reader));
         var context = RuntimeContext.builder().userId(session.claim.owner())
                 .sessionId(session.claim.run().id() + ":" + session.claim.run().epoch() + ":" + session.taskId).build();

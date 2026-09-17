@@ -93,6 +93,30 @@ class ResearchArtifactGeneratorTest {
         assertEquals("finalization", call.get("role")); assertEquals("provider", call.get("usageStatus"));
     }
 
+    @Test void finalInputOmitsCorpusMetadataWhilePublicationKeepsSourceIdentity() throws Exception {
+        var original = item("ev-a");
+        var record = new EvidenceRecord(original.runId(), original.evidenceId(), original.kbId(), original.docId(),
+                original.documentName(), "qasper-v0.3", original.chunkIds(), original.contentHash(), original.text(),
+                Map.of("dataset", "qasper", "split", "validation", "section_path", List.of("Experiment Setup"),
+                        "sheetName", "参数表", "source_paragraph_id", "original-paragraph"), original.retrievedByTaskId(),
+                original.truncated(), original.read(), original.sourceExtent());
+        when(evidence.find("run", "owner", "ev-a")).thenReturn(new EvidenceSnapshot(record, "snapshot", "metadata"));
+        response(report("ev-a"));
+        var artifact = generator.generate(session, result());
+        var request = json.readTree(server.takeRequest().getBody().readUtf8());
+        var input = json.readTree(request.path("messages").get(1).path("content").asText());
+        var provided = input.path("evidence").get(0);
+        assertEquals(record.text(), provided.path("text").asText());
+        assertEquals("ev-a", provided.path("evidenceId").asText());
+        assertEquals("Experiment Setup", provided.path("sourceContext").path("section_path").get(0).asText());
+        assertEquals("参数表", provided.path("sourceContext").path("sheetName").asText());
+        assertFalse(provided.toString().contains("qasper"));
+        assertFalse(provided.has("sourceLocation"));
+        assertEquals("qasper-v0.3", artifact.citations().get(0).documentVersion());
+        assertEquals("qasper", artifact.citations().get(0).sourceLocation().get("dataset"));
+        assertEquals("original-paragraph", artifact.citations().get(0).sourceLocation().get("source_paragraph_id"));
+    }
+
     @Test void planRequiresEachParameterEvidenceAndPreservesMissingValuesAndUserConstraints() throws Exception {
         session = session(ResearchBrief.OutputType.PLAN, Map.of()); session.delivered(item("ev-a")); session.delivered(item("ev-b"));
         Map<String, Object> missing = new HashMap<>(); missing.put("name", "温度"); missing.put("value", null); missing.put("unit", null); missing.put("evidenceIds", List.of());

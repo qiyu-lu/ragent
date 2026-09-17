@@ -35,7 +35,7 @@ import java.util.*;
 /** 同一研究的末尾生成调用；结构/引用失败最多修复一次，不另起 Agent。 */
 @Component
 public class ResearchArtifactGenerator {
-    public static final String PROMPT_VERSION = "research-artifact-v3";
+    public static final String PROMPT_VERSION = "research-artifact-v4";
     private final ResearchModelFactory models;
     private final ResearchProperties properties;
     private final ResearchEvidenceStore evidenceStore;
@@ -44,9 +44,17 @@ public class ResearchArtifactGenerator {
     private final TokenCounterService tokens;
     private final String prompt;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public ResearchArtifactGenerator(ResearchModelFactory models, ResearchProperties properties,
                                      ResearchEvidenceStore evidenceStore, PlanDraftValidator plans,
                                      ObjectMapper json, TokenCounterService tokens) {
+        this(models, properties, evidenceStore, plans, json, tokens, "");
+    }
+
+    /** 离线评测的回答格式仅作用于最终生成，不传入研究阶段的 Brief。 */
+    public ResearchArtifactGenerator(ResearchModelFactory models, ResearchProperties properties,
+                                     ResearchEvidenceStore evidenceStore, PlanDraftValidator plans,
+                                     ObjectMapper json, TokenCounterService tokens, String outputInstruction) {
         this.models = models;
         this.properties = properties;
         this.evidenceStore = evidenceStore;
@@ -55,7 +63,7 @@ public class ResearchArtifactGenerator {
                 .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
         this.tokens = tokens;
         try (var input = new ClassPathResource("prompts/" + PROMPT_VERSION + ".txt").getInputStream()) {
-            prompt = new String(input.readAllBytes(), StandardCharsets.UTF_8);
+            prompt = new String(input.readAllBytes(), StandardCharsets.UTF_8) + "\n" + outputInstruction;
         } catch (Exception error) { throw new IllegalStateException("产物提示词读取失败", error); }
     }
 
@@ -116,7 +124,10 @@ public class ResearchArtifactGenerator {
                 messages = List.of(Msg.builder().role(MsgRole.SYSTEM).textContent(prompt).build(),
                         Msg.builder().role(MsgRole.USER).textContent(json.writeValueAsString(Map.of(
                                 "brief", session.claim.run().brief(), "findings", result,
-                                "workerResults", session.results(), "evidence", evidence.values()))).build());
+                                "workerResults", session.results(), "evidence", evidence.values().stream()
+                                        .map(item -> new ModelEvidence(item.evidenceId(), item.docId(), item.documentName(),
+                                                item.text(), item.truncated(), item.sourceExtent(), sourceContext(item.sourceLocation())))
+                                        .toList()))).build());
             } catch (Exception error) { throw new IllegalStateException("产物输入序列化失败", error); }
             if (estimate(messages) <= properties.getMaxInputTokens()) return messages;
             var longest = evidence.values().stream().filter(e -> e.text().length() > 256)
@@ -129,6 +140,27 @@ public class ResearchArtifactGenerator {
     private int estimate(List<Msg> messages) {
         try { return tokens.countTokens(json.writeValueAsString(Map.of("messages", messages, "tools", List.of()))); }
         catch (Exception error) { throw new IllegalStateException("产物上下文估算失败", error); }
+    }
+
+    /** 语料来源字段保留在服务器引用快照中，生成输入只保留正文和原文结构。 */
+    private record ModelEvidence(String evidenceId, String docId, String documentName, String text,
+                                 boolean truncated, EvidenceRecord.SourceExtent sourceExtent,
+                                 Map<String, Object> sourceContext) { }
+
+    private static Map<String, Object> sourceContext(Map<?, ?> location) {
+        Map<String, Object> context = new LinkedHashMap<>();
+        for (String key : List.of("section_path", "sectionPath", "sheet_name", "sheetName", "page_number", "pageNumber")) {
+            if (location.containsKey(key)) context.put(key, location.get(key));
+        }
+        if (location.get("chunks") instanceof List<?> chunks) {
+            List<Map<String, Object>> nested = new ArrayList<>();
+            for (Object chunk : chunks) if (chunk instanceof Map<?, ?> mapping) {
+                Map<String, Object> part = sourceContext(mapping);
+                if (!part.isEmpty()) nested.add(part);
+            }
+            if (!nested.isEmpty()) context.put("chunks", nested);
+        }
+        return context;
     }
 
     ResearchArtifact validate(ResearchBrief brief, ResearchArtifact.Payload payload, SubtaskResult main,

@@ -62,12 +62,14 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
 
-/** 小规模真实研究 联调：语料连接只读，运行/证据写入随机隔离库，禁止用作批量评分器。 */
+/** 真实联调与显式离线 P7 对照：语料只读，运行/证据写入随机隔离库。 */
 public class ResearchRunCommand {
     public record Case(String id, String collection, List<String> sourceDocumentIds, String goal,
                         ResearchBrief.OutputType outputType, long cancelAfterMillis, String reply, Boolean cancelWhenWorkersRunning,
                         List<String> constraints) { }
-    public record Job(String runDir, List<Case> cases, Boolean generateArtifacts) { }
+    public record Job(String runDir, List<Case> cases, Boolean generateArtifacts,
+                      String evaluationMode, Integer concurrency, Double maxCostCny, String generationInstruction,
+                      String expectedModel, Map<String, Integer> expectedBudget) { }
     @Configuration(proxyBeanMethods = false)
     @EnableTransactionManagement
     static class Transactions { }
@@ -75,7 +77,15 @@ public class ResearchRunCommand {
 
     public static void main(String[] args) throws Exception {
         Job job = JSON.readValue(Path.of(args[0]).toFile(), Job.class);
-        if (job.cases().isEmpty() || job.cases().size() > 6) throw new IllegalArgumentException("P3 smoke supports 1—6 cases only");
+        boolean evaluation = job.evaluationMode() != null;
+        int concurrency = job.concurrency() == null ? 1 : job.concurrency();
+        if (job.cases().isEmpty() || job.cases().size() > (evaluation ? 6000 : 6)
+                || evaluation && (!Set.of("A", "B", "C").contains(job.evaluationMode()) || !Boolean.TRUE.equals(job.generateArtifacts())
+                || job.maxCostCny() == null || !Double.isFinite(job.maxCostCny()) || job.maxCostCny() <= 0)
+                || concurrency < 1 || concurrency > 2 || !evaluation && concurrency != 1
+                || job.cases().stream().map(Case::id).distinct().count() != job.cases().size()) {
+            throw new IllegalArgumentException("Invalid bounded smoke/evaluation job");
+        }
         String corpusUrl = required("RAGENT_POSTGRES_URL");
         String runUrl = required("RESEARCH_P3_TEST_URL");
         if (!corpusUrl.matches("jdbc:postgresql://(127\\.0\\.0\\.1|localhost):[0-9]+/research_corpus_[a-zA-Z0-9_]+")
@@ -94,12 +104,24 @@ public class ResearchRunCommand {
         }
         var models = Binder.get(environment).bind("ai", Bindable.of(AIModelProperties.class)).orElseThrow(IllegalStateException::new);
         var properties = Binder.get(environment).bind("research", Bindable.of(ResearchProperties.class)).orElseThrow(IllegalStateException::new);
+        if (evaluation) {
+            String actualModel = models.getChat().getCandidates().stream().filter(c -> properties.getModelId().equals(c.getId()))
+                    .findFirst().orElseThrow().getModel();
+            if (job.expectedModel() == null || !job.expectedModel().equals(actualModel)) throw new IllegalArgumentException("EVALUATION_MODEL_MISMATCH");
+            var actualBudget = JSON.valueToTree(properties);
+            if (job.expectedBudget() == null || job.expectedBudget().entrySet().stream()
+                    .anyMatch(e -> !actualBudget.has(e.getKey()) || actualBudget.get(e.getKey()).asInt() != e.getValue())) {
+                throw new IllegalArgumentException("EVALUATION_BUDGET_MISMATCH");
+            }
+        }
         var sourceManager = new DataSourceTransactionManager(corpus);
         sourceManager.setEnforceReadOnly(true);
         var store = new ResearchRunStore(runJdbc, JSON, new DataSourceTransactionManager(runData));
         var evidence = new ResearchEvidenceStore(runJdbc, JSON);
         ExecutorService retrieval = Executors.newFixedThreadPool(4);
         ScheduledExecutorService cancels = Executors.newSingleThreadScheduledExecutor();
+        ExecutorService runs = Executors.newFixedThreadPool(concurrency);
+        java.util.concurrent.atomic.DoubleAdder estimatedCost = new java.util.concurrent.atomic.DoubleAdder();
         try (var context = new AnnotationConfigApplicationContext();
              var embeddingUsage = Files.newBufferedWriter(directory.resolve("embedding-usage.jsonl"));
              var predictions = Files.newBufferedWriter(directory.resolve("predictions.jsonl"));
@@ -143,10 +165,18 @@ public class ResearchRunCommand {
             var search = new KnowledgeSearchService(engine, bases, docs, catalog, evidence, JSON);
             var reader = new SourceReader(evidence, catalog, new EvidenceSnapshotFactory(JSON));
             var modelFactory = new ResearchModelFactory(models, properties);
+            if (evaluation) Files.writeString(directory.resolve("runtime.json"), JSON.writeValueAsString(Map.of(
+                    "research", properties, "mode", job.evaluationMode(), "retrieval", Map.of("channel", "PGVector", "rerank", false,
+                    "recallBudget", 20, "candidateLimit", 40, "oneShotTopK", 10))));
             var finalization = Boolean.TRUE.equals(job.generateArtifacts()) ? new ResearchCompletionService(store,
-                    new ResearchArtifactGenerator(modelFactory, properties, evidence, new PlanDraftValidator(), JSON, new HeuristicTokenCounterService()), JSON) : null;
-            try (var runner = new ResearchAgentFactory(modelFactory, properties, search, reader, JSON, new HeuristicTokenCounterService())) {
-            for (Case example : job.cases()) {
+                    new ResearchArtifactGenerator(modelFactory, properties, evidence, new PlanDraftValidator(), JSON, new HeuristicTokenCounterService(),
+                            evaluation && job.generationInstruction() != null ? job.generationInstruction() : ""), JSON) : null;
+            try (var runner = new ResearchAgentFactory(modelFactory, properties, search, reader, JSON, new HeuristicTokenCounterService(), !"B".equals(job.evaluationMode()))) {
+            ResearchRunner execution = "A".equals(job.evaluationMode()) ? new OneShotResearchRunner(search, reader) : runner;
+            List<Future<?>> futures = new ArrayList<>();
+            for (Case example : job.cases()) futures.add(runs.submit(() -> {
+                if (evaluation && estimatedCost.sum() + 0.3 > job.maxCostCny()) throw new IllegalStateException("EVALUATION_COST_LIMIT");
+                long started = System.nanoTime();
                 String kb = corpusJdbc.queryForObject("SELECT id FROM t_knowledge_base WHERE collection_name = ? AND deleted = 0", String.class, example.collection());
                 List<String> documents = new ArrayList<>();
                 for (String sourceId : example.sourceDocumentIds()) documents.add(corpusJdbc.queryForObject(
@@ -156,22 +186,31 @@ public class ResearchRunCommand {
                 var brief = new ResearchBrief(goal, example.outputType(),
                         example.constraints() == null ? List.of() : example.constraints(), List.of(kb), documents);
                 var run = store.create("p3-real-smoke", "p3-smoke", example.id(), brief);
-                execute(store, runner, finalization, run, properties, example.cancelAfterMillis(), Boolean.TRUE.equals(example.cancelWhenWorkersRunning()), cancels);
+                execute(store, execution, finalization, run, properties, example.cancelAfterMillis(), Boolean.TRUE.equals(example.cancelWhenWorkersRunning()), cancels);
                 run = store.get(run.id(), "p3-real-smoke");
                 if (run.status() == ResearchRun.Status.WAITING_INPUT && example.reply() != null) {
                     run = store.input(run.id(), "p3-real-smoke", run.revision(), example.reply());
-                    execute(store, runner, finalization, run, properties, 0, false, cancels);
+                    execute(store, execution, finalization, run, properties, 0, false, cancels);
                     run = store.get(run.id(), "p3-real-smoke");
                 }
-                append(predictions, run);
+                if (evaluation) {
+                    Map<String, Object> prediction = Map.of("caseId", example.id(), "mode", job.evaluationMode(),
+                            "elapsedMillis", (System.nanoTime() - started) / 1_000_000, "run", run,
+                            "sources", evidence.readSources(run.id(), "p3-real-smoke"));
+                    append(predictions, prediction);
+                } else append(predictions, run);
                 for (var event : store.events(run.id(), "p3-real-smoke", 0, 500)) append(traces,
                         Map.of("runId", run.id(), "caseId", example.id(), "event", event));
                 if (run.usage().get("calls") instanceof List<?> calls) for (Object call : calls) append(usage,
                         Map.of("runId", run.id(), "caseId", example.id(), "call", call));
-                System.out.println(example.id() + " " + run.status() + " calls=" + run.usage().get("modelCalls"));
+                if (run.usage().get("calls") instanceof List<?> calls) for (Object value : calls) {
+                    if (value instanceof Map<?, ?> call) estimatedCost.add(estimateCost(call));
+                }
+                System.out.println(example.id() + " " + run.status() + " calls=" + run.usage().get("modelCalls") + " estimatedCny=" + estimatedCost.sum());
+            }));
+            for (Future<?> future : futures) future.get();
             }
-            }
-        } finally { retrieval.shutdownNow(); cancels.shutdownNow(); }
+        } finally { runs.shutdownNow(); retrieval.shutdownNow(); cancels.shutdownNow(); }
     }
 
     private static void execute(ResearchRunStore store, ResearchRunner runner, ResearchCompletionService finalization, ResearchRun run,
@@ -226,6 +265,14 @@ public class ResearchRunCommand {
             if (workersCancellation != null) workersCancellation.cancel(false);
             store.cancelledLocally(claim, session.budget.snapshot());
         }
+    }
+
+    /** 未提供 usage 的请求按配置窗口和最大输出保留保守估计，不宣称免费。 */
+    private static double estimateCost(Map<?, ?> call) {
+        double input = call.get("inputTokens") instanceof Number n ? n.doubleValue() : 32001;
+        double output = call.get("outputTokens") instanceof Number n ? n.doubleValue() : 4096;
+        double rate = input <= 32000 ? 0.2 : input <= 256000 ? 0.6 : 1.2;
+        return (input * rate + output * rate * 4) / 1_000_000;
     }
 
     private static String required(String name) {

@@ -1,6 +1,6 @@
 # 统一研究工作流验证报告
 
-日期：2026-09-17。P0—P6 已实现；最新 170/170 个程序回归、后端 clean package 通过；P6 前端 build 已通过。三种聊天入口、来源/计划卡、只读 SSE、刷新、补充输入、取消与重连已通过本地受控浏览器验收。用户后续明确授权的真实供应商开发联调保留失败和原文支持问题，见下方补充记录；质量评分、P7 A/B/C、P8 未开始。下方保留历史批次。
+日期：2026-09-18。P0—P7 已完成实现与约定验证，P8 最终演示与交接收尾。固定 regression 1200 任务全部记录，24 个应用/85 条引用快照及两例复测保留负结果。当前后端 173/173、Python 28/28、新库/重复升级、前端 build、node 类型与 9 项受控浏览器检查通过；app 24 项既有诊断保留。质量见[固定对照](agentic-research-evaluation-report.md)与[原文核对](agentic-research-application-review.md)，下方历史批次不改写。
 
 ## P0 基线
 
@@ -243,7 +243,7 @@ P3 的 COMPLETED 表示 `state.researchResult` 研究摘要经过已读引用身
 
 最终静态检查通过：5 份入口 Markdown 的 69 个本地链接/锚点、围栏与全部 P3 文件 whitespace；44 份源码/配置/模板指纹与清单一致，最终 E 批的研究 Java、配置和提示词 hash 与交付源码相同。P3 起始提交的 16 份现有升级 SQL 逐字节不变；其中原始 `a7ef618` 基线的 12 份历史 SQL 也未变。脚本语法与 dry-run 通过，全批/单路径分别只生成 5/1 个请求，不访问 API/数据库。长日志、JUnit 和五批模型产物逐文件 SHA-256 检查通过。
 
-## 尚未验证的业务和评测
+## P3 交付时的未验证项（历史快照）
 
 - 未启动全套服务或浏览器进行登录、普通问答、文档管理、版本比较、草稿生成 E2E。
 - 已做 PostgreSQL 隔离库的新建/增量检查和真实公开语料摄取；未升级既有业务库或清除其意图缓存，不自动 DROP 既有数据。
@@ -323,3 +323,41 @@ P5 提交 `3507d9e` 后接入聊天三模式、ResearchProgress / PlanDraftCard�
 原始程序/核对记录在 `local-data/agentic-research/runs/20260917T133300_P5_followup_validation/`，三批真实请求位置见执行记录。没有新增前端改动或重跑浏览器；P6 的构建、9 个受控页面检查及原有 24 个类型诊断沿用该阶段证据。未开展 A/B/C、EM/F1、正式语义支持评分或完整生产服务 E2E。
 
 本次最终静态验收通过：5 份入口 Markdown 的 105 个本地链接/锚点、围栏、whitespace、14 个变更文件范围与 Python 语法；301 个源码/留档指纹匹配，P5/P6 分别按 3507d9e / f79b9e6 冻结核验，16 份历史升级 SQL 不变。clean JAR 仅含 research-artifact-v3；静态检查首次因旧 P5 清单没有 static_checks 字段失败，调整检查器后通过，首次日志保留。
+
+## P7 / P8 当前程序、迁移及浏览器验证
+
+起始提交 `1069330`，固定批次原始资料位于 `local-data/agentic-research/runs/`，程序日志位于 `20260917T140100_P7_validation/`。下面是实际执行边界；固定 regression 400 问题/1200 任务已全部记录，质量、失败、资源和费用见[固定对照报告](agentic-research-evaluation-report.md)。完整应用核对见[应用原文报告](agentic-research-application-review.md)。
+
+| 验证 | 实际结果与范围 |
+| --- | --- |
+| 后端 clean package | 成功；JAR 仅含 research-artifact-v4，不含旧 v3 模板 |
+| Java 回归 | 24 类 173/173，0 failure/error/skip；真实隔离 PostgreSQL 与 SDK 本地 HTTP fixture，无供应商调用 |
+| Python 回归 | 28/28；数据契约、评分、状态失败分母、source IDs/邻块和 full 执行标记 |
+| 作者公式 | 独立作者代码 196 对答案/49 对支持集合匹配；代码字节已保存 official-reference，SHA 在 scorer-alignment.json |
+| 新库/增量 | fresh、重复 02/03/04、owner/快照/约束、历史哨兵保留通过；只作用随机测试库，库已删除 |
+| 普通保留链 | StreamChatPipeline/检索范围与各后端适配器、IngestionTask/TableChunker、WorkbookDiff、取消 trace 在同批检查中通过；不代表全服务/真实摄取 E2E |
+| 前端 | build、node 类型通过；app 24 项既有诊断，去掉 cwd 前缀/行列后与 P6 一致，没有宣称 app 类型全绿 |
+| 受控浏览器 | v4 批次 `20260917T150225_P8_browser_v4` 9 项通过，49 个本地模型调用，0 真实供应商；真实 React/研究 HTTP/SDK/PG，鉴权/检索/读源/模型/普通 QA 为夹具 |
+| 保留历史 | 16 个升级 SQL 与起始提交字节一致；08 的 XLSX 事实比较主体保持，修正独立请求的介绍 |
+| 固定公开 regression | 400 问题/1200 任务全部真实记录，932 COMPLETED / 93 PARTIAL / 175 FAILED，未执行 0；72 项源码/配置冻结，随机运行库清理 |
+| 固定 smoke | 120/120；A 40 完成，B 26/8/6，C 27/5/8、零委派；MuSiQue 答案分母仅 6，v3 开发批次不是独立 held-out |
+| 应用原文 | 固定 12 比较/12 计划：5/15/4；20 个产物/85 引用由 Codex 检查，错误推断保留，没有独立人工盲评或裁判 API |
+| 针对性 v4 复测 | comparison-03 合法完成但仍过度解释碎片；plan-02 缺必填数组失败，未发布计划；原批次不覆盖 |
+| full | 5839 问题/17517 任务 dry-run 准备，模型 0；本轮未付费执行 |
+
+### 10 项必须行为的检查入口
+
+| 行为 | 已执行的代表性检查 |
+| --- | --- |
+| 重复创建幂等 | ResearchRunPostgresIT.concurrentDuplicateRequestsCreateOnlyOneRunAndOneQueueEvent |
+| 运行/事件/证据/产物按 owner 隔离 | ResearchRunPostgresIT.everyOperationEnforcesOwnerAndInputUsesRevision、readSourcesSurviveCancellationAndUnreadCandidatesOrOtherOwnersAreExcluded；ResearchEventStreamServiceTest.invalidCursorOrWrongOwnerCannotOpenStream |
+| worker 不扩大范围 | ResearchEvidenceToolsTest.workerScopeIsValidatedBeforeAdmissionAndCannotMarkAnotherDocumentRead；ResearchWorkerCoordinatorTest.workerCannotReadOtherWorkersCandidatesExpandScopeAskOrDelegate |
+| worker 超时/失败保留成功结果 | ResearchWorkerCoordinatorTest.timeoutReturnsStructuredFailureAndLateCallableCannotPublishASecondResult；ResearchWorkerNativeTest.failedWorkerLeavesSuccessfulFindingsAndExplicitPartialGap；实际应用 comparison-03 一成功/一局部预算不足 |
+| 最后额度竞争与最终生成预留 | ResearchBudgetTest.concurrentRequestsCannotSpendReservedFinalizationCalls、workersShareAtomicCallsAndCountAcrossResumeWhileKeepingMainAndFinalReserve |
+| 取消/完成竞态与旧 epoch | ResearchRunPostgresIT.completionRacingCancellationAlwaysPublishesOneConsistentTerminalState、activeLeaseRejectsDuplicatesAndOldEpochCannotPublish、cancelledRunRejectsLateWritesAndRepeatedCancelIsIdempotent |
+| 非法参数/假引用/来源变化或停用 | ResearchEvidenceToolsTest.invalidMetadataAndInvalidToolArgumentsFailClearly、missingAndForeignRunEvidenceAreRejected、sourceChangeIsReportedWithoutMixingNewTextOrVersion、disabledDocumentCannotBeReadFromSnapshot；ResearchArtifactGeneratorTest 引用校验/修复失败检查 |
+| SSE 只读重连/持久结果 | ResearchEventStreamServiceTest.reconnectReplaysAfterHighestCursorWithoutStartingOrCancellingExecution；ResearchRunControllerTest.readingStateAndEventsDoesNotCreateOrResumeResearch；浏览器刷新/重连检查 |
+| 普通问答/入库/版本比较 | StreamChatPipelineTest、IngestionTaskServiceImplTest、TableChunkerTest、WorkbookDiffServiceTest；普通问答浏览器请求仍为 /rag/v3/chat，但实际答案受控 |
+| 清洁库与既有结构升级不删历史 | validate-agentic-research-p2-database.sh 在随机库重建历史结构、保存真实哨兵、对比研究表 catalog 并重复增量 |
+
+这些是程序机制、隔离存储或受控页面证据，不能包装成生产故障注入。真实模型结果包含失败/超时，远端是否停止计算或计费保持 unknown。

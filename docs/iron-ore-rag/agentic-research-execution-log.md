@@ -4,7 +4,11 @@
 
 ## 当前接续点
 
-P0—P6 已实现，P7—P8 未开始。P5 提交 `3507d9e` 接入统一 REPORT/PLAN 生成、有限修复、结构/引用校验及产物原子落库，旧草稿/审批入口退役；P6 接入三种聊天模式、只读 SSE、来源/计划卡、输入/取消、重新生成和会话恢复。最新 170 个定向程序用例及后端 clean package 通过；P6 前端 build 与本地受控浏览器流程已通过，app 保留原有 24 个类型诊断。用户随后明确授权语料外发和付费 REPORT/PLAN 开发联调，失败、修复及原文核对见下方补充记录。P7 的固定配置架构对照与质量评分尚未开展，不把 fixture 或反复调试样例当作模型效果。
+P0—P7 已完成实现与约定验证，P8 正在做最终演示和交接验收。固定 regression 的 QASPER 200 问题与 MuSiQue Full dev 200 行，A/B/C 共 1200 个任务全部记录（932 COMPLETED / 93 PARTIAL / 175 FAILED），没有未执行任务。QASPER Answer F1：A 0.3365/B 0.2338/C 0.2442；MuSiQue Answer F1：A 0.3325/B 0.3269/C 0.3918；MuSiQue 答案/支持只评分 105 行 answerable，非 200 行答案分母。C 实际 2 个运行委派、创建 4 个 worker。结果和费用见[固定对照报告](agentic-research-evaluation-report.md)。
+
+当前后端 24 类 173/173、Python 28/28、新库/重复增量保留历史、前端 build、node 类型与 9 项受控浏览器检查通过；app 仍有与 P6 相同的 24 项诊断。24 个应用由 Codex 核对 85 条引用快照，两例 v4 复测的错误推断和失败保留；不是独立人工盲评。最终生成 v4 隔离 evidence 输入中的托管元数据，服务端引用快照保持，输入检查不等于语义可靠。
+
+P8 已整理三个入口、当前流程、启动/手工迁移/失败边界和具体四请求演示脚本，真实演示待执行。full 5839 问题/17517 任务仅 dry-run 准备；已有业务库升级、生产登录和真实文档预览下载未执行。P7/P8 阶段提交按各自唯一标题定位，P7 SHA 在 P8 记录中补记。
 
 ## P0：基线、分支与接入准备（2026-09-17，已完成）
 
@@ -375,3 +379,28 @@ python3 eval/agentic-research/smoke_research.py --phase p5 --case comparison-wor
 A/B/C 原始目录分别为 `20260917T132700_P5_real_A/`、`20260917T133500_P5_real_B/`、`20260917T133900_P5_real_C/`，均位于 `local-data/agentic-research/runs/`。程序日志、JUnit、逐字段定性原文核对及检查脚本位于 `20260917T133300_P5_followup_validation/`；运行源码与 v1/v2/v3 模板各自冻结，既有 P5/P6 清单和原始留档不改写。[真实产物联调清单](../../eval/agentic-research/manifests/research-p5-artifact-smoke-2026-09-17.json)保存请求/状态、实际用量、源码及原始产物 SHA-256。历史升级 SQL 和业务数据库未修改；P7/P8 未开始。
 
 本次最终静态验收通过：5 份入口 Markdown 的 105 个本地链接/锚点、围栏、whitespace、14 个变更文件范围与 Python 语法；301 个源码/留档指纹匹配，P5/P6 分别按 3507d9e / f79b9e6 冻结核验，16 份历史升级 SQL 不变。clean JAR 仅含 research-artifact-v3；静态检查首次因旧 P5 清单没有 static_checks 字段失败，调整检查器后通过，首次日志保留。
+
+## P7：固定架构对照、公开数据评分与故障验证（2026-09-18，已完成）
+
+起始提交 `1069330`，分支 `feat/agentic-research`，开始时工作区干净。用户已授权按主计划执行 P7/P8。新增固定配置的 A/B/C 批量运行、离线 QASPER/MuSiQue 评分和 12 个比较/12 个计划应用样例；A 是复用项目知识检索组件的一次检索路径，固定模型后与 B/C 共用产物生成，不包含生产聊天的改写、意图、MCP 和回退，不能写成完整生产 RAG E2E。
+
+当前程序回归最终 24 类 173/173，Python 28/28，通过；首轮 6 个真实校准任务保留 B 的 NATIVE_FINISH_REQUIRED 失败。发现最终回答格式指令混入 Brief，现已将其隔离到最终生成阶段，相同规模复测 6/6 COMPLETED。失败、重试和 unknown usage 保留；尚不作为固定 regression 成绩。程序记录位于 `local-data/agentic-research/runs/20260917T140100_P7_validation/`。
+
+
+### P7 固定 smoke、应用核对与最终生成输入复测
+
+- 固定 smoke（`20260917T140831_P7_smoke`）真实记录 120/120：A 40 COMPLETED；B 26 COMPLETED/8 PARTIAL/6 FAILED；C 27 COMPLETED/5 PARTIAL/8 FAILED。C 没有实际 worker。QASPER 20 题的 answer F1 为 A 0.3685/B 0.2017/C 0.2042；MuSiQue 20 行中仅 6 行 answerable，不能把该小分母写作 20 题答案得分。逐模式答案、证据、可回答性、资源和诊断完整保留。
+- 24 个应用（`20260917T142538_P7_applications`，v3）记录 5 COMPLETED/15 PARTIAL/4 FAILED；comparison-03 真实创建两个 worker，一个完成、一个局部预算不足，保留成功结果和失败缺口。plan-05/11 真实追问和 2 小时回复均保存，随后产物失败，没有发布计划。核对者为 Codex，非独立人工盲评，不调用裁判 API；[24 项核对清单](../../eval/agentic-research/manifests/p7-application-source-review.json)记录维度、数值/条件、缺口、用户输入和具体不支持项。
+- 明显问题包括语料 QASPER 版本被当作论文实验数据、残缺公式/标题被当作完整方法、运行预算失败被解释成源文没有计算预算、个别限制引用没有支持。最终生成输入改为正文、身份、extent/截断及原文章节/表格上下文；历史 v3 模板在旧批次源码快照保留，当前 clean JAR 只有 v4。
+- 原题原范围两例复测（`20260917T145737_P7_application_retest_v4`）：comparison-03 COMPLETED，引用到两篇但仍把断裂公式写作完整公式；plan-02 FAILED，两次缺少 PLAN step parameters 必填数组而未发布。没有把这次修复写作语义质量提升。
+- 固定 regression（`20260917T145853_P7_regression_v4`，v4）400 问题/1200 任务全部记录：932 COMPLETED / 93 PARTIAL / 175 FAILED，未执行 0；三批随机运行库均清理，只读语料不改。72 项源码/配置指纹与实际交付一致，问题/数据/预算/模型固定。QASPER Answer F1：A 0.3365/B 0.2338/C 0.2442；MuSiQue Answer F1：A 0.3325/B 0.3269/C 0.3918，分母与全部指标见[固定对照报告](agentic-research-evaluation-report.md)。C 实际委派 2 个运行/4 个 worker。
+- 本批 SDK 模型调用记录 7778，已知输入 84043881/输出 1456411 token、unknown 1；已知生成费估算 21.4981 元。Embedding 3989 请求、unknown 127，金额和账单未核对。错误与已读支持覆盖提示均在 diagnostics.json；分类不构成因果或语义证明。
+- full 当前仅准备 5839/17517，未付费执行；默认 30 元生成估算上限也作用于 full，未执行不计完成。所有固定任务、负结果、调用资源、日志和配置 SHA 见[P7 清单](../../eval/agentic-research/manifests/research-p7-evaluation-2026-09-17.json)。
+
+## P8：清理与交接（进行中）
+
+运行源码/配置/前端入口引用检查未发现退役 TaskAgent、TaskTemplate、Simulation 或 Robot 依赖。保留普通摄取的任务接口、MCP、Milvus/ES 等现用能力。更新首页、文档索引、08 当前研究流程、面试口径、数据库说明与交接文档；旧工业检索数字、历史阶段日志、历史负结果和 16 份升级 SQL 保持。
+
+新增 `scripts/demo-agentic-research.sh`，冻结两道 A 问题以及双资料比较 REPORT / AMR 摘要 PLAN（缺失 batch/window 保留 null），默认只准备四个请求。初版 comparison-01/plan-01 dry-run 在 `20260917T142200_P8_demo_dryrun/` 通过；最终脚本依据完整应用核对选用 comparison-05/plan-06，独立记录演示，不替换负结果。真实模式需已有公开语料和供应商凭证，逐任务状态、来源与 unknown usage 保留，不能把命令 exit 0 当作正确率。
+
+当前前端 build、node 类型检查通过；app 24 项既有诊断按 cwd 前缀/行号归一化与 P6 相同。`20260917T142343_P8_browser/` 与 v4 变更后 `20260917T150225_P8_browser_v4/` 受控浏览器各 9 项检查通过，49 个本地 fixture 模型调用，零付费调用；受控组件和生产 E2E 边界保留。修复旧 P2 数据库脚本对已退役 fresh 表的假设，仅在随机库执行历史建表脚本；fresh、两轮增量、owner、快照与历史哨兵均通过，库已清理。

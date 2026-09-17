@@ -46,6 +46,11 @@ p2_catalog_sql="SELECT table_name, column_name, udt_name, is_nullable, column_de
   ORDER BY tablename, indexname;"
 psql_p2 -Atc "$p2_catalog_sql" > "$p2_scratch/fresh-catalog.txt"
 
+# Recreate the historical schema only inside this random database. The current
+# fresh schema intentionally omits retired task tables; existing deployments
+# still keep them, so the upgrade must preserve a real historical row.
+psql_p2 < resources/database/upgrades/v1.1.0/260812_iron_ore_demo.sql
+
 psql_p2 <<'SQL'
 INSERT INTO t_iron_ore_task_template
     (id, conversation_id, source_message_id, doc_id, owner_user_id, title, status, template_data)

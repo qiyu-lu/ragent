@@ -1,0 +1,1165 @@
+{
+  "schema_version": "research-application-source-review-v1",
+  "run_dir": "local-data/agentic-research/runs/20260917T142538_P7_applications",
+  "predictions_sha256": "92984fcc54ac5c7d3e7906f04b8c6cdc49f487dd637f835e2b4f12ffa65e4b76",
+  "reviewer": "Codex source inspection; not an independent human or blinded review",
+  "judge_api_used": false,
+  "criteria": [
+    "请求维度及两篇/单篇范围",
+    "逐字段引用是否支持正文、数值、步骤和条件",
+    "资料缺失是否仅限定于当前已读范围",
+    "缺失参数与用户输入是否明确保存",
+    "实际矛盾是否区别于 worker/运行失败"
+  ],
+  "semantic_support_of_all_outputs_proven": false,
+  "cases": [
+    {
+      "case_id": "plan-01",
+      "runtime_status": "FAILED",
+      "prompt_version": null,
+      "verdict": "publication_blocked",
+      "notes": "两次产物引用校验失败。未发布计划；研究阶段对整个知识库缺乏实验说明的判断超出实际碎片读取范围。",
+      "reviewed_citations": [],
+      "user_input": null,
+      "error_summary": "ARTIFACT_VALIDATION_FAILED"
+    },
+    {
+      "case_id": "comparison-01",
+      "runtime_status": "PARTIAL",
+      "prompt_version": "research-artifact-v3",
+      "verdict": "insufficient_evidence",
+      "notes": "无事实章节/引用；只读格式命令，没有完成两篇比较。缺口中“内容完全缺失”仅适用于本次读取，不能推广为语料缺失。",
+      "reviewed_citations": [],
+      "user_input": null,
+      "error_summary": "MODEL_CALL_BUDGET"
+    },
+    {
+      "case_id": "comparison-02",
+      "runtime_status": "PARTIAL",
+      "prompt_version": "research-artifact-v3",
+      "verdict": "supported_with_gaps",
+      "notes": "两篇资料均被引用；QANet 源/目标域、嵌入层判别器和 Seq2Seq 摘要方法有原文支持。2% EM/1.5% F1 是语音问答论文自身结果，不构成跨任务胜负；摘要论文评价维度仍缺失，部分章节引用可进一步贴近直接支持段。",
+      "reviewed_citations": [
+        {
+          "evidence_id": "ev-25604ec72e6ee99cc54703fe9aae46dedb0355eaf63f7ab977d4f290a6432056",
+          "document_id": "2100510684147306677",
+          "excerpt_sha256": "87308f89e4d446ebc95685bcd3d03a30f1e53a619ef885d317dd2cd32e2fde8d",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-887f8ac81340811eb73645c0aa251559bcb919d3c367116a997a58d7d31faf6d"
+          ]
+        },
+        {
+          "evidence_id": "ev-98c1b59e9e4708b313e9d12a7efeacabd286e05692a92d935368bee18029a630",
+          "document_id": "2100510684147306618",
+          "excerpt_sha256": "32fd673ee75b9d78db428c8887452582021ec3741395a1af7579efa1070beccf",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-9f56f7651e56c53b30858cc5c4cfbf1d355c6ec59c4db9ab45f56f87bdff6050"
+          ]
+        },
+        {
+          "evidence_id": "ev-36f1e12f731bebdd9d374f8c9143701a0e43e1b66a2640be2778ba1a245111d0",
+          "document_id": "2100510684147306677",
+          "excerpt_sha256": "071e9f2278b9f871c6d22c8f85d05e7f6cbe1568552f4c61ff36cbb1e2ac579c",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-4b0bce729643e6bac7bb234550a510d47333f2f07cbece592104108c721aefea"
+          ]
+        },
+        {
+          "evidence_id": "ev-9902bf42d8d1d25c70fa24309dcca38a4b38907f7d9c31dc54de8afcf454a3c9",
+          "document_id": "2100510684147306677",
+          "excerpt_sha256": "79d5f670698c153414d928c8edaeb4788c7fdeb8599a630bc06992e581289801",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-822f09516057fad0e81bfdbf597ff64456dded5ec6d4dc259189b4e0d7da124b"
+          ]
+        },
+        {
+          "evidence_id": "ev-69ede9f1ac4f56005fe6aa5480dc694717ea3421f57f04e8a511b9cb06595bea",
+          "document_id": "2100510684147306677",
+          "excerpt_sha256": "c67fcf1245ebc4d7af6b2969375379395d39aec968a59df19fd48f6c8b4370a9",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-5881c4f57df7f0ca136e1ac5b6d357d1b1f3b03234294421920568029b02e21b"
+          ]
+        }
+      ],
+      "user_input": null,
+      "error_summary": "MODEL_CALL_BUDGET"
+    },
+    {
+      "case_id": "plan-02",
+      "runtime_status": "PARTIAL",
+      "prompt_version": "research-artifact-v3",
+      "verdict": "unsupported_claim",
+      "notes": "先决条件把 QASPER/qasper-v0.3 当作论文实验数据，所引结果段没有此要求；实际实验为 Text/Spoken-SQuAD。其余可见 96 维、2 头、batch 20、WGAN 配置有来源；学习率占位符保留为待确认。",
+      "reviewed_citations": [
+        {
+          "evidence_id": "ev-35b47215ffbf7cfccd4ea8aff03df35bc077ba3563dc9aad4079e3564d42adf6",
+          "document_id": "2100510684147306677",
+          "excerpt_sha256": "87308f89e4d446ebc95685bcd3d03a30f1e53a619ef885d317dd2cd32e2fde8d",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-887f8ac81340811eb73645c0aa251559bcb919d3c367116a997a58d7d31faf6d"
+          ]
+        },
+        {
+          "evidence_id": "ev-445b48d8960fc6beed476b91b7a22d02b2c17cfc65e37ac0fd69b47770e7de84",
+          "document_id": "2100510684147306677",
+          "excerpt_sha256": "c9f7dd2442831a56cb3121c8ed1f344e124ae9264246441cf8609cb125d398be",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-ceeb341e2f0b7e9c1c528a0329e595ed0c8f6ce130d820564d89924cb61fa167"
+          ]
+        },
+        {
+          "evidence_id": "ev-ffde8a02f28b61d85755779358b689de1434f660981e610c7f39ab9e71a5cae3",
+          "document_id": "2100510684147306677",
+          "excerpt_sha256": "1c35eecdadebeddba1d5d759d95012133c6957108a35d76a3c2b27752a0ee6aa",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-b83c71be75fca466f2f1999a06b5b05a84535008e59987697983948dd9232ba9"
+          ]
+        },
+        {
+          "evidence_id": "ev-8188d0bbcbc96d9ec27cf841dec09dccb0526b4c0ce74daef78db044e7bb3b79",
+          "document_id": "2100510684147306677",
+          "excerpt_sha256": "a7704602c6b76057578f1088f8808ee2e1a9941541c0128bccfb792f98a5d6a6",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-bc6e2d01b0b757279d04ac327b359b4459ac45d5538cfadf43cfa3a1a9f3c1f4"
+          ]
+        },
+        {
+          "evidence_id": "ev-67635c7ce2c879a911b9c2fcc4f71494af663dc635ef377ddccc623d4635be75",
+          "document_id": "2100510684147306677",
+          "excerpt_sha256": "01bd375c8f75bf1e417e728244469730cecf903ad1a1f68feea2f26e5dcdee57",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-43c7d1ed34418bb60f478a4c35a31f9d713af3e133d6487d522facc8b3cc3f8b"
+          ]
+        },
+        {
+          "evidence_id": "ev-51b08d0b3263d90fab5ae136a50705a8aba2516f78f58f46af94726c2b260b70",
+          "document_id": "2100510684147306677",
+          "excerpt_sha256": "79d5f670698c153414d928c8edaeb4788c7fdeb8599a630bc06992e581289801",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-822f09516057fad0e81bfdbf597ff64456dded5ec6d4dc259189b4e0d7da124b"
+          ]
+        },
+        {
+          "evidence_id": "ev-7fd35baacaf833ee0a1205f45734b0a911725225fd5310b8e731cc5ccb9f4eeb",
+          "document_id": "2100510684147306677",
+          "excerpt_sha256": "d70de575fcd108dd9ae8620e88f4a5d53cdd862179e4133293ed82e289e6873d",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-e11ad74c6e0d5285607fd76abc2591a40c077c42de7e8edd0cd0bb41643eea1d"
+          ]
+        },
+        {
+          "evidence_id": "ev-5c45ad5e06b0862044f98e15cf5da4baec7fa04d63fe1c3844bcd1092ec0c511",
+          "document_id": "2100510684147306677",
+          "excerpt_sha256": "c67fcf1245ebc4d7af6b2969375379395d39aec968a59df19fd48f6c8b4370a9",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-5881c4f57df7f0ca136e1ac5b6d357d1b1f3b03234294421920568029b02e21b"
+          ]
+        }
+      ],
+      "user_input": null,
+      "error_summary": "MODEL_CALL_BUDGET"
+    },
+    {
+      "case_id": "plan-03",
+      "runtime_status": "FAILED",
+      "prompt_version": null,
+      "verdict": "execution_failed",
+      "notes": "RESEARCH_EXECUTION_FAILED，未发布产物。保留失败及调用轨迹；不能计入有依据步骤的成功案例。",
+      "reviewed_citations": [],
+      "user_input": null,
+      "error_summary": "RESEARCH_EXECUTION_FAILED"
+    },
+    {
+      "case_id": "comparison-03",
+      "runtime_status": "PARTIAL",
+      "prompt_version": "research-artifact-v3",
+      "verdict": "unsupported_claim",
+      "notes": "两条残缺 LSTM 公式和残缺 CRF 表达式不能支持完整架构/目标，且把 additive cell update 误称 input gate。一个 worker 成功、另一个局部预算不足被保留，但运行失败被写为 source conflict，不能视为资料矛盾。",
+      "reviewed_citations": [
+        {
+          "evidence_id": "ev-7b2c50735b186a0dbf3e1ece14d6b13203d5c632bc9a1f05a5e78dbd883256ef",
+          "document_id": "2100509688079798272",
+          "excerpt_sha256": "ca9a801ff4eb6a1bf92070d0a7a8f67fbe4a3488d19af1c2866a09d62ddfc96e",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-743b0a4774f126669b985f8bffffa0c26fe2c6bc67c4e44fea2938ef7cbe581d"
+          ]
+        },
+        {
+          "evidence_id": "ev-91cae5a891b405e4d325c478dbbcae269ad90a46b8c9ec2dde5f366b679897e0",
+          "document_id": "2100509688079798272",
+          "excerpt_sha256": "63a8b833a3bcecb30d09ebcbed4179d266d8404fa1786f0312a2049fb35008f3",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-2d28d684a48dec3439d2f153a4231a1a5099fa26b678e086e9536f406137b80a"
+          ]
+        },
+        {
+          "evidence_id": "ev-24e8402c6100e26e9188d291dd77e18a5ef97dea508cb9ec9a5b47c81adec280",
+          "document_id": "2100509688079798272",
+          "excerpt_sha256": "e9a699bba495d3a76afef7616a7b3b91c71fd151ce0db69bcdfeffc618b7ac33",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-8910f1d69e6d895b4be90de14fa8d0d7362cc956ae2d86727810c54daf1e4699"
+          ]
+        }
+      ],
+      "user_input": null,
+      "error_summary": null
+    },
+    {
+      "case_id": "comparison-04",
+      "runtime_status": "PARTIAL",
+      "prompt_version": "research-artifact-v3",
+      "verdict": "insufficient_evidence",
+      "notes": "只引用 PolyResponse 的语音/文本 I/O 段，两篇方法/评价比较未完成。论文标题能识别来源，但该段不足以证明具体排序算法；没有制造两论文冲突。",
+      "reviewed_citations": [
+        {
+          "evidence_id": "ev-cbae5351f27a7ad07e4e103117221a5ee9eed0cbbb7cf4fcb9f21ce799da202c",
+          "document_id": "2100511094702559232",
+          "excerpt_sha256": "097e5881b093d96780996fcdcce981595e2911308e21baf22b36639e2646442a",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-2b2a48a340a16be99d01760cc8c816e093ec073b74ef0e490a272cf264ce324a"
+          ]
+        }
+      ],
+      "user_input": null,
+      "error_summary": "MODEL_CALL_BUDGET"
+    },
+    {
+      "case_id": "plan-04",
+      "runtime_status": "PARTIAL",
+      "prompt_version": "research-artifact-v3",
+      "verdict": "supported_with_gaps",
+      "notes": "原文 S1—S6 支持餐厅 R 集合、top N、exp(a*s)、q_e 累加及阈值 t；N/a/t 未指定，保留 null 和待确认。Edinburgh 396 家/4225 图片/6725 模板响应/125830 评论句及 SGD 500 配对来自原文；尚不具备完整复现实验说明。",
+      "reviewed_citations": [
+        {
+          "evidence_id": "ev-b058ccdd8007f6ea4859afc17e0151f17fb989dbdf98e6903e4c80dd22b6be33",
+          "document_id": "2100511094702559232",
+          "excerpt_sha256": "c0932b870f38b15cacea430026b69756c92710b3dc48ed0946950378e4483f95",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-fa2c1a0bbb295b8922647912bb4a0414ba164847b4125a6c33e255b1f73c14c0"
+          ]
+        },
+        {
+          "evidence_id": "ev-93002e2ec14dc0413292f5d6ded0861414448f6a32ef031128ce1c7fa1934749",
+          "document_id": "2100511094702559232",
+          "excerpt_sha256": "20c89ca2287cdf5942dfd8ea50699f63af70e4d76508b2ce82c702272a2f38b4",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-cef9616232390aaa087b5b628a58fc8b5f51a77c797b7af887d371bd674d5b3a"
+          ]
+        },
+        {
+          "evidence_id": "ev-a4489c0bab53be1708db4ec9e6964f855ef91b39d19efe166d3495aabd954bbc",
+          "document_id": "2100511094702559232",
+          "excerpt_sha256": "0e01f5eba87eebb7f435de4dfb2128c6263f93d8d333b148b73ea084ee57cace",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-02faee73b57a331b0b2a23d325a3eba17dc88ed31825a28be07922567a500237"
+          ]
+        },
+        {
+          "evidence_id": "ev-1fc26487a28efb79fd5f06e9889fe293e62a743c089974d9458fbd70278627ef",
+          "document_id": "2100511094702559232",
+          "excerpt_sha256": "9dbcb62420475914cce087c68039eadd6ed4d7b82f7697db2ac8890260b8cddf",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-b9315871682867de8c4bdaa05e81ce95a9aacecaa41e58f306cb3fbf6352b3ab",
+            "qp-f07d1b5159d71a7fd25506dd041c8c17abc5fc7918ef2c043c05cb84fdbec31e",
+            "qp-fc4893da8ce24bd9aa690eca36bb81af29019cc27be73ebb1104c2b29d74aa80"
+          ]
+        },
+        {
+          "evidence_id": "ev-40473c2b8edcba339c7220f51510331c4220fba3b4bf6cf3f700ed4bf0b1968e",
+          "document_id": "2100511094702559232",
+          "excerpt_sha256": "69e9063ffab5c3dd710356b3be1c8d68f8019b852bf06bc1205f7fd64042c76b",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-f07d1b5159d71a7fd25506dd041c8c17abc5fc7918ef2c043c05cb84fdbec31e"
+          ]
+        },
+        {
+          "evidence_id": "ev-aa06abaf7302e7dcaa01069cec0ff90b17eaff4d6645badef75dd90ba759378e",
+          "document_id": "2100511094702559232",
+          "excerpt_sha256": "78d8134457d615cd5e969e80d80bc631f2ed2201b328dadaea0bc857a3539295",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-01a790448b56cf6e946034a549cbbe8319c0eabeffe1093699d759f569ac1016",
+            "qp-1112e64e599954ce05d0c433d003eb2a3cfde9f98b27bbeabe68efea3dfbc5eb",
+            "qp-92ab3a962c93abd1e87ee5c2f667da4173182b111f225cd9f1585f0f359e9f34"
+          ]
+        },
+        {
+          "evidence_id": "ev-9714e9c498431297be7c6c4325a76dfda68ebd7b7340dd9ba7f21f15c84f725a",
+          "document_id": "2100511094702559232",
+          "excerpt_sha256": "81704561d024165acdd6abf8d7bb63404617136c02e56f8eeb6a1cea84da01d2",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-92ab3a962c93abd1e87ee5c2f667da4173182b111f225cd9f1585f0f359e9f34"
+          ]
+        },
+        {
+          "evidence_id": "ev-c87b4ca8c9eb86cf5fe17fff178be4a1e76de18af3af3af1bb83404666bfd021",
+          "document_id": "2100511094702559232",
+          "excerpt_sha256": "5d22385c671737ed33da21c39769e7ffe8c5a23e6166bba236eef902e2ff3eed",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-b13ee027234ba36318ae1f7fb683e881f22b00dbdfdfb5324792a07143b67f89"
+          ]
+        },
+        {
+          "evidence_id": "ev-9218d92ace5895dd0571fad364ee35637294869f684e4df3c464eb8471ea21ce",
+          "document_id": "2100511094702559232",
+          "excerpt_sha256": "ab5d0b72f667faaa9335924d486c5049cf61bdd2c9a4fc6f75d7fd3556c2a209",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-fd8c9dcb14db4ba9488422cd79fde26b0be1658585d3f91a83d2e0fbfb0d724a"
+          ]
+        },
+        {
+          "evidence_id": "ev-a308d4ee4bc78f46bee39df248b6511ef46a4c5a79b4713a1f0df2654a7c0ecb",
+          "document_id": "2100511094702559232",
+          "excerpt_sha256": "51a5e5bd8597bee882bd005805e65e3a2818268f23d97d31b4106c65b0edcbca",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-c2df14db6202cd1d533af168ef85d0f5c5ede92a170b7673751081691579bd51"
+          ]
+        }
+      ],
+      "user_input": null,
+      "error_summary": "MODEL_CALL_BUDGET"
+    },
+    {
+      "case_id": "plan-05",
+      "runtime_status": "FAILED",
+      "prompt_version": null,
+      "verdict": "publication_blocked",
+      "notes": "真实 ask_user / WAITING_INPUT / INPUT_RECEIVED，2 小时回复保存为 user_input；随后 ARTIFACT_VALIDATION_FAILED，未发布计划。用户回复成功不代表产物成功。",
+      "reviewed_citations": [],
+      "user_input": {
+        "answer": "Preparation duration must be at most 2 hours.",
+        "source": "user_input",
+        "question": "What is your hard constraint for the preparation duration (e.g., number of days or weeks) to reproduce these experiments?"
+      },
+      "error_summary": "ARTIFACT_VALIDATION_FAILED"
+    },
+    {
+      "case_id": "comparison-05",
+      "runtime_status": "COMPLETED",
+      "prompt_version": "research-artifact-v3",
+      "verdict": "supported_with_gaps",
+      "notes": "Agatha 本体事件/链接数据流程与 Bayesian SRI 跨语言潜变量均由两篇原文支持。全文处理链段仅明确 Portuguese，另一段列三种语言，不能把所有实现步骤推广为三语均已验证；实验数字缺失，没有填造跨论文胜负。",
+      "reviewed_citations": [
+        {
+          "evidence_id": "ev-d05ff3bac659cebb7f55c58b450c308fc2fc9d1631864c522f2fdd3e20f5db0c",
+          "document_id": "2100511128135356416",
+          "excerpt_sha256": "536d6106d4be79586a66ef9b0ea821390742db68d6bb38f615098ba1ebd8d54a",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-41c4707dc5c7678215067cda31d05760b75379224c8aba1537176ef815486895"
+          ]
+        },
+        {
+          "evidence_id": "ev-21e037ade75dcf4af25ee9188ba65b9462f4ad07967c9e416004b4eb8e0557e4",
+          "document_id": "2100511128135356416",
+          "excerpt_sha256": "b5d604f77d0e2ce7f2308e2f5113a8dc49c2b31cc975e91594aea0276654a698",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-26de3a1d9d6011a3ff372bede7e07fef95c7eb06490ab83cdc37980939fd9c06"
+          ]
+        },
+        {
+          "evidence_id": "ev-f2065c34eb619d7d7246469cf12a220ac84b0eed034bacf41db62f16139b0701",
+          "document_id": "2100508736882921472",
+          "excerpt_sha256": "f9e24e24169ae63776e5dbb45cffa70b8a7b1762be5d62d3a231014c2755daee",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-303416d5f44bb45a428b3a06741e963709521f91dc7b85ec1e9511f326a919d7"
+          ]
+        },
+        {
+          "evidence_id": "ev-8b81e4822095e2da975738102482f1ef584bbe925ad9c84a85912e4b38d9c445",
+          "document_id": "2100508736882921472",
+          "excerpt_sha256": "37e5edc721a8c079262a38e3fdf90a63934fb806fb5be5b40e19a1dd192f0816",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-8e989a940a3af238327a50e74d45419027c8413327ad369e6ef478ce091c58c7"
+          ]
+        }
+      ],
+      "user_input": null,
+      "error_summary": null
+    },
+    {
+      "case_id": "plan-06",
+      "runtime_status": "COMPLETED",
+      "prompt_version": "research-artifact-v3",
+      "verdict": "supported_with_gaps",
+      "notes": "AMR Bank 298/33、non-anonymized CNN-Dailymail 约 300k、JAMR/Lead-n-AMR/人评有对应原文；batch_size/window_size 保留 null。提纲不是完整算法；详细抽图和生成程序留作待确认。保留原文 ROGUE 拼写，不宣称复现实验已执行。",
+      "reviewed_citations": [
+        {
+          "evidence_id": "ev-14a933119ac0c4780515bdc6daa33a106a7fd188f084e741a0e4cd64172c7af5",
+          "document_id": "2100509686855061504",
+          "excerpt_sha256": "10e0bc181e9301898d580c37e964f945b706ad1c3cd3ffb42b513e328969758f",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-848a591aff9f6ddb227edbb0b752bb741f787faa715ea886b7fea753718ec305"
+          ]
+        },
+        {
+          "evidence_id": "ev-cdb88756613189da7d1d980e3003b97d0de7f2fab0119753137c88cae701c076",
+          "document_id": "2100509686855061504",
+          "excerpt_sha256": "de59d3496738f1dab2299a78b0b34d6dc645447aff3258931d7c95e87306cc83",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-fa701244b5415a7a1db9cd4359df1ff7a41e53d74c74ed271abbdc344751c8a3"
+          ]
+        },
+        {
+          "evidence_id": "ev-c62827130409f502cc2f3e8c7867d81a14e833d09d17e103697c8c6029ca869d",
+          "document_id": "2100509686855061504",
+          "excerpt_sha256": "77eb8fd6b750920e48c7f9ddb0a02cdd75258fa1cbc20078b9c2394a95af0ca9",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-ffeeb3e2b61eb0b300da4c8973961180e08e4fa8480ddd40f36d5522eb90f29f"
+          ]
+        },
+        {
+          "evidence_id": "ev-b49073da9b155998f4c97eebe402b8cc5026dfd776f04c6eed9b4ad0cce79d8b",
+          "document_id": "2100509686855061504",
+          "excerpt_sha256": "1ebf6ed612ce1c972d959054ac33f6831eaba243406d9f1114f1c59e0b2fc818",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-ed3cada4cc9a56a6e78c993e4dab2fe296263aa52257b6e889f054ecf881b0b5"
+          ]
+        },
+        {
+          "evidence_id": "ev-5c817e7b3caf662500c33dda2557f95c54683809b9ef17a93c2efe288d06404e",
+          "document_id": "2100509686855061504",
+          "excerpt_sha256": "a6d9f1993079ee1ce495d48d75ef70ba2b20d8034bee4fa878c004c106f2a50a",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-1c09dd385f39340a5462e6fc564b274020161e525b484153468e1e7e6b60b47d"
+          ]
+        },
+        {
+          "evidence_id": "ev-e6adca4e050d3cc148b7cb74f02411e86629b67265ce4dea7997a9afc496334c",
+          "document_id": "2100509686855061504",
+          "excerpt_sha256": "878b2e1b13e7b6e9efc08bfe62b48c870cb5ce621d7334efa5444aa6bb2f06de",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-8f7ba7c476089859b80805d8a01fc7c5cab0006eab4680ef9c81a9d631c4607f"
+          ]
+        },
+        {
+          "evidence_id": "ev-59497eaf90747d2bc1cfb39555432a7ee8e19e8ffb02cbcbc778260758582a18",
+          "document_id": "2100509686855061504",
+          "excerpt_sha256": "14c2131520f07ecc936a4718137d633c60143b2b3ae2efc938f20c7e64158304",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-2503d0c3dd4196af37190a164859128cb543fa1fd1df6768e7fdce092ff716d0"
+          ]
+        },
+        {
+          "evidence_id": "ev-62c16ff5dddd7f17aadd6a7a2ca6235cf5dc84c5bee9ed4815797344e050082a",
+          "document_id": "2100509686855061504",
+          "excerpt_sha256": "f34178237a9678995a20dd2d99ffe74340dff6523e60d1c26b0a34e5a4046d4b",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-3d0f65cc8eb3a68147ce3ebaa8199bb50c18664a5193bf8bdc2046c3d5f3f8e1"
+          ]
+        }
+      ],
+      "user_input": null,
+      "error_summary": null
+    },
+    {
+      "case_id": "comparison-06",
+      "runtime_status": "PARTIAL",
+      "prompt_version": "research-artifact-v3",
+      "verdict": "insufficient_evidence",
+      "notes": "只有 AMR 论文目录说明，足以支持章节指引，不能完成算法/评价或两篇比较；第二篇未读，应保留为本次证据缺口。",
+      "reviewed_citations": [
+        {
+          "evidence_id": "ev-7823c66e75cd749ced09e93717849e19ac51a9802a8192c504eb88dcb1a51265",
+          "document_id": "2100509686855061504",
+          "excerpt_sha256": "f34178237a9678995a20dd2d99ffe74340dff6523e60d1c26b0a34e5a4046d4b",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-3d0f65cc8eb3a68147ce3ebaa8199bb50c18664a5193bf8bdc2046c3d5f3f8e1"
+          ]
+        }
+      ],
+      "user_input": null,
+      "error_summary": "MODEL_CALL_BUDGET"
+    },
+    {
+      "case_id": "comparison-07",
+      "runtime_status": "COMPLETED",
+      "prompt_version": "research-artifact-v3",
+      "verdict": "supported_with_gaps",
+      "notes": "英语与俄语 ELMo 词元/词形差异、另一论文英文数据集 10%/21% relative improvement 及 BLEU/NIST/ROUGE-4 有支持，条件分别保留；具体数据与限制维度不足，不能跨任务比较效果。",
+      "reviewed_citations": [
+        {
+          "evidence_id": "ev-c41338b752bc2328512f4d3148737ed09de1d67bb13a7b8229e6d8c591805662",
+          "document_id": "2100511094719336448",
+          "excerpt_sha256": "b2a6be11211c87617133f44af7105c40dd4c452af8608656bb41bbe8826f5fad",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-5731f5e6f7824b19c768eeeaceab23ed7328ea200eedf9ca89ed39f43cced8e2"
+          ]
+        },
+        {
+          "evidence_id": "ev-58d7837a10083d5d6ecbac25098296bceb250b9b171c4be21137764bc97dfa3e",
+          "document_id": "2100511094719336448",
+          "excerpt_sha256": "943ed9e4bff5e80690d1cce1fa7c7cba5f223f5d49e256d36b2f0be058de5c18",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-d7c97d8baada972a08c3e4e70b955998e79353cdee14272714d4e43d66363e67"
+          ]
+        },
+        {
+          "evidence_id": "ev-ee7849c4d59767aae7fe5330cc6d97495e1ead13c7e0660befa7c9160a7b98b0",
+          "document_id": "2100510170198265856",
+          "excerpt_sha256": "0d2cbc2845fe4ffc06b96d2c129fccdba53342f5600ff24dac835aae40f9f786",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-d4280e0d9cf32769b287066a7e140cf04f41d3069a124532524fd519de11dc70"
+          ]
+        },
+        {
+          "evidence_id": "ev-4d30190a91b0561689b61ac00dd6afb41c928bb1ef25941b1326bfab79f406ee",
+          "document_id": "2100510170198265856",
+          "excerpt_sha256": "8fb5091115c2308fe7fe3f7fc9803389664ae44049f61ca72969e67778f5e006",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-56844687de01182e48c17d6f80589ba93d28f0b10c2f26b049119c6dc7b8b79f"
+          ]
+        },
+        {
+          "evidence_id": "ev-b872c6f344d4194b66e4778cb124d41f2b2893f5164df2afeb4f03358355d832",
+          "document_id": "2100511094719336448",
+          "excerpt_sha256": "796e46b117f65b11e5d414664029c84b63b99319140e63dc0a3c7c7d8d5dc308",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-b232352e6ef603563002be036ec8af0cbbed839e5f47166e0ef10dfa570c29f6"
+          ]
+        }
+      ],
+      "user_input": null,
+      "error_summary": null
+    },
+    {
+      "case_id": "plan-07",
+      "runtime_status": "COMPLETED",
+      "prompt_version": "research-artifact-v3",
+      "verdict": "supported_with_gaps",
+      "notes": "Senseval-3 nouns、UDPipe/UD 2.3、top-layer ELMo/WSD 步骤由已读文本支持。保留用户 2 小时约束且明确无法证明满足；完整俄语数据/训练配置仍待确认，没有把用户预算写作论文事实。",
+      "reviewed_citations": [
+        {
+          "evidence_id": "ev-7babd748c0fe3c64733949b639e358a84d34746b3249bbff46b87110aa960c1e",
+          "document_id": "2100511094719336448",
+          "excerpt_sha256": "25715debcb0dff4a2cce476aa016121bb56a8b3909e39b00a1c4fa5c2b430700",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-8915547d31b9a0a3dcb8c8338d10f0e1c2a8df38ecdc9dbd531a0bf6aee6a17b",
+            "qp-b2506080fb0aa00b3709572c5ec9ddc87f396421d38ee09068a697c1a5aa60a1",
+            "qp-ee31a8f1eb1bf1f6659c8eaca83a84410a57fc18b8a1de94c7f5f15150f2b2fa"
+          ]
+        },
+        {
+          "evidence_id": "ev-cdc40c4678ac098f17eff9242ac76fe565f222007049dee7d6016f835cdfc06b",
+          "document_id": "2100511094719336448",
+          "excerpt_sha256": "99b608c645905c3d619ad996fbc927121b77a02d34dddda4d0035d411e654c86",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-01353e1cc6896d6faba61298352679da68e64fad02c8d2521af936653fe01929"
+          ]
+        },
+        {
+          "evidence_id": "ev-53e95fce2e784f7f81da2bad3fff3331b94c549d5752158021738a00ee8cc564",
+          "document_id": "2100511094719336448",
+          "excerpt_sha256": "b2a6be11211c87617133f44af7105c40dd4c452af8608656bb41bbe8826f5fad",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-5731f5e6f7824b19c768eeeaceab23ed7328ea200eedf9ca89ed39f43cced8e2"
+          ]
+        },
+        {
+          "evidence_id": "ev-c84df567298df4719fb6c0877abed2bd92d8a7060d2be8191162069ca6cc1449",
+          "document_id": "2100511094719336448",
+          "excerpt_sha256": "d2e477b2cfad67b8adfcb72d034bea899e8a9c0e36de7e119b2b3a6f755c7e90",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-1d1c20d6cfd14e9beefa2a3443d8ec42454723e7c310a74e791065efb6fde905",
+            "qp-5731f5e6f7824b19c768eeeaceab23ed7328ea200eedf9ca89ed39f43cced8e2",
+            "qp-e0c928863602232a11d1218bf5f5c90131f46fde6212761607902b93b4223503"
+          ]
+        },
+        {
+          "evidence_id": "ev-90adc1856f75c168f71de4a4ea1411f63ea133a21f3c1f3efb1bc27fa2e66b81",
+          "document_id": "2100511094719336448",
+          "excerpt_sha256": "796e46b117f65b11e5d414664029c84b63b99319140e63dc0a3c7c7d8d5dc308",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-b232352e6ef603563002be036ec8af0cbbed839e5f47166e0ef10dfa570c29f6"
+          ]
+        }
+      ],
+      "user_input": null,
+      "error_summary": null
+    },
+    {
+      "case_id": "comparison-08",
+      "runtime_status": "PARTIAL",
+      "prompt_version": "research-artifact-v3",
+      "verdict": "supported_with_gaps",
+      "notes": "Nepali NER 的 2015—2016 报纸、PER/LOC/ORG、预处理和 CoNLL-2003 指标由原文支持；评价补查提供了可用事实，但没有读到第二篇，未完成比较。",
+      "reviewed_citations": [
+        {
+          "evidence_id": "ev-947831ff8a415a31defce31c91614218b2e27d47a63e9c586d6722fc3803ca6a",
+          "document_id": "2100510830914392064",
+          "excerpt_sha256": "4ad0af4902bf0c6e4654a17454010a1e80df648c7715ed6c7fc93a48bf5cb083",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-3577409662d9c92da758c907c52c8f2297c109ef10d4ff11939164ec74b1dc4c"
+          ]
+        },
+        {
+          "evidence_id": "ev-c24ef3ef9e03ed4c76be1dd0b628c94a09a0cc1738069fff03165da12e36490e",
+          "document_id": "2100510830914392064",
+          "excerpt_sha256": "aab75cce53b5061bd58fdcfa3090ca07818450677b44691b1eccf92c18db9626",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-8e323c4f0ad272e39b0a12dbc01c5b1ad1fcc6d91f9d4d4e3ef95a7ea89aa0f3"
+          ]
+        },
+        {
+          "evidence_id": "ev-d45775139249f3a000771b18a470be44d4ebfa40dce49c18f512566447371d19",
+          "document_id": "2100510830914392064",
+          "excerpt_sha256": "2f8f0598d86f88de1b94fcf773690a8c948a04739f35de132da98e579d73fbc4",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-702986fc5c5b6db1933dc6ae74b8b6a899c23867fc37fa8ea629c9d83f70639d"
+          ]
+        }
+      ],
+      "user_input": null,
+      "error_summary": "MODEL_CALL_BUDGET"
+    },
+    {
+      "case_id": "plan-08",
+      "runtime_status": "PARTIAL",
+      "prompt_version": "research-artifact-v3",
+      "verdict": "ambiguous_numeric_claim",
+      "notes": "大部分 P100/PyTorch/torchtext/dropout 0.5/POS 数据及调参候选有支持；原文 learning-rate 候选首项为“0,1”，产物未声明歧义便改成 0.1，不能按精确原文数字保留计为通过。最优表值仍待确认。",
+      "reviewed_citations": [
+        {
+          "evidence_id": "ev-388833beeeb608467835d5f3d1370c03c6deee985c59dacf549ed7d2f44218f9",
+          "document_id": "2100510830914392064",
+          "excerpt_sha256": "4ad0af4902bf0c6e4654a17454010a1e80df648c7715ed6c7fc93a48bf5cb083",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-3577409662d9c92da758c907c52c8f2297c109ef10d4ff11939164ec74b1dc4c"
+          ]
+        },
+        {
+          "evidence_id": "ev-596779f5d4f3590b6edf5208aa5f5ed01a52c5efdbe1eb776547153c6b220031",
+          "document_id": "2100510830914392064",
+          "excerpt_sha256": "013a81f4bd08e0916242d999552be4f1d62f81a879eec85458b25f96fe854cc4",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-30ee0f9bae2ee0322d5e1ee0a42b918ff4b87f2d3309d27ed2ae0872bf539ac1"
+          ]
+        },
+        {
+          "evidence_id": "ev-9a679f7bdb95e75ae0a81c7ba34cb871eaaece2f38c860b4a907d4917c0a975e",
+          "document_id": "2100510830914392064",
+          "excerpt_sha256": "eaff4db38906be4b3f5cccd396738990d623b1ff6a13c6f066b62c82a1fa8019",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-68be43546191dccccbe2c07a8349f12cb876d955d43b854c6f7d92d192c627db"
+          ]
+        },
+        {
+          "evidence_id": "ev-4b7658f94d35f526573f2b3b20d21ec855af78afb8546aa2a4e5c4ce7f2f9ba3",
+          "document_id": "2100510830914392064",
+          "excerpt_sha256": "f9cb6b0aff79d0b2661af70ac4986803c6599fb4555edfcce93082e408ed28d4",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-cd11ba59b537ecbec6e68d87dba16404e2f2575992490ab7889ece0625763758"
+          ]
+        },
+        {
+          "evidence_id": "ev-f4ec98cec9938f5cbe35c40f34656e02f46cf81c66dd9a7c386b55418011f93e",
+          "document_id": "2100510830914392064",
+          "excerpt_sha256": "246639f2a5cf1e174cecde1bd7832882c49ce7098eac89a634f37387b6eea23c",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-d0d7a07d3c4ccc2c0824a26bd2b07dd830edc7acc5f2254f0e395204b09536af"
+          ]
+        },
+        {
+          "evidence_id": "ev-1c8a76aa6ff9c774954ad7f685f79fb56fc5e9f3de2340203da921f8dc4376e5",
+          "document_id": "2100510830914392064",
+          "excerpt_sha256": "2f8f0598d86f88de1b94fcf773690a8c948a04739f35de132da98e579d73fbc4",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-702986fc5c5b6db1933dc6ae74b8b6a899c23867fc37fa8ea629c9d83f70639d"
+          ]
+        }
+      ],
+      "user_input": null,
+      "error_summary": "MODEL_CALL_BUDGET"
+    },
+    {
+      "case_id": "comparison-09",
+      "runtime_status": "PARTIAL",
+      "prompt_version": "research-artifact-v3",
+      "verdict": "supported_with_gaps",
+      "notes": "Stateology 197527 用户/4600465 博文及 PA SVM/Logistic/ILP 方法分别有支持；不混合两任务评价，没有捏造 2035 GPU-hour 或碳排放。完整量化评价与限制仍缺。",
+      "reviewed_citations": [
+        {
+          "evidence_id": "ev-543e929596d80f7f3a096e010389b8df7007e51ae1e82b0b948b7eb031ffdbd3",
+          "document_id": "2100509686603403269",
+          "excerpt_sha256": "cab20d2e9d556d679c51b61956ee38d95ff054255127963a4c435e8463e8d80f",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-98919c76cd9f92c7619c5d127c3c61fcf298d9464dc59643ff2ee097856ad55e"
+          ]
+        },
+        {
+          "evidence_id": "ev-d43e6623caf782055267408237e7b44943e24f0f826790c7e2e7c770f1a6dffc",
+          "document_id": "2100509687932997633",
+          "excerpt_sha256": "839b92a3c38334c4cfb25e003337962e248196815c6e6b4f7890e94e07e68957",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-243f48fcbc3e47f91001a52935987172b00faadf843d3cd8e3ca6580188cc4d0"
+          ]
+        },
+        {
+          "evidence_id": "ev-a1e106eba96aa21a9fd776c945b90f4c68365aaae5c2321b403abd729d70bba9",
+          "document_id": "2100509686603403269",
+          "excerpt_sha256": "dadb7e0039e8187d6d995b6821d93147f595a4649f424c513b2b909b494b7864",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-622a538cc952c442d94faec291b7615134087f3524a8d9f6433a41d2411618ce"
+          ]
+        }
+      ],
+      "user_input": null,
+      "error_summary": "MODEL_CALL_BUDGET"
+    },
+    {
+      "case_id": "plan-09",
+      "runtime_status": "PARTIAL",
+      "prompt_version": "research-artifact-v3",
+      "verdict": "supported_with_gaps",
+      "notes": "历史 Blogger 搜索、21 篇下载、清理及 LIWC/Roget 分布处理有原文支持；未来部署成本留作缺口。这是历史论文流程整理，没有验证 2035 服务可用性或执行任何采集。",
+      "reviewed_citations": [
+        {
+          "evidence_id": "ev-6b1947fc2a82e1fff2357b76d63b4fb1b59dec634d244d9ce799e8bd55daa61f",
+          "document_id": "2100509686603403269",
+          "excerpt_sha256": "8753a37290de8987324516863d5ea0f19daa5e99581495011696d5cff43e40fe",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-35b4eff61e875f85819d171f61fea57160f58efa6370acec5ea2ac9bef7f4b8a"
+          ]
+        },
+        {
+          "evidence_id": "ev-bc48835afc2dfe494c7c633042b781e487fbad276bb520b651ee60220f2f08cb",
+          "document_id": "2100509686603403269",
+          "excerpt_sha256": "58aa79966040ca11e57fe924cc4a59f6b424251ee59fd8d600230115c6ff84cf",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-558059bdb5ca8d898b7019d8affb30cc85e737a4660923a0a43183d0af93bbbb"
+          ]
+        },
+        {
+          "evidence_id": "ev-c43c7bf6b5bc8d94b39f54b9d1d01e706ff6379b01347bea56650966bddf9cf1",
+          "document_id": "2100509686603403269",
+          "excerpt_sha256": "dadb7e0039e8187d6d995b6821d93147f595a4649f424c513b2b909b494b7864",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-622a538cc952c442d94faec291b7615134087f3524a8d9f6433a41d2411618ce"
+          ]
+        }
+      ],
+      "user_input": null,
+      "error_summary": "MODEL_CALL_BUDGET"
+    },
+    {
+      "case_id": "comparison-10",
+      "runtime_status": "PARTIAL",
+      "prompt_version": "research-artifact-v3",
+      "verdict": "unsupported_inference",
+      "notes": "100k iterations/batch 64/Adam 0.001、另一论文 Yelp 500K 与关键词保留率有支持且场景分开；“greedy decoding 可能漏掉最优路径”为自身推断，不能包装成论文已述限制。GTD 是 protocol 的原文不自动证明该文所有限制。",
+      "reviewed_citations": [
+        {
+          "evidence_id": "ev-a587916d100a2a5e2a271544c58c605c0bffa90336299483fa3f4b1fc7708df8",
+          "document_id": "2100511753887764480",
+          "excerpt_sha256": "0467548e5cfd22f84031b54d6a1414783721ee494d37040e4b525557e27a4d2a",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-dc38020730d3d42a22ed9285a8a8f3e8abf3f4e7a1fb171f6f0ec9e90a16c85f"
+          ]
+        },
+        {
+          "evidence_id": "ev-e6400852fb35989838e34f73eccc3c6dcb77c911073d5905ef69e52c56b4a4c1",
+          "document_id": "2100511753887764480",
+          "excerpt_sha256": "651711fa3a412fd5b6a9ffa33c0c2916d7480372fa20980dcfe9045c7c26a0e1",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-002b6a3076069e2f285eaaaa8ac4c6f49914e99bb5f6a8fcf5b8d6d59b268d9f"
+          ]
+        },
+        {
+          "evidence_id": "ev-fe6a5a5c596040e719610350f62c02e2cc538ddc1abe66adb2ffe43bb7c59031",
+          "document_id": "2100511414996389930",
+          "excerpt_sha256": "21d0fff345a79f00ad26cfd9df512a0294c29fe92b350c8cd5babef86b7e7ebc",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-5a7dda62839f4afb56b9bb287416808275335c43c71d25924ac4a7cb2fa14f82"
+          ]
+        },
+        {
+          "evidence_id": "ev-bee35c5d1ec7dacd7efbd0914a4a6b263fa8f2dc58daaa2d0c40e7b0fae7f3ab",
+          "document_id": "2100511414996389930",
+          "excerpt_sha256": "66a81a0e2a3badd1ce744cf3df90850c6d7d7cb2f4e10bdd895b114b89cc463b",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-e93fff7398ea10b3b1c73eb944d5946f316e4792722b4c8eab715408b675ec31"
+          ]
+        },
+        {
+          "evidence_id": "ev-cc901f7b989188994ea127ad37a565285022eec22f57e04f7400da45cc1549d8",
+          "document_id": "2100511753887764480",
+          "excerpt_sha256": "62678f0f3a2289e63d04bc8bba339b242c01aca377c760dd29dbd26488255991",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-2e06c4eb08136bb1b838fefee8af8312ea01a1d4870fd5c492d3b3d4501b671c"
+          ]
+        }
+      ],
+      "user_input": null,
+      "error_summary": "MODEL_CALL_BUDGET"
+    },
+    {
+      "case_id": "plan-10",
+      "runtime_status": "PARTIAL",
+      "prompt_version": "research-artifact-v3",
+      "verdict": "misclassified_gap",
+      "notes": "ERG/DMRS/pydmrs、数据规模/validation/test 分工和 10 references 有支持；缺口把本次 MODEL_CALL_BUDGET 解释为源文未披露计算预算，是运行问题与资料缺口混淆。部分训练设置没读到仍待确认。",
+      "reviewed_citations": [
+        {
+          "evidence_id": "ev-6b016295b1576ee96e01b20b953a0bc328b194cd384d434be6ffdfa37f0a59f1",
+          "document_id": "2100511753887764480",
+          "excerpt_sha256": "6e664017ecdd31a65ec38acfe83e825c5e5c61668580b99f38b4d04de1587c55",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-e16a02f7524fd8d8980a73fe817b81bb1cdce9d80f91b64e42b25719b8e5d92d"
+          ]
+        },
+        {
+          "evidence_id": "ev-b7e372aceb1e8292ab8031e12ec21793551fcf8260535290fd204c67eb60360a",
+          "document_id": "2100511753887764480",
+          "excerpt_sha256": "72b0ebc76d0cc91c7ba662c124f4c9a029f4a06eddb6e79ffa7452e9f91e62ad",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-eccaf3cad4e0b685a28249eb1bf11d60be485d071282be4132101a8664464a76"
+          ]
+        },
+        {
+          "evidence_id": "ev-1ca162aed1af063776b335222ffccd688957f72eb90ae632b3d029cdd2887971",
+          "document_id": "2100511753887764480",
+          "excerpt_sha256": "4188d1123ad60ba69546c650e244c5930d41faa01f31190bb843e50010a1794a",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-ecda979ee9de1b6df733007751c7788f5ded177453dcad37e9439fdcdcac6963"
+          ]
+        },
+        {
+          "evidence_id": "ev-df921284c079ea5c9d4a9326013ccf515e290d4f2f01f3137739ecc8e5260dce",
+          "document_id": "2100511753887764480",
+          "excerpt_sha256": "b90be5ac0231340e258590bef20790cdf16b293afd1cbd05101e974e4fdcbcec",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-ad0b528cc8b8aee823822124aecaa42eb003c82e2d844d5a811e45b853614343"
+          ]
+        },
+        {
+          "evidence_id": "ev-26e2f3db08b7d308d64579f7848de6be7ee8bc97a0475d4333b0b86f6c3309c1",
+          "document_id": "2100511753887764480",
+          "excerpt_sha256": "3fc438842217f8febc9e172f2102bc43bbd83a7d35665ab321118cea7b38707c",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-3325613d663fd7e4d8c9b9b6447e0ec036ede48c30d1536be0072bb82fed1763"
+          ]
+        }
+      ],
+      "user_input": null,
+      "error_summary": "MODEL_CALL_BUDGET"
+    },
+    {
+      "case_id": "comparison-11",
+      "runtime_status": "PARTIAL",
+      "prompt_version": "research-artifact-v3",
+      "verdict": "insufficient_evidence",
+      "notes": "只有“main contributions”引导句，不能证明具体方法；缺口声称另一论文不在允许文档或知识库，超出本次未读取的事实，两个输入文档均在固定允许范围。",
+      "reviewed_citations": [
+        {
+          "evidence_id": "ev-300446ca72e2dfc8b57e27fdd4578ec536ba138665683ee6a958bb94f42f5617",
+          "document_id": "2100510180927295519",
+          "excerpt_sha256": "abccfd4f178cde5370a5208357be2d8606ac05d135fc5e16cb9f0f24bc30207e",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-9823f3a36cac61ff798a5b1f8f447a37b6b3bc19371b528c245f2b1ce7c6768c"
+          ]
+        }
+      ],
+      "user_input": null,
+      "error_summary": "MODEL_CALL_BUDGET"
+    },
+    {
+      "case_id": "plan-11",
+      "runtime_status": "FAILED",
+      "prompt_version": null,
+      "verdict": "publication_blocked",
+      "notes": "真实用户澄清回复为 2 小时并保存；两次产物校验失败，未发布计划。不能把有回复当作满足时间限制的证据。",
+      "reviewed_citations": [],
+      "user_input": {
+        "answer": "Preparation duration must be at most 2 hours.",
+        "source": "user_input",
+        "question": "What is your hard constraint for the preparation duration (e.g., number of days or weeks available to reproduce the experiments)?"
+      },
+      "error_summary": "ARTIFACT_VALIDATION_FAILED"
+    },
+    {
+      "case_id": "comparison-12",
+      "runtime_status": "PARTIAL",
+      "prompt_version": "research-artifact-v3",
+      "verdict": "unsupported_claim",
+      "notes": "Paper A 引用只有敏感内容提示，标题不支持 computational methodology；Paper B pronoun/translation 挑战段有效，但仍不足以完成两篇比较，未编造实验数值。",
+      "reviewed_citations": [
+        {
+          "evidence_id": "ev-a769c687a63e9cd3a8111a6449d5ed41b31137cfca9cd7cc9c2e74865f7225f1",
+          "document_id": "2100511896661872640",
+          "excerpt_sha256": "358b1e6785e3a7665251d8ab887b0e5cb563beabf1356d8f4d968ba28b867fa9",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-439f5375a5c4277d5aea3cd2fcc767d9179867bcb4905431dfb5b4113c982000"
+          ]
+        },
+        {
+          "evidence_id": "ev-1d73a68fceb792c2e856e22dc5be735d062e18d01f2b21ee5c89aa5ad6aa7e09",
+          "document_id": "2100509686670512144",
+          "excerpt_sha256": "d2cee841123611e34c7f794f414b9d69eb03b4267cefe23476d5dd36a997c498",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-786be91dee00d3890193fb176e7be42eb3beb162fa1e3de32cc052443c540083"
+          ]
+        }
+      ],
+      "user_input": null,
+      "error_summary": "MODEL_CALL_BUDGET"
+    },
+    {
+      "case_id": "plan-12",
+      "runtime_status": "COMPLETED",
+      "prompt_version": "research-artifact-v3",
+      "verdict": "unsupported_claim",
+      "notes": "1986—2015 NYT、word2vec 100/context 10/min 5/negative 10/iterations 10/1e-4 均有支持，batch_size null；“Connotation Frames sparsity” caution 引用的段只论缺少 ground-truth，不能支持该断言。源文在训练后归一化，计划把归一化前移到年度初始化前，顺序需核实。",
+      "reviewed_citations": [
+        {
+          "evidence_id": "ev-cf0a3c1e4d2bd256ef835975edcdfa559e96361a0fdcae4fb8226f3b6cf7bc9e",
+          "document_id": "2100511896661872640",
+          "excerpt_sha256": "ffdcbcbaf4b80c56ceefa31239f712f71b59ce3da245dd5da042d0c0ecb7c1c8",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-c8a6b1c40f7a37f6ab38198439f8314160b68889b5c6940995487050942d435c"
+          ]
+        },
+        {
+          "evidence_id": "ev-84671af336e807f6c8af97eb34013ca0529705d260d5c92ce10656de0c45dc35",
+          "document_id": "2100511896661872640",
+          "excerpt_sha256": "15ec386ce563efd92d3dd71ca49e698ba8ce9071d9c28c5b596094c334334dac",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-395f1fc5e336c50077f9f1b1d4623b2f1e8ae2b4755ca855cd204be7841bdef1"
+          ]
+        },
+        {
+          "evidence_id": "ev-bf4a643fef707cdcc33710eebba5fcac38779fc50379c7402a82d760a2271cdd",
+          "document_id": "2100511896661872640",
+          "excerpt_sha256": "82627f5aa238a058c92585c340d5d94acb0c50c329ab0f3abc4ded394f7b6af6",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-083775fe45b1edbd15bf5b5fa801d4311e08652b3aa771974be42b29f8a9deab"
+          ]
+        },
+        {
+          "evidence_id": "ev-f86b3a7ae4a11a69d4730a4a5066306ba5b1347a03ae281eddf79cad4012ee50",
+          "document_id": "2100511896661872640",
+          "excerpt_sha256": "e1c1932c7a141fff3941934c9ace0bea437afc3662eb69b158a2ae6b8cc9e8e2",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-892963aa9be244ae3f1d7b1361787c819771ec07f969387028fa3ef7cf7d4168"
+          ]
+        },
+        {
+          "evidence_id": "ev-55cde6f388c6b26ef788e1006414311ae2e800a6f76f22d0aad1419a06f4cc60",
+          "document_id": "2100511896661872640",
+          "excerpt_sha256": "ecd70f6f196022570787c99324385b394ba8b07e7d5bd63495f5126af3fefe16",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-6c8d687fa92a8b561b9b51013ea72616caf9f8a5c84e6f6aa2c2372735367643"
+          ]
+        },
+        {
+          "evidence_id": "ev-a4d91033d3127da602e99b4b574c7f0e6d290c33cbcc181145f848a7745acb24",
+          "document_id": "2100511896661872640",
+          "excerpt_sha256": "323f8a355cd3331b88a0ae97a61fbe586d4a984d6ce1819a9d1a53f81fa1576a",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-ab06a77d89c4cb3aacf3c97b84cd50c528ba1aae0bcf16ef99f1187419c59950"
+          ]
+        },
+        {
+          "evidence_id": "ev-8efcb136ab56018b0eaeffde567001893ad8b34ad6f8d34ce735f3c027b203c4",
+          "document_id": "2100511896661872640",
+          "excerpt_sha256": "27c085d8e03331655772b2284eb29d15d6d2c5d2049b001cfa12da0d5f848b7d",
+          "truncated": false,
+          "source_extent": "CHUNK",
+          "source_paragraph_ids": [
+            "qp-e2dbced8ed0d9dbeb7fb838b15e757b25ac0a77a327d342dc6d8a1e26390669e"
+          ]
+        }
+      ],
+      "user_input": null,
+      "error_summary": null
+    }
+  ],
+  "targeted_retest": {
+    "run_dir": "local-data/agentic-research/runs/20260917T145737_P7_application_retest_v4",
+    "prompt_version": "research-artifact-v4",
+    "fixed_cases": 2,
+    "cases": [
+      {
+        "case_id": "comparison-03",
+        "runtime_status": "COMPLETED",
+        "error_summary": null,
+        "verdict": "unsupported_formula_reconstruction",
+        "notes": "两篇均有实际引用；仍把断裂 LSTM/CRF 表达式写成完整公式，且监督信号由结构推断，不能计语义通过。",
+        "semantic_pass": false
+      },
+      {
+        "case_id": "plan-02",
+        "runtime_status": "FAILED",
+        "error_summary": "ARTIFACT_VALIDATION_FAILED",
+        "verdict": "publication_blocked_missing_required_array",
+        "notes": "原始未发布草稿不再把 QASPER 当实验数据，但两次遗漏多数 steps 的 parameters 必填数组，ARRAY_REQUIRED_OR_TOO_LARGE，故没有公开 PLAN。",
+        "semantic_pass": false
+      }
+    ]
+  }
+}

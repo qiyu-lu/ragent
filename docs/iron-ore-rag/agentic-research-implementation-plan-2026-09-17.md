@@ -1,6 +1,6 @@
 # 统一研究 Agent 与计划草稿改造实施计划
 
-> 制定日期：2026-09-17。实施状态：P0—P6 已实现。P5 完成统一 REPORT/PLAN 生成、有限修复、结构与引用校验及产物原子落库；P6 接入三种聊天模式、只读 SSE、来源和计划卡。最新 168 个程序回归通过，本地受控模型的浏览器流程通过。P5/P6 真实供应商产物联调因自动审批拒绝尚未执行，不能作为质量通过；P7—P8 未开始。当前进度与验证边界见[执行记录](agentic-research-execution-log.md)和[验证报告](agentic-research-validation-report.md)。
+> 制定日期：2026-09-17。实施状态（2026-09-18）：P0—P7 已完成实现与约定验证；P8 最终演示与交接收尾。P7 固定 400 问题/1200 任务全部记录，24 个应用/85 条引用快照及两例复测保留负结果；173 个后端、28 个 Python 用例通过。新库/重复升级保留历史、前端构建和 9 项受控浏览器检查通过，app 24 项既有诊断保留。质量见[固定对照报告](agentic-research-evaluation-report.md)与[应用原文核对](agentic-research-application-review.md)，进度见[执行记录](agentic-research-execution-log.md)。
 >
 > 本文件是后续实施的主要交接入口。它记录本轮已经确定的产品方向、技术选择、删除范围、数据准备、阶段提交和验证方式。后续无需重新阅读完整聊天，也不要重新把方向改回送检助手。
 >
@@ -453,6 +453,8 @@ P2 第三批已新增 [eval/agentic-research/](../../eval/agentic-research/READM
 
 ### P7：公开数据对照与故障路径验证
 
+**当前状态（2026-09-18）：已完成。** 固定 smoke 120 和 regression 1200 个任务均真实记录；24 个应用原文核对、两例针对性复测、作者公式对齐及 10 项程序行为检查完成。A 是一次 scoped 检索的项目组件对照，完整生产普通聊天另有保留链回归；未包含其改写/意图/MCP/回退。失败计入评分，full 17517 任务仅准备。[结果与费用](agentic-research-evaluation-report.md)、[原文负例](agentic-research-application-review.md)及[验证边界](agentic-research-validation-report.md)均留档。阶段提交按唯一标题 `test: evaluate research outputs and execution reliability` 定位。
+
 **工作：**
 
 - 在同一份语料、模型和检索设置下运行普通 RAG、单研究 Agent、主 Agent 按需委派三种模式。
@@ -609,8 +611,8 @@ npm --prefix frontend run build
 | P4 多 Agent | 已完成 | conduct_research、2/4 worker 限制、隔离上下文与共享额度；真实复测和 165 个定向测试；见[执行记录](agentic-research-execution-log.md) |
 | P5 报告与计划 | 已实现；170 个回归通过；真实最新 REPORT 失败、PLAN 部分完成 | 3507d9e；见执行记录 |
 | P6 前端整合 | 已实现；本地受控浏览器流程通过，后续回归 170/170 | f79b9e6；见执行记录 |
-| P7 对照与可靠性 | 未开始 | — |
-| P8 清理与交接 | 未开始 | — |
+| P7 对照与可靠性 | 已完成：smoke 120、regression 1200、应用 24/引用 85、v4 复测 2；173/28 程序回归，负结果保留 | `test: evaluate research outputs and execution reliability`；见固定对照与应用报告 |
+| P8 清理与交接 | 进行中：入口/流程/迁移说明、演示脚本；当前构建与浏览器回归通过 | 见交接说明和执行记录 |
 
 后续可直接使用下面的实施指令：
 

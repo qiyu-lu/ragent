@@ -1,6 +1,6 @@
 # 统一研究工作流验证报告
 
-日期：2026-09-17。P0/P1 已完成；P2 已完成证据工具、Java/PG 联调、训练/开发数据转换和固定抽样，P2 仍进行中。第四批已完成公开语料小批摄取/search/read 联调，完整批次正在运行。研究接口、原生模型工具调用与 A/B/C 评测尚未运行。下方按批次保留历史结果，以最新批次说明当前验证边界。
+日期：2026-09-17。P0/P1/P2 已完成。P2 已完成证据工具、Java/PG 联调、训练/开发数据转换和固定抽样，以及四个完整 split 的真实摄取、来源审计与 search/read 验收。研究接口、原生模型工具调用与 A/B/C 评测尚未运行。下方按批次保留历史结果，以最新批次说明当前验证边界。
 
 ## P0 基线
 
@@ -170,21 +170,28 @@ python3 eval/agentic-research/prepare_dataset.py --dataset musique --split dev -
 
 ## P2 第四批：来源摄取与真实批次
 
-本批实现及命令见[执行记录](agentic-research-execution-log.md#p2-第四批来源摄取幂等导入与真实联调2026-09-17)和[导入说明](../../eval/agentic-research/README.md#真实摄取)。完整语料导入正在执行；小批联调、程序回归和完整批次分别记录。
+本批实现及命令见[执行记录](agentic-research-execution-log.md#p2-第四批来源摄取幂等导入与真实联调2026-09-17)和[导入说明](../../eval/agentic-research/README.md#真实摄取)。实现提交 `4b06f21`；完整语料导入及最终数据库审计通过，P2 已完成。小批联调、程序回归和完整批次分别记录。
 
 | 验证 | 实际结果 |
 | --- | --- |
 | 后端构建 | package 通过；没有 SDK/前端修改 |
 | 普通 Java 回归 | 原有 18 类 123/123 通过；新增 EmbeddingUsageCaptureTest 3/3 通过，实际供应商用量/unknown、观察者恢复、HTTP 200 坏响应留失败 |
 | Python | 19/19，通过完整源顺序重建、独立摘录和输入幂等；既有转换/字段隔离测试仍通过 |
-| 实际 PostgreSQL | 11/11，实际 JdbcTemplate/MyBatis/PG sink 与短事务，包括已提交 identity 复用、配置变更拒绝、来源字段/同名章节、同标题 MuSiQue 独立摘录、provider/index 故障与回滚后重入 |
+| 实际 PostgreSQL | 11/11，实际 JdbcTemplate/MyBatis/PG sink 与短事务，包括已提交 identity 复用、配置变更拒绝、来源字段/同名章节、同标题 MuSiQue 独立摘录、provider/index 故障与回滚后重入、非默认预算的标准配置编解码；用例向量为固定夹具，真实供应商联调另列 |
 | SQL | fresh 与重复 02/03/04 升级的列/约束/索引一致；旧草稿保留；仅随机测试库被清理 |
 | 小批真实数据 | QASPER validation 固定 20 query 覆盖 17 篇/801 来源段落；MuSiQue Full dev 20 query 覆盖 392 摘录；实际 embedding 为现有 SiliconFlow 模型 1536 维，使用实际库 search/read 验证正文/位置/extent |
 | 续入 | 已提交 QASPER 801 个块保留真实 doc/chunk ID，不重复向量化；批次完成状态来自 DB 映射，progress 不作为恢复依据 |
 | 失败保留 | 初次网络超时、时间填充接线遗漏、停止旧顺序导入；修正后回归和真实续入通过，不把失败费用记为 0 |
-| 完整批次 | 正在导入四个可用训练/开发 split，见下方目录；完成前不声称 P2 验收通过 |
+| 完整批次 | 四个完整训练/开发 split 全部完成，共 122,620 文档 / 182,768 来源段落 / 182,896 块及向量；逐 split 三条真实 query 的 search/read 与两项拒绝检查通过 |
+| 最终库存与身份审计 | 可读文档、来源映射、mapping 逐行/去重数量、正文 SHA-256、版本/extent/原定位及向量一致，答案字段隔离，异常均为 0 |
+| 标准摄取配置 | 当前代码使用已有 IngestionSpecCodec；worker 全部退出后规范化旧命令写入的 123,029 个 corpus spec（含 smoke），v2/fast/1024/128 审计异常为 0，正文及索引身份不变 |
+| 最终静态检查 | 58 个本地链接/锚点、Markdown 围栏、whitespace、全部清单产物 hash 通过；15 个历史升级 SQL 与起始提交逐字节一致；日志指纹见完整批次 validation/checks.json |
 
-原始路径：`local-data/agentic-research/runs/20260917T084500_P2D_smoke/` 和 `local-data/agentic-research/runs/20260917T085000_P2D_full/`。每份 split 保留 input/job、documents、mapping、progress/complete、corpus-audit、source-probes、usage、traces 和 Java 日志；完整批次输入的源清单/代码 SHA 在 run/invocations 中保存。逐请求日志按 call_id 合并，STARTED 没有 COMPLETED 的记录保留未知状态，不重复累加 token。金额以实际账单核对，不能把 token 记录当结算账单。
+完整库存按 split 为 QASPER train 888 文档 / 47,770 来源段落 / 47,877 块，validation 281 / 13,547 / 13,568；MuSiQue Full train 95,125 独立摘录、dev 26,326 独立摘录，各自块数等于摘录数。源段落数、分块数与问答行数采用不同口径。
+
+完整批次留档 5,884 个 embedding 请求，已知供应商 total_tokens 合计 19,958,704；4 个返回失败及 24 个停止旧命令留下的无结束帧请求保持 usage unknown。小批及超时连通性探测另列。没有问答生成调用、答案/引用质量评分或货币结算结果。
+
+原始路径：`local-data/agentic-research/runs/20260917T084500_P2D_smoke/` 和 `local-data/agentic-research/runs/20260917T085000_P2D_full/`。每份 split 保留 input/job、documents、mapping、progress/complete、corpus-audit、source-probes、usage、traces 和 Java 日志；完整批次输入的源清单/代码 SHA 在 run/invocations 中保存。[导入清单](../../eval/agentic-research/manifests/imported-development-2026-09-17.json)保留数量、KB ID、逐产物 SHA 和执行源码与最终配置编码的差异处理。逐请求日志按 call_id 合并，STARTED 没有 COMPLETED 的记录保留未知状态，不重复累加 token。金额以实际账单核对，不能把 token 记录当结算账单。
 
 ## 尚未验证的业务和评测
 

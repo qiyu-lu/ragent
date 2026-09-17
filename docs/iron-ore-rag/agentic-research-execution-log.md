@@ -4,7 +4,7 @@
 
 ## 当前接续点
 
-P0、P1 已完成；P2 进行中，已完成证据工具、Java/PG 联调、QASPER/MuSiQue 训练/开发转换、固定抽样和字段隔离/来源校验；P3—P8 未开始。第四批已接通真实来源 metadata、实际主键映射与幂等摄取，并完成小批真实 embedding/search/read；完整训练/开发批次正在执行。Java 服务尚未接入 SDK 工具、运行器或聊天入口，不能将 P2 链路联调写成新研究 Agent 已上线。
+P0、P1、P2 已完成；P3—P8 未开始。P2 已完成证据工具、Java/PG 联调、QASPER/MuSiQue 训练/开发转换与固定抽样、字段隔离，以及四个完整 split 的真实 embedding 摄取、稳定主键映射、幂等续入和 search/read 验收。Java 服务尚未接入 SDK 工具、运行器或聊天入口；下一步从 P3 的模型工厂、原生工具注册与单任务运行闭环接续。
 
 ## P0：基线、分支与接入准备（2026-09-17，已完成）
 
@@ -153,7 +153,7 @@ app 严格类型检查仍有 24 个既有诊断，与 P0 的诊断逐条一致�
 
 ## P2 第四批：来源摄取、幂等导入与真实联调（2026-09-17）
 
-用户要求直接完成 P2，沿真实链路导入可用训练/开发语料，保持实现简单；本批从干净 `943c11a` 开始，没有接入 P3 SDK/运行器。
+用户要求直接完成 P2，沿真实链路导入可用训练/开发语料，保持实现简单；本批从干净 `943c11a` 开始，实现提交为 `4b06f21`。完整批次与最终审计已通过，P2 已完成；没有接入 P3 SDK/运行器。
 
 ### 实现
 
@@ -166,10 +166,30 @@ app 严格类型检查仍有 24 个既有诊断，与 P0 的诊断逐条一致�
 
 ### 当前验证
 
-- Python 19 个转换/导入准备测试通过；普通 Java 回归 123 个和新增 usage 测试 3 个通过；实际 PostgreSQL 11 个用例通过，涵盖完整 Java 摄取写入、重复身份/配置、同名章节边界、MuSiQue 同标题独立摘录、供应商失败及索引失败后的回滚/再入库。
+- Python 19 个转换/导入准备测试通过；普通 Java 回归 123 个和新增 usage 测试 3 个通过；实际 PostgreSQL 11 个用例通过，涵盖完整 Java 摄取写入、重复身份/配置、同名章节边界、MuSiQue 同标题独立摘录、供应商失败及索引失败后的回滚/再入库，以及非默认分块预算的标准 IngestionSpec 编解码回查。
 - 数据库脚本证明 fresh schema 与重复执行 02/03/04 升级的列、约束和索引一致，历史草稿保留；后端 package 通过。临时测试库已清理。
 - 两种格式已用真实 SiliconFlow 向量小批入库；QASPER 的 17 篇/801 块已完成实际搜索/邻读，重复续入 801 块没有重新向量化；MuSiQue 的 392 条摘录已入库，真实阅读返回 AVAILABLE_EXCERPT。
 - 小批首次网络超时、独立命令漏注册已有时间填充器导致回滚，以及停止旧顺序命令的记录保留。时间填充接线已修正，最终命令在新库/升级库与小批实际入库上验证。
-- 完整 QASPER train/validation 和 MuSiQue Full train/dev 批量正在执行，结果保存在独立 `research_corpus_v1`，不改现有业务库。小批原始记录在 `local-data/agentic-research/runs/20260917T084500_P2D_smoke/`，完整批次在 `local-data/agentic-research/runs/20260917T085000_P2D_full/`。
+- 完整 QASPER train/validation 和 MuSiQue Full train/dev 导入完成，结果保存在独立 `research_corpus_v1`，不改现有业务库。每个 split 的三条 gold-free query 均通过真实 scoped search/read，越界及缺失证据检查通过。
+
+### 完整批次验收
+
+| split | 文档 | 来源段落 | 实际块 / 向量 |
+| --- | ---: | ---: | ---: |
+| QASPER train | 888 | 47,770 | 47,877 |
+| QASPER validation | 281 | 13,547 | 13,568 |
+| MuSiQue Full train | 95,125 | 95,125 | 95,125 |
+| MuSiQue Full dev | 26,326 | 26,326 | 26,326 |
+| 合计 | 122,620 | 182,768 | 182,896 |
+
+最终数据库审计核对可读文档与来源映射、逐块正文 SHA-256、来源 ID/hash/标题/version/extent、对应向量和标注隔离，异常数均为 0；完整 mapping 逐行数量及去重文档/来源/块身份与库存一致。QASPER 阅读保留 CHUNK/可靠邻块，MuSiQue 保留 AVAILABLE_EXCERPT，不补造全文。
+
+完整批次执行过程中补正了摄取配置的标准编码：运行中的旧类已加载，待所有 worker 退出后，将研究库中 123,029 个 corpus 文档（含小批）的早期预算对象转为已有 IngestionSpec v2/fast 格式，正文、块、向量、来源身份均未改变；配置格式审计异常为 0。当前代码通过已有 IngestionSpecCodec 写入，非默认预算在实际 PG 用例中验证。执行时源码与最终源码的这一差异及处理留在清单中。
+
+完整批次按 call_id 合并后记录 5,884 个 embedding 请求，供应商已知 total_tokens 为 19,958,704；4 个返回失败、24 个旧命令停止前请求缺少结束帧，合计 28 个 usage 未知。未知请求仍保留原日志，不填 0；小批和连通性探测另记，金额未经账单核对。完成语料导入不代表历史全部 HTTP 请求都有可观测结算结果。
+
+小批原始记录在 `local-data/agentic-research/runs/20260917T084500_P2D_smoke/`，完整批次在 `local-data/agentic-research/runs/20260917T085000_P2D_full/`；其中 validation 保留构建、回归、SQL、最终审计和标准配置转换日志。[导入清单](../../eval/agentic-research/manifests/imported-development-2026-09-17.json)纳入 Git，包含实际 KB/文档/来源/块/向量数量、源码与产物 SHA-256、调用及验证摘要；原始语料和日志留在忽略目录。
+
+最终静态检查通过：58 个本地链接及锚点、Markdown 围栏、whitespace 和全部导入清单产物 hash；15 个历史增量 SQL 与起始提交逐字节一致。本批检查及日志指纹汇总保存在完整批次的 `validation/checks.json`。
 
 本批只证明真实数据摄取及检索阅读链路，不运行答案生成、A/B/C 或 EM/F1；真实 test 仍不转换/入库。Milvus/ES 服务、SDK 原生工具、研究取消/epoch 和页面 E2E 尚未验证，属于后续阶段。

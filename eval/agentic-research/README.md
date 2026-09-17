@@ -72,8 +72,10 @@ python3 eval/agentic-research/import_corpus.py --prepared local-data/agentic-res
 
 [260917_04_research_corpus.sql](../../resources/database/upgrades/v1.1.0/260917_04_research_corpus.sql) 显式增量创建来源文档映射；新库使用 schema_pg.sql，不假定 Flyway 自动发现脚本。映射与实际 doc/chunk/vector 在短事务内提交；embedding 在事务外执行。已提交的同内容/配置重试复用原 docId/chunkId，不重新向量化；内容、metadata、预算或模型变化需新建语料库。单批失败回滚，命令按批重试；重启使用相同目录和命令，依据 DB 映射继续，进度文件仅供展示。
 
-默认 QASPER 每批 8 篇，MuSiQue 每批 256 条；可用 `--batch-documents` 调整。每次供应商请求最多 32 条，单 split 最多 16 个同步请求，最多四个 split 并行，每个 split 最多 8 个独立批次在途，最多 16 个 embedding 请求在途。固定模型为 SiliconFlow Qwen/Qwen3-Embedding-8B，默认 1536 维，没有模型回退。已有数据库必须维度一致。
+默认 QASPER 每批 8 篇，MuSiQue 每批 256 条；可用 `--batch-documents` 调整。每次供应商请求最多 32 条，最多四个 split 并行；单 split 最多 8 个独立批次及 16 个 embedding 请求在途。固定模型为 SiliconFlow Qwen/Qwen3-Embedding-8B，默认 1536 维，没有模型回退。已有数据库必须维度一致。
 
 每个 split 保存 input/job、documents、mapping、progress/complete、traces、usage 和 source-probes。usage 逐请求保留实际 token、状态与耗时，未提供 usage 的失败标为 unknown；批次重试产生的额外请求也保留。mapping 记录离线来源文档/段落到实际 docId/chunkId/序号/hash；启动时重新导出已提交映射。导入结束用前三个 gold-free query 验证实际 scoped search 与原文/邻块读取，并检查越范围与不存在证据错误。这是链路联调，不是三题答案质量成绩。
 
-转换条数和指纹见[转换清单](manifests/prepared-development-2026-09-17.json)，实际导入、失败及验证记录见[验证报告](../../docs/iron-ore-rag/agentic-research-validation-report.md)。
+2026-09-17 已完成 QASPER train/validation 与 MuSiQue Full train/dev 全量导入：共 122,620 文档、182,768 来源段落、182,896 实际块/向量。每个 split 的三条真实 scoped search/read 和拒绝检查通过，最终库存、正文 hash、来源映射、标注隔离及标准摄取配置审计通过。真实 test 未转换/入库，未运行答案生成或质量评分。
+
+转换条数和指纹见[转换清单](manifests/prepared-development-2026-09-17.json)；实际主键、库存、源码/产物指纹及 usage 摘要见[导入清单](manifests/imported-development-2026-09-17.json)，失败和验证边界见[验证报告](../../docs/iron-ore-rag/agentic-research-validation-report.md)。大文件和原始日志留在忽略目录。

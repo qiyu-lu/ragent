@@ -2,7 +2,6 @@ import { Navigate, createBrowserRouter } from "react-router-dom";
 
 import { LoginPage } from "@/pages/LoginPage";
 import { ChatPage } from "@/pages/ChatPage";
-import { TaskAgentPage } from "@/pages/TaskAgentPage";
 import { ChangeLogsPage } from "@/pages/ChangeLogsPage";
 import { DocPreviewPage } from "@/pages/DocPreviewPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
@@ -64,10 +63,6 @@ function HomeRedirect() {
 }
 
 export const router = createBrowserRouter([
-  {
-    path: "/tasks",
-    element: <RequireAuth><TaskAgentPage /></RequireAuth>
-  },
   {
     path: "/",
     element: <HomeRedirect />

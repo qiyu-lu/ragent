@@ -1,6 +1,6 @@
 # 统一研究 Agent 与计划草稿改造实施计划
 
-> 制定日期：2026-09-17。实施状态：P0 已完成，P1 进行中，P2—P8 未开始。当前进度与验证边界见[执行记录](agentic-research-execution-log.md)和[验证报告](agentic-research-validation-report.md)。
+> 制定日期：2026-09-17。实施状态：P0、P1 已完成，P2—P8 未开始。当前进度与验证边界见[执行记录](agentic-research-execution-log.md)和[验证报告](agentic-research-validation-report.md)。
 >
 > 本文件是后续实施的主要交接入口。它记录本轮已经确定的产品方向、技术选择、删除范围、数据准备、阶段提交和验证方式。后续无需重新阅读完整聊天，也不要重新把方向改回送检助手。
 >
@@ -51,8 +51,8 @@
 | [MultiChannelRetrievalEngine](../../bootstrap/src/main/java/com/nageoffer/ai/ragent/rag/core/retrieval/MultiChannelRetrievalEngine.java) | 已有知识库范围、召回通道和后处理能力 | 作为新 search_knowledge 工具的主要复用基础 |
 | [KnowledgeChunkDO](../../bootstrap/src/main/java/com/nageoffer/ai/ragent/knowledge/dao/entity/KnowledgeChunkDO.java) | 保存 docId、chunkIndex、正文、hash、来源 metadata | 支持按证据标识读取正文和有依据的邻接内容 |
 | [LLMService](../../infra-ai/src/main/java/com/nageoffer/ai/ragent/infra/chat/LLMService.java) | chat 返回字符串，另有流式回答接口 | 普通问答继续用；研究分支使用原生工具调用模型适配 |
-| [TaskAgentController](../../bootstrap/src/main/java/com/nageoffer/ai/ragent/ironore/controller/TaskAgentController.java) | 独立送检、样品、工位、任务推进与确认 | 整条业务链退役 |
-| [TaskAgentStore](../../bootstrap/src/main/java/com/nageoffer/ai/ragent/ironore/agent/TaskAgentStore.java) | 已有归属、短事务、租约、事件等实现 | 参考并迁移必要机制，不沿用送检状态对象 |
+| [原 TaskAgentController（P1 已退役）](agentic-research-execution-log.md) | 制定时为独立送检、样品、工位、任务推进与确认入口 | 整条业务链退役；历史源码见起始提交 |
+| [原 TaskAgentStore（P1 已退役）](agentic-research-execution-log.md) | 制定时已有归属、短事务、租约、事件等实现 | 执行记录保存必要机制供 P3 重建，不沿用送检状态对象 |
 | [IronOreTaskTemplateService](../../bootstrap/src/main/java/com/nageoffer/ai/ragent/ironore/service/IronOreTaskTemplateService.java) | 从一条回答的单文档证据生成草稿，与审批及模拟逻辑共处一类 | 拆出生成与校验能力，改为接收研究任务的多文档证据 |
 | [IronOreTaskSection](../../frontend/src/components/chat/IronOreTaskSection.tsx) | 草稿、批准、模拟、机器人操作混在同一组件 | 替换为只展示研究结果和计划草稿的组件 |
 
@@ -592,8 +592,8 @@ npm --prefix frontend run build
 
 | 阶段 | 状态 | 提交 / 记录 |
 | --- | --- | --- |
-| P0 基线与分支 | 已完成 | docs: record agentic research implementation baseline；见执行记录 |
-| P1 退役旧业务 | 进行中 | 本轮实施；见执行记录 |
+| P0 基线与分支 | 已完成 | 8a9c79d；见执行记录 |
+| P1 退役旧业务 | 已完成 | refactor: retire inspection and robot execution demos；见执行记录与验证报告 |
 | P2 数据与工具 | 未开始 | — |
 | P3 单研究运行 | 未开始 | — |
 | P4 多 Agent | 未开始 | — |

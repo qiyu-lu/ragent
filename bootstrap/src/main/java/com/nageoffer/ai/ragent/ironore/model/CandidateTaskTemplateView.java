@@ -28,7 +28,6 @@ public record CandidateTaskTemplateView(
         String status,
         TaskTemplatePayload template,
         List<TaskEvidenceRef> evidenceRefs,
-        TaskExecutionView execution,
         String approvedBy,
         Date approvedAt,
         Date createTime

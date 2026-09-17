@@ -20,8 +20,9 @@ package com.nageoffer.ai.ragent.ironore.controller;
 import com.nageoffer.ai.ragent.framework.convention.Result;
 import com.nageoffer.ai.ragent.framework.web.Results;
 import com.nageoffer.ai.ragent.ironore.model.CandidateTaskTemplateView;
-import com.nageoffer.ai.ragent.ironore.model.TaskExecutionView;
 import com.nageoffer.ai.ragent.ironore.service.IronOreTaskTemplateService;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -38,7 +39,7 @@ public class IronOreTaskController {
     private final IronOreTaskTemplateService taskTemplateService;
 
     @PostMapping("/iron-ore/task-templates")
-    public Result<CandidateTaskTemplateView> create(@RequestBody CreateTaskRequest request) {
+    public Result<CandidateTaskTemplateView> create(@Valid @RequestBody CreateTaskRequest request) {
         return Results.success(taskTemplateService.createDraft(request.sourceMessageId(), request.docId()));
     }
 
@@ -57,11 +58,6 @@ public class IronOreTaskController {
         return Results.success(taskTemplateService.approve(taskId));
     }
 
-    @PostMapping("/iron-ore/task-templates/{taskId}/simulate")
-    public Result<TaskExecutionView> simulate(@PathVariable String taskId) {
-        return Results.success(taskTemplateService.simulate(taskId));
-    }
-
-    public record CreateTaskRequest(String sourceMessageId, String docId) {
+    public record CreateTaskRequest(@NotBlank String sourceMessageId, @NotBlank String docId) {
     }
 }

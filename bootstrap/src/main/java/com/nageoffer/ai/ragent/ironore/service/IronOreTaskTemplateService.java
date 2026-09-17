@@ -23,59 +23,37 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nageoffer.ai.ragent.framework.context.UserContext;
-import com.nageoffer.ai.ragent.framework.convention.ChatMessage;
-import com.nageoffer.ai.ragent.framework.convention.ChatRequest;
 import com.nageoffer.ai.ragent.framework.convention.GroundingChunk;
 import com.nageoffer.ai.ragent.framework.convention.SourceRef;
 import com.nageoffer.ai.ragent.framework.exception.ClientException;
-import com.nageoffer.ai.ragent.infra.chat.LLMService;
-import com.nageoffer.ai.ragent.infra.enums.Tier;
-import com.nageoffer.ai.ragent.infra.util.LLMResponseCleaner;
-import com.nageoffer.ai.ragent.ironore.dao.entity.IronOreTaskExecutionDO;
 import com.nageoffer.ai.ragent.ironore.dao.entity.IronOreTaskTemplateDO;
-import com.nageoffer.ai.ragent.ironore.dao.mapper.IronOreTaskExecutionMapper;
 import com.nageoffer.ai.ragent.ironore.dao.mapper.IronOreTaskTemplateMapper;
 import com.nageoffer.ai.ragent.ironore.model.CandidateTaskTemplateView;
 import com.nageoffer.ai.ragent.ironore.model.TaskEvidenceRef;
-import com.nageoffer.ai.ragent.ironore.model.TaskExecutionView;
-import com.nageoffer.ai.ragent.ironore.model.TaskExecutionView.TaskSimulationEvent;
 import com.nageoffer.ai.ragent.ironore.model.TaskTemplatePayload;
 import com.nageoffer.ai.ragent.ironore.model.TaskTemplateStatus;
 import com.nageoffer.ai.ragent.knowledge.dao.entity.KnowledgeDocumentDO;
 import com.nageoffer.ai.ragent.knowledge.dao.mapper.KnowledgeDocumentMapper;
-import com.nageoffer.ai.ragent.rag.core.prompt.PromptTemplateLoader;
 import com.nageoffer.ai.ragent.rag.dao.entity.ConversationMessageDO;
 import com.nageoffer.ai.ragent.rag.dao.mapper.ConversationMessageMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
 public class IronOreTaskTemplateService {
 
-    private static final String PROMPT_PATH = "prompt/iron-ore-task-template.st";
-    private static final int MAX_EVIDENCE_TEXT_CHARS = 4000;
-    private static final int MAX_REPAIR_RAW_CHARS = 6000;
-
     private final IronOreTaskTemplateMapper taskTemplateMapper;
-    private final IronOreTaskExecutionMapper taskExecutionMapper;
     private final ConversationMessageMapper messageMapper;
     private final KnowledgeDocumentMapper documentMapper;
-    private final PromptTemplateLoader promptTemplateLoader;
-    private final TaskTemplateValidator taskTemplateValidator;
-    private final LLMService llmService;
+    private final TaskTemplateGenerator taskTemplateGenerator;
     private final ObjectMapper objectMapper;
 
-    @Transactional
     public CandidateTaskTemplateView createDraft(String sourceMessageId, String docId) {
         String userId = UserContext.requireUser().getUserId();
         IronOreTaskTemplateDO existing = findBySource(sourceMessageId, docId, userId);
@@ -99,11 +77,12 @@ public class IronOreTaskTemplateService {
                         && StrUtil.isNotBlank(chunk.getText()))
                 .toList();
         if (grounding.isEmpty()) {
-            throw new ClientException("该回答没有可用于生成任务的精确检索证据，请重新提问后再生成");
+            throw new ClientException("该回答没有可用于生成计划草稿的精确检索证据，请重新提问后再生成");
         }
 
         String question = resolveQuestion(assistant, userId);
-        TaskTemplatePayload payload = generatePayload(question, document, grounding);
+        TaskTemplatePayload payload = taskTemplateGenerator.generate(
+                question, document.getDocName(), document.getDocumentVersion(), grounding);
         List<TaskEvidenceRef> evidenceRefs = grounding.stream().map(this::toEvidenceRef).toList();
 
         String username = UserContext.getUsername();
@@ -121,7 +100,16 @@ public class IronOreTaskTemplateService {
                 .createdBy(username)
                 .updatedBy(username)
                 .build();
-        taskTemplateMapper.insert(row);
+        // One insert is atomic; model calls above do not hold a database transaction.
+        try {
+            taskTemplateMapper.insert(row);
+        } catch (DuplicateKeyException duplicate) {
+            IronOreTaskTemplateDO concurrent = findBySource(sourceMessageId, docId, userId);
+            if (concurrent == null) {
+                throw duplicate;
+            }
+            return toView(concurrent);
+        }
         return toView(row);
     }
 
@@ -166,109 +154,6 @@ public class IronOreTaskTemplateService {
         return toView(requireOwnedTask(taskId));
     }
 
-    @Transactional
-    public TaskExecutionView simulate(String taskId) {
-        IronOreTaskTemplateDO task = requireOwnedTask(taskId);
-        IronOreTaskExecutionDO existing = findExecution(taskId);
-        if (existing != null) {
-            return toExecutionView(existing);
-        }
-        if (!TaskTemplateStatus.APPROVED.name().equals(task.getStatus())) {
-            throw new ClientException("只有已批准的候选任务可以模拟执行");
-        }
-
-        TaskTemplatePayload payload = readJson(task.getTemplateData(), TaskTemplatePayload.class);
-        Date now = new Date();
-        List<TaskSimulationEvent> events = buildSimulationEvents(payload);
-        IronOreTaskExecutionDO execution = IronOreTaskExecutionDO.builder()
-                .taskTemplateId(taskId)
-                .status("SIMULATED_SUCCESS")
-                .events(writeJson(events))
-                .startTime(now)
-                .endTime(now)
-                .createdBy(UserContext.getUsername())
-                .build();
-        taskExecutionMapper.insert(execution);
-        taskTemplateMapper.update(null, new LambdaUpdateWrapper<IronOreTaskTemplateDO>()
-                .set(IronOreTaskTemplateDO::getStatus, TaskTemplateStatus.SIMULATED.name())
-                .set(IronOreTaskTemplateDO::getUpdatedBy, UserContext.getUsername())
-                .set(IronOreTaskTemplateDO::getUpdateTime, now)
-                .eq(IronOreTaskTemplateDO::getId, taskId)
-                .eq(IronOreTaskTemplateDO::getStatus, TaskTemplateStatus.APPROVED.name()));
-        return toExecutionView(execution);
-    }
-
-    private TaskTemplatePayload generatePayload(String question,
-                                                KnowledgeDocumentDO document,
-                                                List<GroundingChunk> grounding) {
-        Set<String> allowedIds = grounding.stream()
-                .map(GroundingChunk::getChunkId)
-                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
-        String systemPrompt = promptTemplateLoader.load(PROMPT_PATH);
-        String userPrompt = buildUserPrompt(question, document, grounding);
-        String raw = chat(systemPrompt, userPrompt);
-        try {
-            return parseAndValidate(raw, document.getDocumentVersion(), allowedIds);
-        } catch (Exception first) {
-            String repairPrompt = userPrompt
-                    + "\n\n上一份输出未通过协议校验：" + first.getMessage()
-                    + "\n请仅修复 JSON，不得添加新事实。上一份输出：\n"
-                    + StrUtil.subPre(StrUtil.nullToEmpty(raw), MAX_REPAIR_RAW_CHARS);
-            try {
-                return parseAndValidate(chat(systemPrompt, repairPrompt), document.getDocumentVersion(), allowedIds);
-            } catch (Exception second) {
-                throw new ClientException("候选任务生成结果未通过结构与证据校验：" + second.getMessage());
-            }
-        }
-    }
-
-    private String chat(String systemPrompt, String userPrompt) {
-        ChatRequest request = ChatRequest.builder()
-                .messages(List.of(ChatMessage.system(systemPrompt), ChatMessage.user(userPrompt)))
-                .temperature(0D)
-                .topP(0.2D)
-                .thinking(false)
-                .build();
-        return llmService.chat(request, Tier.STANDARD);
-    }
-
-    private String buildUserPrompt(String question,
-                                   KnowledgeDocumentDO document,
-                                   List<GroundingChunk> grounding) {
-        StringBuilder evidence = new StringBuilder();
-        for (GroundingChunk chunk : grounding) {
-            evidence.append("<chunk id=\"").append(chunk.getChunkId()).append("\" sheet=\"")
-                    .append(StrUtil.nullToEmpty(chunk.getSheetName())).append("\" cells=\"")
-                    .append(StrUtil.nullToEmpty(chunk.getCellRange())).append("\">\n")
-                    .append(StrUtil.subPre(chunk.getText(), MAX_EVIDENCE_TEXT_CHARS))
-                    .append("\n</chunk>\n");
-        }
-        return "<question>\n" + StrUtil.nullToEmpty(question) + "\n</question>\n"
-                + "<document version=\"" + StrUtil.nullToEmpty(document.getDocumentVersion()) + "\">\n"
-                + StrUtil.nullToEmpty(document.getDocName()) + "\n</document>\n"
-                + "<evidence>\n" + evidence + "</evidence>";
-    }
-
-    private TaskTemplatePayload parseAndValidate(String raw,
-                                                 String documentVersion,
-                                                 Set<String> allowedIds) throws Exception {
-        String cleaned = LLMResponseCleaner.stripMarkdownCodeFence(raw);
-        TaskTemplatePayload payload = objectMapper.readValue(cleaned, TaskTemplatePayload.class);
-        return taskTemplateValidator.validate(payload, documentVersion, allowedIds);
-    }
-
-    private List<TaskSimulationEvent> buildSimulationEvents(TaskTemplatePayload payload) {
-        List<TaskSimulationEvent> events = new ArrayList<>();
-        events.add(new TaskSimulationEvent(0, "SIMULATION_STARTED", "开始模拟；不会连接或控制真实设备。", List.of()));
-        for (TaskTemplatePayload.TaskStep step : payload.steps()) {
-            events.add(new TaskSimulationEvent(step.order(), "STEP_COMPLETED",
-                    "步骤 " + step.order() + "：" + step.action(), step.evidenceChunkIds()));
-        }
-        events.add(new TaskSimulationEvent(payload.steps().size() + 1, "SIMULATION_COMPLETED",
-                "候选任务模拟完成；结果仅用于流程演示。", List.of()));
-        return List.copyOf(events);
-    }
-
     private ConversationMessageDO requireAssistantMessage(String messageId, String userId) {
         ConversationMessageDO message = messageMapper.selectById(messageId);
         if (message == null || !userId.equals(message.getUserId()) || !"assistant".equalsIgnoreCase(message.getRole())) {
@@ -287,12 +172,12 @@ public class IronOreTaskTemplateService {
 
     private String resolveQuestion(ConversationMessageDO assistant, String userId) {
         if (StrUtil.isBlank(assistant.getReplyToMessageId())) {
-            return "根据当前检索证据生成候选任务模板";
+            return "根据当前检索证据生成计划草稿";
         }
         ConversationMessageDO userMessage = messageMapper.selectById(assistant.getReplyToMessageId());
         return userMessage != null && userId.equals(userMessage.getUserId())
                 ? StrUtil.nullToEmpty(userMessage.getContent())
-                : "根据当前检索证据生成候选任务模板";
+                : "根据当前检索证据生成计划草稿";
     }
 
     private IronOreTaskTemplateDO findBySource(String messageId, String docId, String userId) {
@@ -312,12 +197,6 @@ public class IronOreTaskTemplateService {
         return task;
     }
 
-    private IronOreTaskExecutionDO findExecution(String taskId) {
-        return taskExecutionMapper.selectOne(new LambdaQueryWrapper<IronOreTaskExecutionDO>()
-                .eq(IronOreTaskExecutionDO::getTaskTemplateId, taskId)
-                .last("LIMIT 1"));
-    }
-
     private TaskEvidenceRef toEvidenceRef(GroundingChunk chunk) {
         return new TaskEvidenceRef(
                 chunk.getChunkId(),
@@ -332,26 +211,22 @@ public class IronOreTaskTemplateService {
     private CandidateTaskTemplateView toView(IronOreTaskTemplateDO row) {
         List<TaskEvidenceRef> evidence = readJson(row.getEvidenceRefs(), new TypeReference<>() {
         });
-        IronOreTaskExecutionDO execution = findExecution(row.getId());
         return new CandidateTaskTemplateView(
                 row.getId(),
                 row.getConversationId(),
                 row.getSourceMessageId(),
                 row.getDocId(),
-                row.getStatus(),
+                draftStatus(row.getStatus()),
                 readJson(row.getTemplateData(), TaskTemplatePayload.class),
                 evidence,
-                execution == null ? null : toExecutionView(execution),
                 row.getApprovedBy(),
                 row.getApprovedAt(),
                 row.getCreateTime());
     }
 
-    private TaskExecutionView toExecutionView(IronOreTaskExecutionDO row) {
-        List<TaskSimulationEvent> events = readJson(row.getEvents(), new TypeReference<>() {
-        });
-        return new TaskExecutionView(
-                row.getId(), row.getTaskTemplateId(), row.getStatus(), events, row.getStartTime(), row.getEndTime());
+    private String draftStatus(String storedStatus) {
+        // Older databases may retain simulated rows; only their draft is exposed now.
+        return "SIMULATED".equals(storedStatus) ? TaskTemplateStatus.APPROVED.name() : storedStatus;
     }
 
     private String writeJson(Object value) {

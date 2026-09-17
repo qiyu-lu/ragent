@@ -7,13 +7,13 @@
 | 项目 | 当前状态 |
 | --- | --- |
 | 上游基线 | Ragent `1.1.0`，`f64de341452c8998ebf64cd264e60ccad6a31631` |
-| 开发分支 | `research/iron-ore-rag` |
+| 开发分支 | `feat/agentic-research` |
 | 冻结状态 | D2 固定回放已结束；公平回填质量 gate fail，代码保留但默认关闭 |
-| 最终配置 | `intent=off`、`ocr=off`、`rag.search.request-level-refill-enabled=false` |
+| 历史评测配置 | `intent=off`、`ocr=off`、`rag.search.request-level-refill-enabled=false` |
 
-阶段 2 的工程实现、迁移和定向测试已完成；ROS1 可选扩展另有三条本地运行时路径通过。两者的登录页面业务 E2E 均未完成，作为已知边界保留，不再列为本阶段待开发事项。提交与问题的对应关系统一见[改动索引](changes/README.md)。
+当前从 P0/P1 开始实施[统一研究工作流计划](agentic-research-implementation-plan-2026-09-17.md)，进度、提交和下一阶段入口以[执行记录](agentic-research-execution-log.md)为准；测试与真实模型边界见[验证报告](agentic-research-validation-report.md)。
 
-2026-09-15 新增独立的规程驱动送检 Agent，不改写上述冻结实验。后端、页面和软件层定向验证已完成，真实模型页面验收尚未执行；完整改动过程集中在[送检任务 Agent 记录](changes/2026-09-15-task-agent.md)。
+阶段 2、ROS1 和 2026-09-15 送检 Agent 的实现、迁移及定向验证属于历史版本记录，均未完成登录页面业务 E2E。P1 已退役送检和执行演示；旧评测及其负结果保留。对应历史提交统一见[改动索引](changes/README.md)。
 
 ## 主线阅读路径
 
@@ -24,12 +24,13 @@
 | 了解项目与量化结果 | [仓库首页](../../README.md) |
 | 重建本地环境 | [阶段 0：本地基线复现](stages/00-reproduction.md) → [开发栈改动说明](changes/2026-08-12-reproducible-local-development-stack.md) |
 | 了解 Java 后端 + AI 核心改造 | [工业知识闭环改动](changes/2026-08-12-industrial-knowledge-demo.md) → [部署与验收手册](stages/02-industrial-knowledge-demo.md) |
-| 体验工具调用、人工确认、业务提交及任务恢复 | [规程驱动送检 Agent：过程、验证、体验步骤](changes/2026-09-15-task-agent.md) |
+| 接续统一研究 Agent 与计划改造 | [实施计划](agentic-research-implementation-plan-2026-09-17.md) → [执行记录](agentic-research-execution-log.md) |
+| 查阅已退役送检 Agent 的设计与验证 | [送检 Agent 历史记录](changes/2026-09-15-task-agent.md) |
 | 复现小型系统评测 | [评测工具与冻结结果](changes/2026-08-13-system-evaluation-harness.md) → [评测说明](../../eval/iron-ore/README.md) → [固定运行手册](../../eval/iron-ore/RUNBOOK.md) |
 | 查看证据驱动优化 | [XLSX 分块](changes/2026-08-13-xlsx-structure-aware-chunking.md) → [检索纯度](changes/2026-08-13-request-level-retrieval-purity.md) → [D2 负结果](changes/2026-08-14-request-level-fair-refill.md) |
 | 查找某次改动、提交和回滚方式 | [改动索引](changes/README.md) |
 
-早期最小样本方法保留在[表格样本基线](changes/2026-08-12-table-sample-baseline.md)；ROS1 dry-run 是非求职主线的[可选执行适配案例](changes/2026-08-12-ros1-robot-mission-demo.md)。
+早期最小样本方法保留在[表格样本基线](changes/2026-08-12-table-sample-baseline.md)；已退役 ROS1 dry-run 的设计与当时验证保留在[历史案例](changes/2026-08-12-ros1-robot-mission-demo.md)。
 
 ## 文档职责
 

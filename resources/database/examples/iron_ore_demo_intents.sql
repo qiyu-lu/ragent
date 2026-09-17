@@ -1,6 +1,7 @@
 -- 铁矿工业知识 Demo 意图配置。
 -- 手工执行；脚本要求目标库中已经存在且仅存在一个名为“铁矿检测演示库”的知识库。
--- 四个互斥入口覆盖：闲聊、文档检索、确定性版本比较、批准后任务模拟。
+-- 三个入口覆盖：闲聊、文档检索、确定性版本比较。
+-- 已有数据库的模拟工具意图由 260917_retire_execution_demo.sql 停用。
 
 DO $$
 BEGIN
@@ -28,13 +29,7 @@ INSERT INTO t_intent_node (
     NULL, '[]'::jsonb, NULL, 'iron_ore_compare_versions', 2,
     NULL, NULL, NULL,
     30, 1, 'admin', 'admin', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0
-), (
-    '20260812000000000004', NULL, 'iron-ore-task-simulate', '候选任务模拟', 0, NULL,
-    '对已经人工批准的候选任务模板生成模拟执行事件；不连接、不控制真实设备。',
-    '["模拟执行任务模板 123","运行已批准的候选任务","演示任务执行过程"]',
-    NULL, '[]'::jsonb, NULL, 'iron_ore_simulate_task', 2,
-    NULL, NULL, NULL,
-    40, 1, 'admin', 'admin', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0
+
 )
 ON CONFLICT (id) DO UPDATE SET
     intent_code = EXCLUDED.intent_code,

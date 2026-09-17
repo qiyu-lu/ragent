@@ -163,14 +163,6 @@
             <testResource>
                 <directory>src/test/resources</directory>
             </testResource>
-            <!-- Integration tests execute the actual incremental migration. -->
-            <testResource>
-                <directory>${project.basedir}/../resources/database/upgrades/v1.1.0</directory>
-                <targetPath>db</targetPath>
-                <includes>
-                    <include>260915_task_agent.sql</include>
-                </includes>
-            </testResource>
         </testResources>
         <plugins>
             <plugin>

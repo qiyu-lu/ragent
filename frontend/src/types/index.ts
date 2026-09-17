@@ -36,7 +36,7 @@ export interface SourceRef {
   cellRange?: string;
 }
 
-export type CandidateTaskStatus = "DRAFT" | "APPROVED" | "SIMULATED";
+export type CandidateTaskStatus = "DRAFT" | "APPROVED";
 
 export interface TaskEvidenceItem {
   text: string;
@@ -78,22 +78,6 @@ export interface TaskEvidenceRef {
   excerpt?: string | null;
 }
 
-export interface TaskSimulationEvent {
-  sequence: number;
-  type: string;
-  message: string;
-  evidenceChunkIds: string[];
-}
-
-export interface TaskExecution {
-  id: string;
-  taskTemplateId: string;
-  status: string;
-  events: TaskSimulationEvent[];
-  startTime?: string | null;
-  endTime?: string | null;
-}
-
 export interface CandidateTaskTemplate {
   id: string;
   conversationId: string;
@@ -102,62 +86,8 @@ export interface CandidateTaskTemplate {
   status: CandidateTaskStatus;
   template: TaskTemplatePayload;
   evidenceRefs: TaskEvidenceRef[];
-  execution?: TaskExecution | null;
   approvedBy?: string | null;
   approvedAt?: string | null;
-  createTime?: string | null;
-}
-
-export type RobotMissionStatus =
-  | "READY"
-  | "DISPATCHED"
-  | "RUNNING"
-  | "SUCCEEDED"
-  | "FAILED"
-  | "CANCELED"
-  | "DISPATCH_FAILED";
-
-export interface RobotSkillStep {
-  order: number;
-  skillId: "NAVIGATE_TO_STATION" | "TRANSPORT_CONTAINER";
-  parameters: Record<string, string>;
-  timeoutSeconds: number;
-}
-
-export interface RobotMissionPayload {
-  missionId: string;
-  taskTemplateId: string;
-  documentVersion?: string | null;
-  missionType: "SAMPLE_TRANSPORT";
-  robotId: string;
-  dryRun: true;
-  scope: string;
-  planHash: string;
-  steps: RobotSkillStep[];
-}
-
-export interface RobotMissionEvent {
-  sequence: number;
-  status: string;
-  skillId?: string | null;
-  message: string;
-  timestamp: string;
-}
-
-export interface RobotMission {
-  id: string;
-  taskTemplateId: string;
-  robotId: string;
-  status: RobotMissionStatus;
-  planHash: string;
-  mission: RobotMissionPayload;
-  currentStep: number;
-  totalSteps: number;
-  currentSkillId?: string | null;
-  message?: string | null;
-  events: RobotMissionEvent[];
-  dispatchedAt?: string | null;
-  completedAt?: string | null;
   createTime?: string | null;
 }
 

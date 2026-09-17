@@ -3,13 +3,6 @@ spring:
     activate:
       on-profile: iron-ore-demo
 
-iron-ore:
-  robot:
-    gateway:
-      enabled: true
-      base-url: http://127.0.0.1:18081
-      timeout-ms: 3000
-
 rag:
   context:
     enrich:

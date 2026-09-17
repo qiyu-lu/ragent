@@ -257,48 +257,6 @@ CREATE INDEX idx_iron_ore_task_conversation
     ON t_iron_ore_task_template (conversation_id, owner_user_id);
 COMMENT ON TABLE t_iron_ore_task_template IS '铁矿演示候选任务模板';
 
-CREATE TABLE t_iron_ore_task_execution (
-    id               VARCHAR(20) NOT NULL PRIMARY KEY,
-    task_template_id VARCHAR(20) NOT NULL,
-    status           VARCHAR(32) NOT NULL,
-    events           JSONB       NOT NULL DEFAULT '[]'::jsonb,
-    start_time       TIMESTAMP,
-    end_time         TIMESTAMP,
-    created_by       VARCHAR(64),
-    create_time      TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-CREATE UNIQUE INDEX ux_iron_ore_task_execution
-    ON t_iron_ore_task_execution (task_template_id);
-COMMENT ON TABLE t_iron_ore_task_execution IS '铁矿候选任务模拟执行记录';
-
-CREATE TABLE t_iron_ore_robot_mission (
-    id               VARCHAR(20)  NOT NULL PRIMARY KEY,
-    task_template_id VARCHAR(20)  NOT NULL,
-    owner_user_id    VARCHAR(20)  NOT NULL,
-    robot_id          VARCHAR(64)  NOT NULL,
-    status            VARCHAR(32)  NOT NULL,
-    plan_hash         VARCHAR(64)  NOT NULL,
-    mission_data      JSONB        NOT NULL,
-    gateway_state     JSONB        NOT NULL DEFAULT '{}'::jsonb,
-    current_step      INTEGER      NOT NULL DEFAULT 0,
-    total_steps       INTEGER      NOT NULL DEFAULT 0,
-    current_skill_id  VARCHAR(64),
-    status_message    VARCHAR(512),
-    dispatched_at     TIMESTAMP,
-    completed_at      TIMESTAMP,
-    created_by        VARCHAR(64),
-    updated_by        VARCHAR(64),
-    create_time       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_time       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted           SMALLINT     NOT NULL DEFAULT 0
-);
-CREATE UNIQUE INDEX ux_iron_ore_robot_mission_task
-    ON t_iron_ore_robot_mission (task_template_id)
-    WHERE deleted = 0;
-CREATE INDEX idx_iron_ore_robot_mission_owner
-    ON t_iron_ore_robot_mission (owner_user_id, create_time DESC);
-COMMENT ON TABLE t_iron_ore_robot_mission IS '已批准候选任务编译出的 ROS1 机器人任务及反馈快照';
-
 CREATE TABLE t_knowledge_document_chunk_log (
     id                 VARCHAR(20)      NOT NULL PRIMARY KEY,
     doc_id             VARCHAR(20)      NOT NULL,
@@ -922,60 +880,3 @@ COMMENT ON COLUMN t_agent_prompt.update_by IS '更新人';
 COMMENT ON COLUMN t_agent_prompt.create_time IS '创建时间';
 COMMENT ON COLUMN t_agent_prompt.update_time IS '更新时间';
 COMMENT ON COLUMN t_agent_prompt.deleted IS '是否删除 0：正常 1：删除';
-
--- Procedure-driven task agent: local sample registration and station booking.
-CREATE TABLE IF NOT EXISTS t_task_agent_run (
-    id VARCHAR(64) PRIMARY KEY,
-    owner_user_id VARCHAR(64) NOT NULL,
-    status VARCHAR(32) NOT NULL,
-    revision BIGINT NOT NULL DEFAULT 0,
-    state_json TEXT NOT NULL,
-    lease_token VARCHAR(64),
-    lease_until BIGINT NOT NULL DEFAULT 0,
-    created_at BIGINT NOT NULL,
-    updated_at BIGINT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_task_agent_owner ON t_task_agent_run(owner_user_id, updated_at);
-
-CREATE TABLE IF NOT EXISTS t_task_agent_event (
-    run_id VARCHAR(64) NOT NULL REFERENCES t_task_agent_run(id),
-    sequence_no BIGINT NOT NULL,
-    event_type VARCHAR(32) NOT NULL,
-    message TEXT NOT NULL,
-    detail_json TEXT NOT NULL,
-    created_at BIGINT NOT NULL,
-    PRIMARY KEY (run_id, sequence_no)
-);
-
-CREATE TABLE IF NOT EXISTS t_task_agent_sample (
-    owner_user_id VARCHAR(64) NOT NULL,
-    id VARCHAR(64) NOT NULL,
-    name VARCHAR(200) NOT NULL,
-    test_type VARCHAR(64) NOT NULL,
-    label_verified BOOLEAN NOT NULL,
-    handoff_ready BOOLEAN NOT NULL,
-    status VARCHAR(32) NOT NULL DEFAULT 'REGISTERED',
-    PRIMARY KEY (owner_user_id, id)
-);
-
-CREATE TABLE IF NOT EXISTS t_task_agent_station (
-    owner_user_id VARCHAR(64) NOT NULL,
-    id VARCHAR(64) NOT NULL,
-    name VARCHAR(200) NOT NULL,
-    test_type VARCHAR(64) NOT NULL,
-    status VARCHAR(32) NOT NULL DEFAULT 'AVAILABLE',
-    reservation_run_id VARCHAR(64),
-    PRIMARY KEY (owner_user_id, id)
-);
-
-CREATE TABLE IF NOT EXISTS t_task_agent_submission (
-    run_id VARCHAR(64) PRIMARY KEY REFERENCES t_task_agent_run(id),
-    owner_user_id VARCHAR(64) NOT NULL,
-    sample_id VARCHAR(64) NOT NULL,
-    station_id VARCHAR(64) NOT NULL,
-    document_id VARCHAR(64) NOT NULL,
-    document_version VARCHAR(128) NOT NULL,
-    proposal_json TEXT NOT NULL,
-    created_at BIGINT NOT NULL,
-    UNIQUE (owner_user_id, sample_id)
-);

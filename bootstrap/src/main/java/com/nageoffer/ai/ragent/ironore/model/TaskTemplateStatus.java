@@ -19,6 +19,5 @@ package com.nageoffer.ai.ragent.ironore.model;
 
 public enum TaskTemplateStatus {
     DRAFT,
-    APPROVED,
-    SIMULATED
+    APPROVED
 }

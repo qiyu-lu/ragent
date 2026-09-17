@@ -111,6 +111,16 @@ class ResearchEvidenceToolsTest {
     }
 
     @Test
+    void workerScopeIsValidatedBeforeAdmissionAndCannotMarkAnotherDocumentRead() {
+        assertEquals(List.of("doc-a"), search.validateDocumentScope("run-a", "owner", List.of("doc-a")));
+        assertThrows(ClientException.class, () -> search.validateDocumentScope("run-a", "owner", List.of("missing")));
+        String id = search("run-a", "worker-other");
+        assertThrows(ClientException.class, () -> reader.read("run-a", "owner", id, ReadMode.CHUNK, List.of("doc-b")));
+        assertFalse(snapshots.get(id).evidence().read());
+        verify(store, never()).markRead(anyString(), any());
+    }
+
+    @Test
     void serverScopeIsPassedBeforeRecallAndMultipleDocumentsUseStoredBody() {
         addSource("chunk-b", "doc-b", "V2", "second document", "{}");
         returnCandidates("chunk-a", "chunk-b");

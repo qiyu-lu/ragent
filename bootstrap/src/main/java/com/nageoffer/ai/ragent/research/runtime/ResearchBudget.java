@@ -36,6 +36,7 @@ public class ResearchBudget {
     private final long previousActiveMillis;
     private int modelCalls;
     private int toolCalls;
+    private int workersCreated;
     private final List<Map<String, Object>> calls = new ArrayList<>();
 
     @SuppressWarnings("unchecked")
@@ -44,6 +45,7 @@ public class ResearchBudget {
         this.limits = limits;
         this.modelCalls = number(saved, "modelCalls").intValue();
         this.toolCalls = number(saved, "toolCalls").intValue();
+        this.workersCreated = number(saved, "workersCreated").intValue();
         this.previousActiveMillis = number(saved, "activeMillis").longValue();
         if (saved.get("calls") instanceof List<?> records) {
             for (Object record : records) calls.add(new LinkedHashMap<>((Map<String, Object>) record));
@@ -63,11 +65,36 @@ public class ResearchBudget {
         toolCalls++;
     }
 
+    /** worker 仍扣全局探索额度，并额外留一次主 Agent 整合调用。 */
+    public synchronized void acquireWorkerModel() {
+        if (explorationCallsRemaining() <= 1) throw new Exhausted("WORKER_MODEL_BUDGET");
+        acquireModel(false);
+    }
+
+    public synchronized int explorationCallsRemaining() {
+        return Math.max(0, limits.getMaxModelCalls() - limits.getReservedFinalizationModelCalls() - modelCalls);
+    }
+
+    public synchronized int acquireWorkers(int count) {
+        checkTime();
+        if (count < 1 || workersCreated + count > limits.getMaxTotalWorkers()) {
+            throw new Exhausted("WORKER_COUNT_BUDGET");
+        }
+        int first = workersCreated + 1;
+        workersCreated += count;
+        return first;
+    }
+
     public synchronized void startCall(String callId, String model, int estimatedInputTokens) {
+        startCall(callId, model, estimatedInputTokens, "main", "main");
+    }
+
+    public synchronized void startCall(String callId, String model, int estimatedInputTokens, String role, String taskId) {
         Map<String, Object> call = new LinkedHashMap<>();
         call.put("callId", callId);
         call.put("model", model);
-        call.put("role", "main");
+        call.put("role", role);
+        call.put("taskId", taskId);
         call.put("status", "STARTED");
         call.put("usageStatus", "unknown");
         call.put("estimatedInputTokens", estimatedInputTokens);
@@ -101,7 +128,7 @@ public class ResearchBudget {
     }
 
     public synchronized Map<String, Object> snapshot() {
-        return Map.of("modelCalls", modelCalls, "toolCalls", toolCalls, "activeMillis", activeMillis(),
+        return Map.of("modelCalls", modelCalls, "toolCalls", toolCalls, "workersCreated", workersCreated, "activeMillis", activeMillis(),
                 "calls", calls.stream().map(LinkedHashMap::new).toList());
     }
 

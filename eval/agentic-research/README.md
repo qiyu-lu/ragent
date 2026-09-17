@@ -1,6 +1,6 @@
 # 统一研究工作流的数据准备
 
-这里实现 P2 的离线转换、校验与真实幂等摄取，以及 P3 的原生工具单研究运行联调。转换不调用模型；`import_corpus.py --execute` 复用项目已有分块、向量化和索引落点，再用知识搜索/原文读取服务回查。`smoke_research.py --execute` 调用真实研究模型，进度与失败记录见[执行记录](../../docs/iron-ore-rag/agentic-research-execution-log.md)。
+这里实现 P2 的离线转换、校验与真实幂等摄取，以及 P3/P4 的原生工具、独立 worker 与运行联调。转换不调用模型；`import_corpus.py --execute` 复用项目已有分块、向量化和索引落点，再用知识搜索/原文读取服务回查。`smoke_research.py --execute` 调用真实研究模型，进度与失败记录见[执行记录](../../docs/iron-ore-rag/agentic-research-execution-log.md)。
 
 ## 来源与环境
 
@@ -28,13 +28,13 @@ python3 -m unittest discover -s eval/agentic-research/tests -v
 
 默认种子为 `20260917`；smoke 为 20 题，regression 为 200 题，可通过 `--seed`、`--smoke`、`--regression` 调整。对全部问题按 SHA256(seed, question ID) 排序抽样，与源文件行序无关；smoke 是 regression 的前缀，不是独立数据集。小型夹具不足指定题数时取全部并记录实际数。QASPER test 和 MuSiQue test 需要显式 `--allow-test`，仅在最终配置确定后转换；MuSiQue 无答案字段的行保留 `gold=null`，不伪造不可回答标签。本批没有转换真实 test。
 
-## P3 单研究运行联调
+## 原生研究运行联调（P3/P4）
 
-研究运行器接入 AgentScope Java 2.0.1，使用原生 `search_knowledge`、`read_source`、`ask_user` 和 `finish_research`。创建、查询、补充输入、取消接口位于 `/rag/research/runs`；事件接口目前返回 `after`/`limit` 分页 JSON，SSE 在 P6 接续。创建时必须提供当前用户的 `conversationId`、唯一 `clientRequestId`、目标、REPORT/PLAN 以及可用知识库范围。知识库仍采用项目现有全局共享规则，运行和会话按用户归属隔离。
+研究运行器接入 AgentScope Java 2.0.1，主 Agent 使用原生 `search_knowledge`、`read_source`、`conduct_research`、`ask_user` 和 `finish_research`，worker 只注册检索、阅读、结束三个工具。创建、查询、补充输入、取消接口位于 `/rag/research/runs`；事件接口目前返回 `after`/`limit` 分页 JSON，SSE 在 P6 接续。创建时必须提供当前用户的 `conversationId`、唯一 `clientRequestId`、目标、REPORT/PLAN 以及可用知识库范围。知识库仍采用项目现有全局共享规则，运行和会话按用户归属隔离。
 
-本阶段返回 `state.researchResult` 中的发现、已读证据 ID、缺口和冲突；`artifact` 仍为空。COMPLETED 在 P3 只表示研究阶段形成经过引用身份检查的摘要，完整报告、计划 JSON 和卡片属于 P5/P6。资料没有提供的要求不能补造。等待输入通过 `state.question` 展示，回复携带当前 `revision` 与 `answer`；原研究范围保持不变，需要更换范围时使用新的请求。
+本阶段返回 `state.researchResult` 中的发现、已读证据 ID、缺口和冲突；`artifact` 仍为空。COMPLETED 在 P3/P4 只表示研究阶段形成经过引用身份检查的摘要，完整报告、计划 JSON 和卡片属于 P5/P6。资料没有提供的要求不能补造。等待输入通过 `state.question` 展示，回复携带当前 `revision` 与 `answer`；原研究范围保持不变，需要更换范围时使用新的请求。
 
-运行器默认最多 16 次模型调用、24 次工具调用、300 秒累计活动时长，预留 2 次最终生成额度；最后两次研究调用限定为原生 finish_research。人工等待不计入活动时长，恢复保留已消耗额度。预算/超时退出时，有已读证据则保留为 PARTIAL，无证据则 FAILED。取消关闭本地 SDK/HTTP 订阅并阻止迟到写回，供应商是否停止远端计算保持 unknown。运行与模型并发分别限制为 2；本阶段采用单 JVM 执行，重启将失去执行者的 QUEUED/RUNNING 标为 INTERRUPTED，不恢复中间 token。
+运行器默认最多 16 次模型调用、24 次工具调用、300 秒累计活动时长，预留 2 次最终生成额度；最后两次研究调用限定为原生 finish_research。人工等待不计入活动时长，恢复保留已消耗额度。预算/超时退出时，有已读证据则保留为 PARTIAL，无证据则 FAILED。失败 worker 的 gaps 自动纳入主摘要，状态为 PARTIAL；主 Agent 预算/超时退出仍保留成功 worker 的 findings。取消关闭父子 SDK/HTTP 订阅并阻止迟到写回，供应商是否停止远端计算保持 unknown。运行与模型并发分别限制为 2；本阶段采用单 JVM 执行，重启将失去执行者的 QUEUED/RUNNING 标为 INTERRUPTED，不恢复中间 token。
 
 ```bash
 # 随机 PostgreSQL 隔离库与本地 HTTP 桩，无付费模型调用
@@ -50,6 +50,27 @@ python3 eval/agentic-research/smoke_research.py --run-dir local-data/agentic-res
 真实联调复用已导入的 `research_corpus_v1`，仅查询语料，将运行、证据和事件写入随机 `research_p3_*` 库并在结束时清理。参数可覆盖 prepared 路径、容器名和语料库名；使用 `--case waiting-and-resume` 等可只复测一条路径。凭证优先来自环境变量，也可复用既有 IDEA 配置，在子进程环境中传递，日志不输出其值。Java 命令复用现有向量检索；本阶段 smoke 不启用 rerank，不运行 A/B/C 或 EM/F1。
 
 每批保留 `run.json`、`job.json`、`predictions.jsonl`、`traces.jsonl`、`usage.jsonl`、`embedding-usage.jsonl`、`java.log` 和 `summary.json`。请求只读取 gold-free `queries.jsonl`；不读取评分用 questions。源码/配置/模板 hash、实际 model ID、请求类型、工具参数/结果及未知 usage 分开记录。退出码 0 表示命令完成；每个样例是否形成闭环必须检查 predictions 的状态，不能把失败样例从报告中删除。
+
+## P4 委派与复测
+
+`conduct_research` 参数为 `tasks` 数组，每项包含 `goal`、1—8 个 `dimensions`、`expectedOutput`，可选 `documentIds`。服务器分配 `worker-n` 身份，并校验文档存在、启用且位于父范围；省略列表继承父范围，不能清除已有限制。同批或已经委派的相同子目标拒绝重复启动，需要补查时提出具体的新子目标。worker 只接收自己的任务、范围和用户约束，不接收父/其他 worker 的工具历史。只允许阅读自己的检索候选，引用必须实际读过。
+
+默认专用 worker 池最多 2 个并发、每个运行累计最多 4 个 worker，每个 worker 最多 6 次模型请求（仍扣同一份全局额度）、180 秒（含排队）；模型并发继续共用全局配额 2。worker 额外保留一次主 Agent 整合调用，P5 的 2 次生成预留不被研究消耗。人工输入恢复保留 worker 累计数和已提交的压缩结果。worker-v2 在有未读候选时要求先进行一次原生阅读，随后可补查；提示词与工具选择共同约束阅读节奏，不能把候选摘要当作已读依据。
+
+父任务收到的是 `SubtaskResult` 列表。`state.subtasks` 保存每个任务的范围、状态、已读 ID 与压缩结果；事件通过 `taskId` 区分。主 Agent 自己阅读的 ID 位于 `readEvidenceIds`，worker findings 中经验证的引用位于 `acceptedWorkerEvidenceIds`。后者允许引用，但不代表主 Agent 看过 worker 原文或完整历史。失败/超时保留其他 worker 成功结果；取消、过期 epoch、已结束子任务后的重复回调均不能覆盖已提交结果。重启和主任务提前结束会关闭仍在运行的子状态，保留已有快照。
+
+```bash
+# P4 核心故障测试；复用 P3 helper 的随机 research_p3_* 隔离库和清理
+bash scripts/validate-agentic-research-p4.sh
+
+# 4 个 P4 请求：跨文档比较、PLAN 研究、串行多跳、两个 worker 在途取消；无 API 调用
+python3 eval/agentic-research/smoke_research.py --phase p4 --run-dir local-data/agentic-research/runs/<new-id>
+
+# 只付费复测指定的两条路径；--case 可重复
+python3 eval/agentic-research/smoke_research.py --phase p4 --case comparison-workers --case plan-workers --run-dir local-data/agentic-research/runs/<new-id> --execute
+```
+
+跨文档样例从 gold-free queries 选择两份不同文档，`[[DOC_n]]` 由 Java 入口替换为真实 docId，不用 gold 选择材料或拆解任务。比较和 PLAN 是应用联调样例，不是 QASPER 问答分数。`--phase p3` 保留旧五个样例集合，但使用当前版本运行器；历史 P3 回放应检出 `20b1133`。批次 A/B 等名称表示开发复测，不是 P7 的架构 A/B/C。清单见 [P4 smoke manifest](manifests/research-p4-smoke-2026-09-17.json)。
 
 ## 产物与标注隔离
 

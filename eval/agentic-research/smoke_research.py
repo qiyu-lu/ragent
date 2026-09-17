@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run five paid P3 probes with real SDK tools; corpus reads and run writes use separate databases."""
+"""Run bounded paid research probes with real SDK tools; corpus reads and run writes use separate databases."""
 from __future__ import annotations
 
 import argparse
@@ -28,7 +28,8 @@ def main():
     parser.add_argument('--corpus-database', default='research_corpus_v1')
     parser.add_argument('--idea', type=Path, default=Path('.idea/workspace.xml'))
     parser.add_argument('--execute', action='store_true')
-    parser.add_argument('--case', choices=('lookup', 'multi-hop', 'insufficient-source', 'waiting-and-resume', 'cancel-in-flight'))
+    parser.add_argument('--phase', choices=('p3', 'p4'), default='p3')
+    parser.add_argument('--case', action='append', choices=('lookup', 'multi-hop', 'insufficient-source', 'waiting-and-resume', 'cancel-in-flight', 'comparison-workers', 'plan-workers', 'cancel-workers', 'follow-up-workers'))
     args = parser.parse_args()
     if not args.corpus_database.startswith('research_corpus_') or not args.corpus_database.replace('_', '').isalnum():
         raise ValueError('A dedicated research_corpus_ database is required')
@@ -53,21 +54,63 @@ def main():
         {'id': 'cancel-in-flight', 'collection': 'rs_musique_dev_v1_full', 'sourceDocumentIds': musique['document_ids'],
          'goal': musique['question'], 'outputType': 'REPORT', 'cancelAfterMillis': 800, 'reply': None},
     ]
+    if args.phase == 'p4':
+        with (args.prepared / 'qasper-validation/queries.jsonl').open() as source:
+            other = next(json.loads(line) for line in source if json.loads(line)['document_ids'] != qasper['document_ids'])
+        comparison = ('Compare the research approaches in Paper A (document ID [[DOC_0]]) and Paper B (document ID [[DOC_1]]). '
+                      'Use conduct_research once with two independent workers, one narrowed to each exact document ID. '
+                      'Each worker should investigate the learning/model approach, supervision or inputs, and reported limitations. '
+                      'Read sources and perform a targeted follow-up search if a dimension remains unresolved. '
+                      'Return concise cited findings, preserve numbers, units and applicable conditions; missing details stay gaps.')
+        cases = [
+            {'id': 'comparison-workers', 'collection': 'rs_qasper_validation_v1_full',
+             'sourceDocumentIds': qasper['document_ids'] + other['document_ids'], 'goal': comparison,
+             'outputType': 'REPORT', 'cancelAfterMillis': 0, 'reply': None},
+            {'id': 'plan-workers', 'collection': 'rs_qasper_validation_v1_full', 'sourceDocumentIds': qasper['document_ids'],
+             'goal': 'Research an active-learning experiment plan from this paper with a maximum of 500 manually annotated training examples. '
+                     'Use conduct_research once with two independent tasks: (1) source-supported prerequisites, data and resources; '
+                     '(2) source-supported learning/annotation loop, evaluation steps and limitations. '
+                     'Workers should search, read and target a follow-up query when needed. This is a plan draft: preserve parameters and conditions, '
+                     'leave unspecified deployment or equipment values as gaps. Integrate only compressed cited results.',
+             'outputType': 'PLAN', 'cancelAfterMillis': 0, 'reply': None},
+            next(case for case in cases if case['id'] == 'multi-hop'),
+            {'id': 'cancel-workers', 'collection': 'rs_qasper_validation_v1_full',
+             'sourceDocumentIds': qasper['document_ids'] + other['document_ids'], 'goal': comparison,
+             'outputType': 'REPORT', 'cancelAfterMillis': 60000, 'cancelWhenWorkersRunning': True, 'reply': None},
+        ]
+    if args.phase == 'p4' and args.case and 'follow-up-workers' in args.case:
+        cases.append({'id': 'follow-up-workers', 'collection': 'rs_qasper_validation_v1_full', 'sourceDocumentIds': qasper['document_ids'],
+                      'goal': 'Use conduct_research once with exactly two independent workers on this paper. '
+                              'Worker A investigates the learning model and batch selection parameters: first search only for the model/classifier, '
+                              'limit 1, then read it; identify a model/classifier name from that source and issue a NEW search using that exact name '
+                              'to investigate selection or batch parameters, limit 1, then read and finish. '
+                              'Worker B investigates the stopping criterion and its window/threshold parameters: first search only for the stopping rule, '
+                              'limit 1, then read it; identify a criterion or method name from that source and issue a NEW search using that exact name '
+                              'to investigate its window/threshold details, limit 1, then read and finish. '
+                              'Put these execution requirements into the delegated task goals. A source-derived follow-up query after the first read is required '
+                              'for each worker even if the first excerpt contains partial parameter details. Preserve exact evidence IDs, numbers and units; '
+                              'missing parameters remain gaps. Return only compressed cited findings.',
+                      'outputType': 'REPORT', 'cancelAfterMillis': 0, 'reply': None})
     if args.case:
-        cases = [case for case in cases if case['id'] == args.case]
+        cases = [case for case in cases if case['id'] in args.case]
+    if not cases:
+        raise ValueError('The selected case does not belong to the selected phase')
     args.run_dir.mkdir(parents=True, exist_ok=False)
     job = {'runDir': str(args.run_dir.resolve()), 'cases': cases}
     (args.run_dir / 'job.json').write_text(json.dumps(job, indent=2) + '\n')
-    record = {'started_at': datetime.now(timezone.utc).isoformat(), 'mode': 'P3-single-agent-smoke',
-              'model_config_id': 'research-flash', 'prompt_version': 'research-main-v2',
+    record = {'started_at': datetime.now(timezone.utc).isoformat(), 'mode': 'P4-worker-smoke' if args.phase == 'p4' else 'serial-research-smoke',
+              'model_config_id': 'research-flash', 'prompt_version': 'research-main-v3', 'worker_prompt_version': 'research-worker-v2',
               'git_commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=REPO, text=True).strip(),
               'working_tree_modified': bool(subprocess.check_output(['git', 'status', '--porcelain'], cwd=REPO, text=True)),
-              'query_ids': [qasper['id'], musique['id']], 'gold_used': False,
+              'query_ids': ([qasper['id']] if any(c['id'] not in ('multi-hop', 'cancel-in-flight') for c in cases) else [])
+                  + ([musique['id']] if any(c['id'] in ('multi-hop', 'cancel-in-flight') for c in cases) else [])
+                  + ([other['id']] if any(c['id'] in ('comparison-workers', 'cancel-workers') for c in cases) else []), 'gold_used': False,
               'query_file_sha256': {scope: digest(args.prepared / scope / 'queries.jsonl') for scope in ('qasper-validation', 'musique-dev')},
               'source_sha256': {str(p.relative_to(REPO)): digest(p) for p in sorted((REPO / 'bootstrap/src/main/java/com/nageoffer/ai/ragent/research').rglob('*.java'))},
               'config_sha256': digest(REPO / 'bootstrap/src/main/resources/application.yaml'),
-              'prompt_sha256': digest(REPO / 'bootstrap/src/main/resources/prompts/research-main-v2.txt'),
-              'command': sys.argv, 'paid_generation': bool(args.execute), 'scoring': False}
+              'prompt_sha256': digest(REPO / 'bootstrap/src/main/resources/prompts/research-main-v3.txt'),
+              'worker_prompt_sha256': digest(REPO / 'bootstrap/src/main/resources/prompts/research-worker-v2.txt'),
+              'harness_sha256': digest(Path(__file__)), 'command': sys.argv, 'paid_generation': bool(args.execute), 'scoring': False}
     (args.run_dir / 'run.json').write_text(json.dumps(record, indent=2) + '\n')
     if not args.execute:
         print('Prepared {} smoke probes; no API or database calls made.'.format(len(cases)))
@@ -109,7 +152,19 @@ def main():
                 read_seen = True
             if read_seen and event['type'] == 'TOOL_STARTED' and event['payload'].get('tool') == 'search_knowledge':
                 dependent_search = True
-        summary = {'states': {p['clientRequestId']: p['status'] for p in predictions}, 'model_requests': len(calls),
+        worker_summaries = {}
+        for prediction in predictions:
+            tasks = prediction['state'].get('subtasks', {})
+            by_task = {}
+            for task_id, task in tasks.items():
+                events = [t['event'] for t in traces if t['runId'] == prediction['id'] and t['event']['taskId'] == task_id]
+                read, follow = False, False
+                for event in events:
+                    if event['type'] == 'TOOL_ENDED' and event['payload'].get('tool') == 'read_source': read = True
+                    if read and event['type'] == 'TOOL_STARTED' and event['payload'].get('tool') == 'search_knowledge': follow = True
+                by_task[task_id] = {'status': task['status'], 'read_evidence_count': len(task.get('readEvidenceIds', [])), 'follow_up_after_read': follow}
+            worker_summaries[prediction['clientRequestId']] = by_task
+        summary = {'workers': worker_summaries, 'states': {p['clientRequestId']: p['status'] for p in predictions}, 'model_requests': len(calls),
                    'provider_input_tokens': sum(c.get('inputTokens', 0) for c in calls),
                    'provider_output_tokens': sum(c.get('outputTokens', 0) for c in calls),
                    'unknown_usage_requests': sum(c['usageStatus'] == 'unknown' for c in calls),

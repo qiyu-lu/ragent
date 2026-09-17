@@ -151,12 +151,14 @@ public class ResearchRunService {
             Map<String, Object> state = new HashMap<>();
             state.put("promptVersion", ResearchAgentFactory.PROMPT_VERSION);
             state.put("readEvidenceIds", session.delivered().keySet());
+            state.put("acceptedWorkerEvidenceIds", session.acceptedEvidenceIds());
             if (outcome.question() != null) {
                 state.put("question", outcome.question());
                 store.finish(claim, Status.WAITING_INPUT, state, session.budget.snapshot(), null);
             } else {
                 state.put("researchResult", json.convertValue(outcome.result(), Map.class));
-                store.finish(claim, Status.COMPLETED, state, session.budget.snapshot(), null);
+                store.finish(claim, outcome.result().status() == com.nageoffer.ai.ragent.research.model.SubtaskResult.Status.PARTIAL
+                        ? Status.PARTIAL : Status.COMPLETED, state, session.budget.snapshot(), null);
             }
         } catch (Exception error) {
             if (claim != null && session != null) {
@@ -167,9 +169,9 @@ public class ResearchRunService {
                         : cause instanceof java.util.concurrent.TimeoutException ? "RESEARCH_TIMEOUT"
                         : "NATIVE_FINISH_REQUIRED".equals(cause.getMessage()) ? "NATIVE_FINISH_REQUIRED"
                         : cause instanceof java.util.concurrent.CancellationException ? "EXECUTION_CANCELLED" : "RESEARCH_EXECUTION_FAILED";
-                Status status = exhausted && !session.delivered().isEmpty() ? Status.PARTIAL : Status.FAILED;
+                Status status = (exhausted && !session.citableIds().isEmpty() || !session.acceptedEvidenceIds().isEmpty()) ? Status.PARTIAL : Status.FAILED;
                 Map<String, Object> state = Map.of("researchResult", json.convertValue(session.partial(reason), Map.class),
-                        "readEvidenceIds", session.delivered().keySet(), "promptVersion", ResearchAgentFactory.PROMPT_VERSION);
+                        "readEvidenceIds", session.delivered().keySet(), "acceptedWorkerEvidenceIds", session.acceptedEvidenceIds(), "promptVersion", ResearchAgentFactory.PROMPT_VERSION);
                 store.finish(claim, status, state, session.budget.snapshot(), reason);
             }
         } finally {

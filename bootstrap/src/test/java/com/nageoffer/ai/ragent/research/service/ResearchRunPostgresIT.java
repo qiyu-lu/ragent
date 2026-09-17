@@ -28,6 +28,7 @@ import com.nageoffer.ai.ragent.research.model.ResearchRun.Status;
 import com.nageoffer.ai.ragent.research.model.SubtaskResult;
 import com.nageoffer.ai.ragent.research.runtime.ResearchRunner;
 import com.nageoffer.ai.ragent.research.runtime.ResearchSession;
+import com.nageoffer.ai.ragent.research.runtime.ResearchBudget;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -39,6 +40,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -239,6 +241,91 @@ class ResearchRunPostgresIT {
             assertThrows(ClientException.class, () -> service.create(new ResearchRunService.CreateRequest("foreign", "foreign", "compare", ResearchBrief.OutputType.REPORT, List.of(), List.of(kb), List.of())));
             assertThrows(ClientException.class, () -> service.create(new ResearchRunService.CreateRequest(conversation, "scope", "compare", ResearchBrief.OutputType.REPORT, List.of(), List.of(kb), List.of("outside"))));
         } finally { service.close(); }
+    }
+
+    @Test
+    void subtaskCheckpointsAreFencedIdempotentAndRetainedAfterCancellation() {
+        var run = run();
+        var claim = claim(run);
+        var completed = Map.<String, Object>of("status", "COMPLETED", "result", Map.of("taskId", "worker-1", "findings", List.of(), "gaps", List.of("missing")), "readEvidenceIds", List.of("ev"));
+        assertTrue(store.subtask(claim, "worker-1", completed, "SUBTASK_COMPLETED", Map.of("workersCreated", 2)));
+        assertFalse(store.subtask(claim, "worker-1", completed, "SUBTASK_COMPLETED", Map.of()));
+        assertTrue(store.subtask(claim, "worker-2", Map.of("status", "RUNNING"), "SUBTASK_RUNNING", Map.of("workersCreated", 2)));
+        var cancelled = store.cancel(run.id(), owner);
+        var tasks = (Map<String, Map<String, Object>>) cancelled.state().get("subtasks");
+        assertEquals("COMPLETED", tasks.get("worker-1").get("status"));
+        assertEquals("CANCELLED", tasks.get("worker-2").get("status"));
+        assertFalse(store.subtask(claim, "worker-2", completed, "SUBTASK_COMPLETED", Map.of()));
+        assertTrue(store.events(run.id(), owner, 0, 500).stream().anyMatch(e -> e.taskId().equals("worker-1")));
+        assertEquals(1, store.events(run.id(), owner, 0, 500).stream().filter(e -> e.type().equals("SUBTASK_COMPLETED")).count());
+    }
+
+    @Test
+    void inputResumeRetainsWorkerCountAndValidatedFindingsWithoutReplayingHistory() {
+        var run = run();
+        var old = claim(run);
+        var result = new SubtaskResult("worker-1", List.of(new SubtaskResult.Finding("7 ms under condition X", List.of("ev"))), List.of(), List.of(), SubtaskResult.Status.COMPLETED);
+        var usage = Map.<String, Object>of("workersCreated", 2, "modelCalls", 6, "toolCalls", 6);
+        assertTrue(store.subtask(old, "worker-1", Map.of("status", "COMPLETED", "task", Map.of("goal", "completed goal"),
+                "result", json.convertValue(result, Map.class), "readEvidenceIds", List.of("ev")), "SUBTASK_COMPLETED", usage));
+        assertTrue(store.finish(old, Status.WAITING_INPUT, Map.of("question", "Budget?"), usage, null));
+        var waiting = store.get(run.id(), owner);
+        var queued = store.input(run.id(), owner, waiting.revision(), "500 annotations");
+        var fresh = claim(queued);
+        assertTrue(fresh.run().epoch() > old.run().epoch());
+        var session = new ResearchSession(store, fresh, new ResearchBudget(new ResearchProperties(), fresh.run().usage()),
+                new com.nageoffer.ai.ragent.research.runtime.ResearchControl());
+        session.restoreResults(json);
+        assertEquals(Set.of("ev"), session.citableIds());
+        assertTrue(session.delivered().isEmpty());
+        assertEquals(6, session.budget.snapshot().get("modelCalls"));
+        var task = new com.nageoffer.ai.ragent.research.runtime.ResearchTask("follow up", List.of("dimension"), "findings", List.of());
+        assertEquals(3, session.reserveTasks(List.of(task)));
+        assertThrows(ClientException.class, () -> session.reserveTasks(List.of(new com.nageoffer.ai.ragent.research.runtime.ResearchTask("completed goal", List.of("dimension"), "findings", List.of()))));
+        assertFalse(store.subtask(old, "worker-2", Map.of("status", "COMPLETED"), "SUBTASK_COMPLETED", usage));
+    }
+
+    @Test
+    void parentEndingAfterBudgetFailureClosesRemainingChildStateAndKeepsCheckpoints() {
+        var run = run();
+        var claim = claim(run);
+        assertTrue(store.subtask(claim, "worker-1", Map.of("status", "RUNNING", "readEvidenceIds", List.of("ev")), "SUBTASK_RUNNING", Map.of("workersCreated", 1)));
+        assertTrue(store.finish(claim, Status.PARTIAL, Map.of("reason", "RUN_DURATION_BUDGET"), Map.of("workersCreated", 1), "RUN_DURATION_BUDGET"));
+        var tasks = (Map<String, Map<String, Object>>) store.get(run.id(), owner).state().get("subtasks");
+        assertEquals("INTERRUPTED", tasks.get("worker-1").get("status"));
+        assertEquals(List.of("ev"), tasks.get("worker-1").get("readEvidenceIds"));
+        assertFalse(store.subtask(claim, "worker-1", Map.of("status", "COMPLETED"), "SUBTASK_COMPLETED", Map.of()));
+    }
+
+    @Test
+    void parallelSessionsPersistMonotonicGlobalUsageAndIndependentTaskCheckpoints() throws Exception {
+        var run = run();
+        var claim = claim(run);
+        var limits = new ResearchProperties();
+        limits.setMaxToolCalls(100);
+        var budget = new ResearchBudget(limits, Map.of());
+        var main = new ResearchSession(store, claim, budget, new com.nageoffer.ai.ragent.research.runtime.ResearchControl());
+        var task = new com.nageoffer.ai.ragent.research.runtime.ResearchTask("goal", List.of("dimension"), "finding", List.of());
+        var a = main.worker("worker-1", task);
+        var b = main.worker("worker-2", task);
+        var executor = Executors.newFixedThreadPool(8);
+        try {
+            var futures = new ArrayList<Future<?>>();
+            for (int i = 0; i < 40; i++) {
+                var worker = i % 2 == 0 ? a : b;
+                futures.add(executor.submit(() -> { budget.acquireTool(); worker.event("TOOL_COUNTED", "count", Map.of()); }));
+            }
+            for (var future : futures) future.get(10, TimeUnit.SECONDS);
+            assertEquals(40, store.get(run.id(), owner).usage().get("toolCalls"));
+            var events = store.events(run.id(), owner, 0, 500);
+            assertEquals(42, events.size());
+            for (int i = 0; i < events.size(); i++) assertEquals(i + 1, events.get(i).sequence());
+            assertEquals(20, events.stream().filter(e -> e.taskId().equals("worker-1")).count());
+            assertTrue(main.checkpoint(a, "RUNNING", null, json));
+            store.interruptOrphans();
+            var saved = (Map<String, Map<String, Object>>) store.get(run.id(), owner).state().get("subtasks");
+            assertEquals("INTERRUPTED", saved.get("worker-1").get("status"));
+        } finally { executor.shutdownNow(); }
     }
 
     private void await(java.util.function.BooleanSupplier condition) throws Exception {

@@ -132,6 +132,11 @@ public class KnowledgeSearchService {
         return List.copyOf(hits);
     }
 
+    public List<String> validateDocumentScope(String runId, String owner, List<String> requested) {
+        ResearchBrief brief = evidenceStore.requireBrief(runId, owner);
+        return resolveDocuments(brief, requested, Set.copyOf(brief.allowedKbIds()));
+    }
+
     private List<String> resolveDocuments(ResearchBrief brief, List<String> requested, Set<String> kbIds) {
         boolean explicit = requested != null && !requested.isEmpty();
         List<String> selected = explicit ? requested : brief.allowedDocIds();

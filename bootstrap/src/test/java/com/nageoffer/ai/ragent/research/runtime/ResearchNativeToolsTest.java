@@ -116,7 +116,7 @@ class ResearchNativeToolsTest {
             JsonNode body = json.readTree(request.getBody().readUtf8());
             assertEquals("fixture-native", body.path("model").asText());
             assertFalse(body.path("enable_thinking").asBoolean(true));
-            assertEquals(4, body.path("tools").size());
+            assertEquals(5, body.path("tools").size());
             assertEquals("required", body.path("tool_choice").asText());
             if (i > 0) {
                 String expected = List.of("search-1", "read-1", "search-2", "read-2").get(i - 1);

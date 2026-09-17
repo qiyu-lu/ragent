@@ -114,12 +114,35 @@ public class ResearchRunStore {
     }
 
     public boolean event(Claim claim, String type, String summary, Map<String, Object> payload, Map<String, Object> usage) {
+        return event(claim, "main", type, summary, payload, usage);
+    }
+
+    public boolean event(Claim claim, String taskId, String type, String summary, Map<String, Object> payload, Map<String, Object> usage) {
         return transactions.execute(tx -> {
             lock(claim.run().id(), claim.owner());
             if (!current(claim)) return false;
             if (usage != null) jdbc.update("UPDATE t_research_run SET usage = ?::jsonb WHERE id = ?",
                     encode(usage), claim.run().id());
-            appendLocked(claim.run().id(), "main", type, summary, payload);
+            appendLocked(claim.run().id(), taskId, type, summary, payload);
+            return true;
+        });
+    }
+
+    /** 子任务快照和事件同一短事务提交；仅父领取仍有效时接收。 */
+    public boolean subtask(Claim claim, String taskId, Map<String, Object> checkpoint,
+                           String type, Map<String, Object> usage) {
+        return transactions.execute(tx -> {
+            lock(claim.run().id(), claim.owner());
+            if (!current(claim)) return false;
+            String previous = jdbc.queryForObject("SELECT state -> 'subtasks' -> ? ->> 'status' FROM t_research_run WHERE id = ?",
+                    String.class, taskId, claim.run().id());
+            if (previous != null && !previous.equals("QUEUED") && !previous.equals("RUNNING")) return false;
+            jdbc.update("""
+                    UPDATE t_research_run SET state = jsonb_set(state, '{subtasks}',
+                        COALESCE(state -> 'subtasks', '{}'::jsonb) || jsonb_build_object(?::text, ?::jsonb)),
+                        usage = ?::jsonb WHERE id = ?
+                    """, taskId, encode(checkpoint), encode(usage), claim.run().id());
+            appendLocked(claim.run().id(), taskId, type, "子任务状态已更新", checkpoint);
             return true;
         });
     }
@@ -128,14 +151,16 @@ public class ResearchRunStore {
                            Map<String, Object> usage, String error) {
         if (status != Status.WAITING_INPUT && !status.terminal()) throw new IllegalArgumentException("无效的研究结束状态");
         return transactions.execute(tx -> {
-            lock(claim.run().id(), claim.owner());
+            ResearchRun run = lock(claim.run().id(), claim.owner());
             if (!current(claim)) return false;
+            Map<String, Object> finishedState = new java.util.LinkedHashMap<>(state);
+            finishedState.putAll(closeSubtasks(run, "INTERRUPTED"));
             jdbc.update("""
                     UPDATE t_research_run SET status = ?, state = state || ?::jsonb, usage = ?::jsonb,
                         error_summary = ?, revision = revision + 1, lease_token = NULL, lease_until = NULL,
                         completed_at = CASE WHEN ? THEN CURRENT_TIMESTAMP ELSE NULL END,
                         update_time = CURRENT_TIMESTAMP WHERE id = ? AND owner_user_id = ?
-                    """, status.name(), encode(state), encode(usage), error, status.terminal(),
+                    """, status.name(), encode(finishedState), encode(usage), error, status.terminal(),
                     claim.run().id(), claim.owner());
             appendLocked(claim.run().id(), "main", status.name(),
                     status == Status.WAITING_INPUT ? "研究等待补充条件" : "研究执行已结束",
@@ -177,8 +202,8 @@ public class ResearchRunStore {
             jdbc.update("""
                     UPDATE t_research_run SET status = 'CANCELLED', epoch = epoch + 1, revision = revision + 1,
                         lease_token = NULL, lease_until = NULL, completed_at = CURRENT_TIMESTAMP,
-                        update_time = CURRENT_TIMESTAMP WHERE id = ? AND owner_user_id = ?
-                    """, id, owner);
+                        state = state || ?::jsonb, update_time = CURRENT_TIMESTAMP WHERE id = ? AND owner_user_id = ?
+                    """, encode(closeSubtasks(run, "CANCELLED")), id, owner);
             appendLocked(id, "main", "CANCEL_REQUESTED", "已请求取消研究及模型连接",
                     Map.of("remoteComputationStopped", "unknown"));
             return get(id, owner);
@@ -220,11 +245,21 @@ public class ResearchRunStore {
                 jdbc.update("""
                         UPDATE t_research_run SET status = 'INTERRUPTED', epoch = epoch + 1, revision = revision + 1,
                             lease_token = NULL, lease_until = NULL, error_summary = 'EXECUTOR_LOST',
-                            completed_at = CURRENT_TIMESTAMP, update_time = CURRENT_TIMESTAMP WHERE id = ?
-                        """, run.id());
+                            completed_at = CURRENT_TIMESTAMP, state = state || ?::jsonb, update_time = CURRENT_TIMESTAMP WHERE id = ?
+                        """, encode(closeSubtasks(run, "INTERRUPTED")), run.id());
                 appendLocked(run.id(), "main", "INTERRUPTED", "执行者已退出，可重新发起研究", Map.of());
             });
         }
+    }
+
+    private Map<String, Object> closeSubtasks(ResearchRun run, String status) {
+        Map<String, Object> closed = new java.util.LinkedHashMap<>();
+        if (run.state().get("subtasks") instanceof Map<?, ?> tasks) tasks.forEach((id, value) -> {
+            Map<String, Object> task = new java.util.LinkedHashMap<>((Map<String, Object>) value);
+            if ("RUNNING".equals(task.get("status")) || "QUEUED".equals(task.get("status"))) task.put("status", status);
+            closed.put(id.toString(), task);
+        });
+        return closed.isEmpty() ? Map.of() : Map.of("subtasks", closed);
     }
 
     public void rejectQueued(String id, String owner) {

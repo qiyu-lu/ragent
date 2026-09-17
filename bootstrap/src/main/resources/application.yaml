@@ -187,6 +187,10 @@ research:
   max-concurrent-runs: 2
   queue-capacity: 32
   max-concurrent-model-calls: 2
+  max-concurrent-workers: 2
+  max-total-workers: 4
+  max-worker-model-calls: 6
+  worker-timeout-seconds: 180
   max-model-calls: 16
   max-tool-calls: 24
   max-duration-seconds: 300

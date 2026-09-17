@@ -1,6 +1,6 @@
 # 统一研究 Agent 与计划草稿改造实施计划
 
-> 制定日期：2026-09-17。实施状态：P0—P3 已完成。P2 完成四个训练/开发 split 的真实幂等导入和 search/read 验收；P3 完成 AgentScope 2.0.1 原生工具、单研究任务服务与接口、预算/取消/epoch 保护及真实模型联调。当前返回结构化研究摘要，完整报告/计划产物与页面在 P5/P6 接续；P4—P8 未开始。本轮按用户允许的任务量先完成 P3。当前进度与验证边界见[执行记录](agentic-research-execution-log.md)和[验证报告](agentic-research-validation-report.md)。
+> 制定日期：2026-09-17。实施状态：P0—P4 已完成。P2 完成真实语料摄取；P3 接入原生工具、运行服务和预算/取消/epoch；P4 接入主 Agent 委派、独立 worker、专用线程池与共享额度，完成真实比较/计划复测、补查与并行取消验证。当前仍返回结构化研究摘要，完整报告/计划产物和页面从 P5/P6 接续；P5—P8 未开始。当前进度与验证边界见[执行记录](agentic-research-execution-log.md)和[验证报告](agentic-research-validation-report.md)。
 >
 > 本文件是后续实施的主要交接入口。它记录本轮已经确定的产品方向、技术选择、删除范围、数据准备、阶段提交和验证方式。后续无需重新阅读完整聊天，也不要重新把方向改回送检助手。
 >
@@ -403,6 +403,8 @@ P2 第三批已新增 [eval/agentic-research/](../../eval/agentic-research/READM
 
 ### P4：主 Agent 委派与有限多 Agent
 
+**当前状态（2026-09-17）：已完成。** `conduct_research` 批量委派明确子目标/维度/返回要求，仅主 Agent 可用。worker 拥有独立 Toolkit、上下文、已读证据与取消信号，专用池最多 2 个并行、每个运行累计最多 4 个、只允许一层委派。全部角色共用模型/工具/活动时长预算与模型并发配额，worker 最多 6 次模型请求并为主整合和后续生成保留额度。子任务结果/已读证明/事件由父 epoch 保护；失败、超时、重复回调和迟到返回不会覆盖其他成功结果。真实联调保留 A 批负结果；worker-v2 的比较和 PLAN 复测完成，补查压力样例两名 worker 均阅读后补查，其中一名预算退出，主结果 PARTIAL 且保留另一名发现；并行取消和串行多跳路径已验证。最新 165 个定向测试通过，质量评分与完整产物尚未执行。
+
 **工作：**
 
 - 增加 conduct_research 和独立子 Agent 上下文；支持最多两个研究者同时工作。
@@ -600,7 +602,7 @@ npm --prefix frontend run build
 | P1 退役旧业务 | 已完成 | a1b61d7；见执行记录与验证报告 |
 | P2 数据与工具 | 已完成：证据工具、转换抽样、完整训练/开发摄取及真实联调 | 4b8a328、365d3e4、943c11a、4b06f21；验收见执行记录 |
 | P3 单研究运行 | 已完成：原生工具、持久化运行闭环与真实联调 | `feat: implement bounded research runs with native tool calls`；见执行记录与验证报告 |
-| P4 多 Agent | 未开始 | — |
+| P4 多 Agent | 已完成 | conduct_research、2/4 worker 限制、隔离上下文与共享额度；真实复测和 165 个定向测试；见[执行记录](agentic-research-execution-log.md) |
 | P5 报告与计划 | 未开始 | — |
 | P6 前端整合 | 未开始 | — |
 | P7 对照与可靠性 | 未开始 | — |

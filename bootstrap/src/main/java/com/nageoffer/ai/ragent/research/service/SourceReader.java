@@ -47,11 +47,18 @@ public class SourceReader {
     }
 
     public SourceReadResult read(String runId, String ownerUserId, String evidenceId, ReadMode mode) {
+        return read(runId, ownerUserId, evidenceId, mode, List.of());
+    }
+
+    public SourceReadResult read(String runId, String ownerUserId, String evidenceId, ReadMode mode, List<String> narrowedDocs) {
         var brief = evidenceStore.requireBrief(runId, ownerUserId);
         if (mode == null) {
             throw new ClientException("原文展开模式不能为空");
         }
         var snapshot = evidenceStore.find(runId, ownerUserId, evidenceId);
+        if (narrowedDocs != null && !narrowedDocs.isEmpty() && !narrowedDocs.contains(snapshot.evidence().docId())) {
+            throw new ClientException("证据超出子任务文档范围");
+        }
         validateSnapshot(snapshot);
         if (mode == ReadMode.CHUNK || snapshot.evidence().chunkIds().size() > 1) {
             return readPinned(brief, ownerUserId, snapshot, evidenceId, null);

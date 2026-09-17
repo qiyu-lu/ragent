@@ -22,22 +22,29 @@ import reactor.core.publisher.Sinks;
 
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /** Reactor 取消信号会一直传播到 SDK 的 JDK HTTP future 和响应 socket。 */
 public class ResearchControl {
     private final AtomicBoolean cancelled = new AtomicBoolean();
     private final Sinks.One<Boolean> signal = Sinks.one();
-    private volatile Runnable interrupt = () -> { };
+    private final CopyOnWriteArrayList<Runnable> interrupts = new CopyOnWriteArrayList<>();
 
-    public void bindInterrupt(Runnable callback) {
-        interrupt = callback;
-        if (cancelled.get()) callback.run();
+    public AutoCloseable bindInterrupt(Runnable callback) {
+        AtomicBoolean invoked = new AtomicBoolean();
+        Runnable once = () -> { if (invoked.compareAndSet(false, true)) callback.run(); };
+        interrupts.add(once);
+        if (cancelled.get()) once.run();
+        return () -> interrupts.remove(once);
     }
 
     public void cancel() {
         if (cancelled.compareAndSet(false, true)) {
             signal.tryEmitValue(true);
-            interrupt.run();
+            for (Runnable callback : interrupts) {
+                try { callback.run(); } catch (RuntimeException ignored) { /* 继续取消其他 worker */ }
+            }
+            interrupts.clear();
         }
     }
 

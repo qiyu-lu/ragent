@@ -66,6 +66,33 @@ class ResearchBudgetTest {
     }
 
     @Test
+    void workersShareAtomicCallsAndCountAcrossResumeWhileKeepingMainAndFinalReserve() throws Exception {
+        var limits = new ResearchProperties();
+        limits.setMaxModelCalls(8);
+        var budget = new ResearchBudget(limits, Map.of());
+        assertEquals(1, budget.acquireWorkers(2));
+        var resumed = new ResearchBudget(limits, budget.snapshot());
+        assertEquals(3, resumed.acquireWorkers(2));
+        assertThrows(ResearchBudget.Exhausted.class, () -> resumed.acquireWorkers(1));
+        var pool = Executors.newFixedThreadPool(8);
+        var accepted = new AtomicInteger();
+        try {
+            for (int i = 0; i < 30; i++) pool.submit(() -> {
+                try { resumed.acquireWorkerModel(); accepted.incrementAndGet(); }
+                catch (ResearchBudget.Exhausted expected) { }
+            });
+            pool.shutdown();
+            assertTrue(pool.awaitTermination(10, TimeUnit.SECONDS));
+            assertEquals(5, accepted.get());
+            resumed.acquireModel(false);
+            assertThrows(ResearchBudget.Exhausted.class, resumed::acquireWorkerModel);
+            resumed.acquireModel(true);
+            resumed.acquireModel(true);
+            assertEquals(8, resumed.snapshot().get("modelCalls"));
+        } finally { pool.shutdownNow(); }
+    }
+
+    @Test
     void activeDurationIncludesEarlierExecutionsAndInvalidConfigFails() {
         var limits = new ResearchProperties();
         var budget = new ResearchBudget(limits, Map.of("activeMillis", 300001));

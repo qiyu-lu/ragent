@@ -1,6 +1,6 @@
 # 统一研究工作流验证报告
 
-日期：2026-09-17。P0—P3 已完成。P2 完成四个完整训练/开发 split 的真实摄取和 search/read 验收；P3 完成原生工具单研究运行、接口、实际 PostgreSQL 竞争验证和真实供应商联调，最新后端回归 149/149。P4 多 Agent、P5 最终报告/计划、P6 页面与 SSE、P7 A/B/C 质量评测尚未完成。本轮按用户允许的任务量先完成 P3。下方按批次保留历史结果，以最新批次说明当前验证边界。
+日期：2026-09-17。P0—P4 已完成。P4 完成原生批量委派、独立 worker、共享额度与取消/epoch；最新后端定向回归 165/165。真实比较和 PLAN 复测完成，补查压力样例返回 PARTIAL 并保留成功子结果；历史失败和取消用量完整保存。P5 最终报告/计划、P6 页面/SSE、P7 A/B/C 质量评测未开始。下方保留各阶段历史批次，最新边界见 P4 节。
 
 ## P0 基线
 
@@ -252,3 +252,27 @@ P3 的 COMPLETED 表示 `state.researchResult` 研究摘要经过已读引用身
 - P3 原生工具、单研究运行器及取消/epoch 已验证；P4 并发 worker、P5 最终 REPORT/PLAN 生成与引用映射、P6 研究 SSE/聊天整合尚未完成。
 
 后续每阶段追加实际结果，保留失败和未运行边界，不以单元测试替代真实模型或页面效果。
+
+
+## P4 实际验证
+
+起始提交 `20b1133`，当前主/worker 模板为 `research-main-v3` / `research-worker-v2`，SDK 2.0.1 不变。实现与重现命令见[执行记录](agentic-research-execution-log.md)和 [eval README](../../eval/agentic-research/README.md)，完整指纹见 [P4 manifest](../../eval/agentic-research/manifests/research-p4-smoke-2026-09-17.json)。本批已获用户付费联调授权。
+
+| 检查 | 实际结果与边界 |
+| --- | --- |
+| clean 构建、定向回归 | 后端 clean package 通过；最新 24 类 165/165，0 失败/错误/跳过，新增 16 个 P4 用例 |
+| 原生 SDK / 本地 HTTP | 2 个 worker 重叠请求，各自 search→read→新 search→read→finish；不同目标/历史隔离，主只见 findings/gaps/conflicts；worker schema 仅 search/read/finish |
+| 共享预算与线程池 | worker 专用池，4 个任务分两波；所有角色同一预算与模型配额，最终 2 次生成和一次主整合预留；恢复保留 worker 累计数，重复/非法任务不启动 |
+| 故障、迟到与取消 | 一个 HTTP 失败不丢弃成功 findings；worker 超时返回结构化缺口、迟到 callable 不提交；父取消使两个实际本地 SDK HTTP 订阅结束；远端停止仍 unknown |
+| PostgreSQL | 父 epoch/归属保护子 checkpoint、终态重复回调拒绝、取消/父提前结束/重启关闭活跃子状态且保留快照；40 个并行事件保持单调全局 usage 和连续序号；人工输入后新 epoch 保留子 findings/读证明/额度 |
+| 引用与范围 | worker 的文档筛选在检索前生效，read 再校验子范围；候选未读不能引用；主接收 worker 已验证引用不等于主读过原文；不验证引用语义支持 |
+| A 真实开发 probe | 比较/PLAN 各 PARTIAL 14 调用，worker 有未读引用且有限修复失败；串行多跳 COMPLETED 11 并有阅读后新搜索；父取消 CANCELLED 3，两个 worker usage unknown；2 次 embedding 超时保留 |
+| B 当前比较/PLAN复测 | worker-v2：COMPLETED 13/14 调用，主分别 4/1 findings；4 个 worker 均 COMPLETED、各 3 个已读 ID。该批没有后续补查，不将它作为补查证明 |
+| C 当前补查压力 | 2 个 worker 均先读、再依观察新搜索，并各保留 2 个已读 ID；一名局部额度退出、另一名返回 2 条 findings；主 PARTIAL 保留成功结果与失败 gaps，全局 14 次探索调用、生成预留未使用 |
+| 付费用量 | 三批 83 个模型请求记录，已知输入 496671 / 输出 22935 token、2 个取消请求 usage unknown；25 个去重 query embedding 请求、23 个已知 total_tokens 共 196、2 个超时 unknown；未核账单或余额 |
+| 构建失败历史 | 缺失 import 和不可变 List 空项检查首次失败均保留；修复后同类测试通过。源码 A 快照保存，B/C 研究源码与当前交付一致 |
+| 未执行 | 无 SQL/前端修改，无完整应用/浏览器 E2E、SSE、最终报告/计划生成或 A/B/C、EM/F1、语义评分；COMPLETED 仅研究摘要形成，不表示完整产物或资料充分 |
+
+原始目录：`local-data/agentic-research/runs/20260917T114900_P4_real_A/`、`20260917T115300_P4_real_B/`、`20260917T115900_P4_real_C/`。验证日志和最新 JUnit XML 归档于 `local-data/agentic-research/runs/20260917T120000_P4_validation/`。v1 失败批次不可覆盖；当前 v2 在有新候选时先要求一次原生 read，之后可以补查，有限修复仍可能预算退出，按 PARTIAL 和 gaps 保留真实状态。
+
+最终静态检查通过：5 份入口 Markdown 的 81 个本地链接/锚点、围栏、whitespace、33 个 P4 变更文件范围、51 份源码/配置/模板与全部原始/归档结果指纹；B/C 当前运行源码一致，P3 原始结果与 `20b1133` 冻结源码未改写。P3 基线的 16 份升级 SQL 保持字节一致，最初基线的 12 份也不变。全批 4 请求和补查单路径 1 请求 dry-run、shell/Python 语法与最终当前源码 clean package 通过。静态程序与检查记录位于 P4 validation 归档，未为这些检查追加付费调用。

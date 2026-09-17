@@ -47,8 +47,8 @@ import java.util.concurrent.Semaphore;
 import java.util.function.Function;
 
 @Component
-public class ResearchAgentFactory implements ResearchRunner {
-    public static final String PROMPT_VERSION = "research-main-v2";
+public class ResearchAgentFactory implements ResearchRunner, AutoCloseable {
+    public static final String PROMPT_VERSION = "research-main-v3";
     private final ResearchModelFactory models;
     private final ResearchProperties properties;
     private final KnowledgeSearchService search;
@@ -57,6 +57,9 @@ public class ResearchAgentFactory implements ResearchRunner {
     private final TokenCounterService tokens;
     private final Semaphore modelQuota;
     private final String prompt;
+    public static final String WORKER_PROMPT_VERSION = "research-worker-v2";
+    private final String workerPrompt;
+    private final ResearchWorkerCoordinator coordinator;
 
     public ResearchAgentFactory(ResearchModelFactory models, ResearchProperties properties,
                                  KnowledgeSearchService search, SourceReader reader, ObjectMapper json,
@@ -69,32 +72,41 @@ public class ResearchAgentFactory implements ResearchRunner {
         this.json = json;
         this.tokens = tokens;
         this.modelQuota = new Semaphore(properties.getMaxConcurrentModelCalls(), true);
-        try (var input = new ClassPathResource("prompts/" + PROMPT_VERSION + ".txt").getInputStream()) {
-            this.prompt = new String(input.readAllBytes(), StandardCharsets.UTF_8);
-        } catch (Exception e) { throw new IllegalStateException("研究提示词读取失败", e); }
+        this.prompt = load(PROMPT_VERSION);
+        this.workerPrompt = load(WORKER_PROMPT_VERSION);
+        this.coordinator = new ResearchWorkerCoordinator(properties, search, this::run, json);
     }
 
     @Override
     public ResearchSession.Outcome run(ResearchSession session) {
         session.check();
         Toolkit tools = new Toolkit(ToolkitConfig.builder().parallel(false).build());
-        tools.registerTool(new ResearchTools(session, search, reader));
+        if (session.main()) {
+            session.restoreResults(json);
+            tools.registerTool(new ResearchTools(session, search, reader));
+            tools.registerTool(coordinator.tools(session));
+        } else tools.registerTool(new ResearchWorkerTools(session, search, reader));
         var context = RuntimeContext.builder().userId(session.claim.owner())
-                .sessionId(session.claim.run().id() + ":" + session.claim.run().epoch()).build();
+                .sessionId(session.claim.run().id() + ":" + session.claim.run().epoch() + ":" + session.taskId).build();
         var model = new BoundedResearchModel(models.create(), session, properties, modelQuota, json, tokens);
-        try (ReActAgent agent = ReActAgent.builder().name("research-main").sysPrompt(prompt)
+        try (ReActAgent agent = ReActAgent.builder().name("research-" + session.taskId).sysPrompt(session.main() ? prompt : workerPrompt)
                 .model(model).toolkit(tools).enableMetaTool(false).enablePendingToolRecovery(false)
                 .maxRetries(1).maxIters(properties.getMaxModelCalls())
                 .modelExecutionConfig(ExecutionConfig.builder().maxAttempts(1)
                         .timeout(Duration.ofSeconds(properties.getMaxDurationSeconds())).build())
                 .toolExecutionConfig(ExecutionConfig.builder().maxAttempts(1)
-                        .timeout(Duration.ofSeconds(properties.getToolTimeoutSeconds())).build())
-                .middleware(new ToolProgress(session)).build()) {
-            session.control.bindInterrupt(() -> agent.interrupt(context));
-            session.event("RESEARCH_STARTED", "正在按目标检索和阅读", Map.of("promptVersion", PROMPT_VERSION, "model", model.getModelName()));
+                        .timeout(Duration.ofSeconds(session.main() ? properties.getMaxDurationSeconds()
+                                : properties.getToolTimeoutSeconds())).build())
+                .middleware(new ToolProgress(session, properties)).build();
+             var cancellation = session.control.bindInterrupt(() -> agent.interrupt(context))) {
+            session.event("RESEARCH_STARTED", "正在按目标检索和阅读", Map.of("promptVersion", session.main() ? PROMPT_VERSION : WORKER_PROMPT_VERSION, "model", model.getModelName()));
             Map<String, Object> saved = new java.util.HashMap<>(session.claim.run().state());
             saved.remove("requestHash");
-            String request = json.writeValueAsString(Map.of("brief", session.claim.run().brief(), "savedResearchState", saved));
+            String request = session.main()
+                    ? json.writeValueAsString(Map.of("brief", session.claim.run().brief(), "savedResearchState", saved))
+                    : json.writeValueAsString(Map.of("task", session.task, "outputType", session.claim.run().brief().outputType(),
+                            "constraints", session.claim.run().brief().constraints(),
+                            "allowedKbIds", session.claim.run().brief().allowedKbIds()));
             var message = Msg.builder().role(MsgRole.USER).textContent(request).build();
             agent.streamEvents(message, context)
                     // 不保存 text/thinking 事件；只留下可回放的工具参数、结果和实际 usage。
@@ -108,9 +120,19 @@ public class ResearchAgentFactory implements ResearchRunner {
         catch (Exception e) { throw new IllegalStateException("研究请求构建失败", e); }
     }
 
+    private static String load(String version) {
+        try (var input = new ClassPathResource("prompts/" + version + ".txt").getInputStream()) {
+            return new String(input.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (Exception e) { throw new IllegalStateException("研究提示词读取失败", e); }
+    }
+
+    @jakarta.annotation.PreDestroy
+    @Override public void close() { coordinator.close(); }
+
     private static class ToolProgress implements MiddlewareBase {
         private final ResearchSession session;
-        ToolProgress(ResearchSession session) { this.session = session; }
+        private final ResearchProperties properties;
+        ToolProgress(ResearchSession session, ResearchProperties properties) { this.session = session; this.properties = properties; }
 
         @Override
         public Flux<AgentEvent> onActing(Agent agent, RuntimeContext context, ActingInput input,
@@ -121,7 +143,11 @@ public class ResearchAgentFactory implements ResearchRunner {
                 session.event("TOOL_STARTED", "正在执行 " + call.getName(),
                         Map.of("toolCallId", call.getId(), "tool", call.getName(), "arguments", call.getInput()));
                 StringBuilder output = new StringBuilder();
-                return next.apply(new ActingInput(java.util.List.of(call))).doOnNext(event -> {
+                var execution = next.apply(new ActingInput(java.util.List.of(call)));
+                if (!"conduct_research".equals(call.getName())) {
+                    execution = execution.timeout(Duration.ofSeconds(properties.getToolTimeoutSeconds()));
+                }
+                return execution.doOnNext(event -> {
                     if (event instanceof ToolResultTextDeltaEvent delta && output.length() < 40000) {
                         output.append(delta.getDelta(), 0, Math.min(delta.getDelta().length(), 40000 - output.length()));
                     }

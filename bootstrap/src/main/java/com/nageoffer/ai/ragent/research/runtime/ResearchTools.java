@@ -30,7 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
 
-/** 只注册这四个工具；run、owner、task 与实际知识库范围均由执行器绑定。 */
+/** 主 Agent 的四个基础工具；run、owner、task 与实际知识库范围均由执行器绑定。 */
 public class ResearchTools {
     private final ResearchSession session;
     private final KnowledgeSearchService search;
@@ -50,8 +50,17 @@ public class ResearchTools {
         return guarded(() -> {
             int count = limit == null ? 5 : limit;
             if (count < 1 || count > 8) throw new ClientException("单次研究检索条数应为 1—8");
-            return search.search(session.claim.run().id(), session.claim.owner(), "main", query,
-                    List.of(), documents, count);
+            List<String> selected = documents;
+            if (!session.main()) {
+                if (documents != null && !documents.isEmpty() && !session.documents().isEmpty()
+                        && !session.documents().containsAll(documents)) throw new ClientException("搜索不能扩大子任务文档范围");
+                if (documents == null || documents.isEmpty()) selected = session.documents();
+            }
+            var hits = search.search(session.claim.run().id(), session.claim.owner(), session.taskId, query,
+                    List.of(), selected, count);
+            session.check();
+            session.candidates(hits.stream().map(com.nageoffer.ai.ragent.research.model.KnowledgeSearchHit::evidenceId).toList());
+            return hits;
         });
     }
 
@@ -59,8 +68,10 @@ public class ResearchTools {
     public Object read(@ToolParam(name = "evidence_id") String id,
                        @ToolParam(name = "mode", required = false) SourceReadResult.ReadMode mode) {
         return guarded(() -> {
-            var result = reader.read(session.claim.run().id(), session.claim.owner(), id,
-                    mode == null ? SourceReadResult.ReadMode.CHUNK : mode);
+            session.requireReadable(id);
+            var readMode = mode == null ? SourceReadResult.ReadMode.CHUNK : mode;
+            var result = session.main() ? reader.read(session.claim.run().id(), session.claim.owner(), id, readMode)
+                    : reader.read(session.claim.run().id(), session.claim.owner(), id, readMode, session.documents());
             session.check();
             session.delivered(result.evidence());
             return result;
@@ -70,6 +81,7 @@ public class ResearchTools {
     @Tool(name = "ask_user", description = "Pause only when a missing USER condition prevents research. Ask one clear question. Missing source information belongs in gaps.")
     public Object ask(@ToolParam(name = "question") String question) {
         return guarded(() -> {
+            if (!session.main()) throw new ClientException("子任务的用户条件问题必须通过 gaps 返回");
             if (question == null || question.isBlank() || question.length() > 2000) {
                 throw new ClientException("必须提出一个长度合理的明确问题");
             }
@@ -78,7 +90,7 @@ public class ResearchTools {
         });
     }
 
-    @Tool(name = "finish_research", description = "Finish with evidence-grounded findings, gaps and conflicts. Each finding must cite IDs actually returned by read_source in this execution. Preserve numbers, units and conditions; never invent missing parameters.")
+    @Tool(name = "finish_research", description = "Finish with evidence-grounded findings, gaps and conflicts. Each finding must cite IDs actually read by this Agent or cited in validated worker results. Preserve numbers, units and conditions; never invent missing parameters.")
     public Object finish(@ToolParam(name = "findings") List<SubtaskResult.Finding> findings,
                          @ToolParam(name = "gaps") List<String> gaps,
                          @ToolParam(name = "conflicts") List<String> conflicts) {
@@ -87,24 +99,32 @@ public class ResearchTools {
                     || gaps.size() > 30 || conflicts.size() > 30 || findings.isEmpty() && gaps.isEmpty()) {
                 throw new ClientException("研究结果必须包含发现或资料缺口，且各项不能超过 30 条");
             }
-            var delivered = session.delivered();
+            var delivered = session.citableIds();
+            if (!session.main() && (findings.size() > 8 || gaps.size() > 8 || conflicts.size() > 8
+                    || findings.stream().mapToInt(f -> f == null || f.statement() == null ? 0 : f.statement().length()).sum()
+                    + java.util.stream.Stream.concat(gaps.stream(), conflicts.stream()).mapToInt(t -> t == null ? 0 : t.length()).sum() > 8000)) {
+                throw new ClientException("子任务压缩结果每类最多 8 条，总文字最多 8000 字符");
+            }
             for (var finding : findings) {
                 if (finding == null || finding.statement() == null || finding.statement().isBlank()
                         || finding.statement().length() > 4000 || finding.evidenceIds() == null
                         || finding.evidenceIds().isEmpty() || finding.evidenceIds().size() > 12) {
                     throw new ClientException("发现必须包含明确陈述与 1—12 个已读证据 ID");
                 }
-                var unread = finding.evidenceIds().stream().filter(id -> !delivered.containsKey(id)).toList();
+                var unread = finding.evidenceIds().stream().filter(id -> !delivered.contains(id)).toList();
                 if (!unread.isEmpty()) {
                     throw new ClientException("以下引用尚未通过本次 read_source 提供：" + unread
-                            + "；已读取的 ID：" + delivered.keySet());
+                            + "；已读取的 ID：" + delivered);
                 }
             }
             if (java.util.stream.Stream.concat(gaps.stream(), conflicts.stream())
                     .anyMatch(text -> text == null || text.isBlank() || text.length() > 4000)) {
                 throw new ClientException("缺口或冲突说明无效");
             }
-            var result = new SubtaskResult("main", findings, gaps, conflicts, SubtaskResult.Status.COMPLETED);
+            var combinedGaps = new java.util.ArrayList<>(gaps);
+            session.workerGaps().stream().filter(g -> !combinedGaps.contains(g)).forEach(combinedGaps::add);
+            var result = new SubtaskResult(session.taskId, findings, combinedGaps, conflicts,
+                    session.workerFailure() ? SubtaskResult.Status.PARTIAL : SubtaskResult.Status.COMPLETED);
             session.conclude(new ResearchSession.Outcome(null, result));
             return result;
         });

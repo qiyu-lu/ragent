@@ -29,6 +29,10 @@ public class ResearchProperties {
     private int maxConcurrentRuns = 2;
     private int queueCapacity = 32;
     private int maxConcurrentModelCalls = 2;
+    private int maxConcurrentWorkers = 2;
+    private int maxTotalWorkers = 4;
+    private int maxWorkerModelCalls = 6;
+    private int workerTimeoutSeconds = 180;
     private int maxModelCalls = 16;
     private int maxToolCalls = 24;
     private int reservedFinalizationModelCalls = 2;
@@ -40,7 +44,9 @@ public class ResearchProperties {
 
     public void validate() {
         if (modelId == null || modelId.isBlank() || maxConcurrentRuns < 1 || queueCapacity < 1
-                || maxConcurrentModelCalls < 1 || maxModelCalls < 1 || maxToolCalls < 1
+                || maxConcurrentModelCalls < 1 || maxConcurrentWorkers < 1 || maxConcurrentWorkers > 2
+                || maxTotalWorkers < 1 || maxTotalWorkers > 4 || maxWorkerModelCalls < 1
+                || workerTimeoutSeconds < 1 || maxModelCalls < 1 || maxToolCalls < 1
                 || reservedFinalizationModelCalls < 0 || reservedFinalizationModelCalls >= maxModelCalls
                 || maxDurationSeconds < 1 || modelCallTimeoutSeconds < 1 || toolTimeoutSeconds < 1
                 || maxInputTokens < 1024 || maxOutputTokens < 1) {

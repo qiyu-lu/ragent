@@ -4,7 +4,7 @@
 
 ## 当前接续点
 
-P0—P3 已完成；P4—P8 未开始。P2 完成四个训练/开发 split 的真实摄取和 search/read 验收；P3 完成 AgentScope 2.0.1 原生工具、带归属/幂等/epoch 的单任务运行服务、预算、追问恢复、取消与接口，并保留真实模型联调和 149 个回归测试记录。本轮按用户允许的任务量先完成 P3。当前结果是结构化研究摘要，完整报告/计划产物、SSE 和聊天页面尚未接入；下一步从 P4 的 conduct_research、独立 worker 上下文与受限并发接续。
+P0—P4 已完成；P5—P8 未开始。P4 已实现主 Agent 批量委派、独立 worker、专用池最多 2 个并行/累计 4 个、共享预算与模型配额、父子取消和 epoch 保护。比较/PLAN 的真实 worker-v2 复测完成；补查压力样例保留成功子结果并按预算返回 PARTIAL，A 批负结果和并行取消记录完整保留。最新定向回归 165/165。当前结果仍是结构化研究摘要，artifact 为空；下一步从 P5 的统一报告/计划生成、引用映射与结构校验接续。
 
 ## P0：基线、分支与接入准备（2026-09-17，已完成）
 
@@ -231,3 +231,51 @@ app 严格类型检查仍有 24 个既有诊断，与 P0 的诊断逐条一致�
 最终静态验收通过：69 个入口本地链接/锚点、Markdown 围栏、全部 P3 文件 whitespace、44 份源码/配置/模板及全部原始结果/检查记录指纹一致；E 批研究源码与当前交付内容一致。P3 起始提交的 16 份升级 SQL 不变，其中最初基线 `a7ef618` 的 12 份历史文件也不变。shell/Python 语法与 5/1 请求的全批/单路径 dry-run 通过，未重复调用付费模型。
 
 下一步从 P4 接续 conduct_research：在现有 run/epoch、证据身份、预算和模型配额上增加独立 worker 上下文与专用线程池，最多 2 个并行研究者、总数 4，仅一层委派；不得分别复制全局额度，也不将子 Agent 完整历史拼回主 Agent。
+
+
+## P4：主 Agent 委派与独立 worker
+
+起始提交 `20b1133`（P3），分支仍为 `feat/agentic-research`，开始时工作区干净。用户明确要求执行 P4，并说明已充值、授权付费联调；本批完成 P4，不继续实现 P5。阶段提交标题为 `feat: orchestrate isolated research workers`，SHA 可通过 Git log 定位，不自动 push/合并。
+
+### 本批实现
+
+- 主 Agent 新增原生 `conduct_research(tasks)`，1—4 个子任务包含目标、1—8 个维度、预期返回和可选文档缩小范围。服务器验证存在/启用/父范围后才原子分配累计 worker 数；相同子目标重复委派返回工具错误，补查使用具体新目标。简单查询和串行依赖继续直接使用检索/阅读工具。
+- worker 使用新的 ReActAgent、Toolkit、RuntimeContext、已读集合和独立取消信号，只注册 search/read/finish。不会接收父或兄弟的完整历史，不能追问用户或再次委派。自己的检索候选才能阅读；缺少用户条件以 gaps 返回。默认专用有界池 2 个线程/32 队列，父任务池独立，防止互相等待；每运行累计最多 4 个 worker，人工输入恢复不重置。
+- 主与子共用同一 ResearchBudget、活动时长、工具额度和全局模型信号量。默认仍是 16 次模型/24 次工具/300 秒，预留 2 次后续生成；worker 每个最多 6 次模型请求、180 秒含排队，另保留一次主 Agent 整合。输入按估算上限裁剪整组往返，主的已验证子摘要保留在系统上下文，不增加总结调用。
+- 主只接收 `SubtaskResult`。worker 结果每类最多 8 条、总文字最多 8000 字符，保留数字、单位、适用条件和读过的证据 ID。主可引用经验证 findings 中的 ID；主自行读取和 worker 引用分别记录为 `readEvidenceIds` / `acceptedWorkerEvidenceIds`，不把接收摘要伪装成主已读原文。失败 gaps 自动合并到主结果并标 PARTIAL；主提前退出仍保留其他 worker 的已验证 findings。
+- `state.subtasks` 保存任务、状态、已读 ID 和压缩结果，完成即短事务提交；事件 taskId 区分主/子，usage 增加 role/taskId/workersCreated。快照与事件写入串行化，防止并行用旧计数覆盖新计数；序号仍由 run 行原子分配。父领取失效、取消、终态重复回调不可写回。人工回复恢复已提交 findings 与读证明，不重放工具历史；重启/父提前结束关闭仍在执行的子状态并保留快照。
+- 父取消信号连接所有子 SDK/HTTP 订阅，worker 超时/失败只结束自身。迟到 callable 返回不经过结果提交回调；关闭已登记的中断句柄，避免取消绑定遗留。仍分别记录取消请求和本地结束，远端是否停止计算保持 unknown。
+
+入口代码：[ResearchWorkerCoordinator](../../bootstrap/src/main/java/com/nageoffer/ai/ragent/research/runtime/ResearchWorkerCoordinator.java)、[ResearchSession](../../bootstrap/src/main/java/com/nageoffer/ai/ragent/research/runtime/ResearchSession.java)、[ResearchAgentFactory](../../bootstrap/src/main/java/com/nageoffer/ai/ragent/research/runtime/ResearchAgentFactory.java)、[ResearchRunStore](../../bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/ResearchRunStore.java)。主提示词为 `research-main-v3`，当前 worker 为 `research-worker-v2`；v1 保留用于 A 批回放。SDK 仍锁定 AgentScope Java 2.0.1，无依赖升级、SQL/前端变更或新权限体系。
+
+### 实际验证
+
+```bash
+./mvnw -o -pl bootstrap -am -DskipTests clean package
+P4_TESTS=ResearchRunPostgresIT,ResearchWorkerCoordinatorTest,ResearchWorkerNativeTest,ResearchNativeToolsTest,ResearchBudgetTest,ResearchRunControllerTest,ResearchEvidenceToolsTest,ResearchEvidenceStoreTest,MultiChannelRetrievalEngineTest,RetrievalScopeResolverTest,VectorSearchChannelTest,KeywordSearchChannelTest,PgVectorRetrieverServiceTest,MilvusVectorRetrieverServiceTest,EsKeywordRetrieverServiceTest,RetrievalEngineTest,StreamChatPipelineTest,IngestionTaskServiceImplTest,TableChunkerTest,WorkbookDiffServiceTest,TaskTemplateGeneratorTest,IronOreTaskTemplateServiceTest,TaskTemplateValidatorTest,StreamTaskManagerCancelTraceTest bash scripts/validate-agentic-research-p4.sh
+python3 eval/agentic-research/smoke_research.py --phase p4 --run-dir local-data/agentic-research/runs/<new-id>
+python3 eval/agentic-research/smoke_research.py --phase p4 --case comparison-workers --case plan-workers --run-dir local-data/agentic-research/runs/<new-id> --execute
+python3 eval/agentic-research/smoke_research.py --phase p4 --case follow-up-workers --run-dir local-data/agentic-research/runs/<new-id> --execute
+```
+
+后端 clean package 通过。最终 24 个类、165 个用例，0 失败/错误/跳过；相对 P3 新增 16 个。真实 SDK + 本地 HTTP 桩证明 2 个 worker 重叠执行、各自阅读和补查、schema 无 ask/conduct、主只收到压缩结果、单 worker HTTP 失败保留另一名 findings、两个在途 HTTP 订阅随父取消而结束。专用池/预算测试覆盖 4 个任务分两波、跨恢复累计数、全局原子额度与主/生成预留、文档越界/未读引用拒绝、超时后忽略中断的迟到返回。PostgreSQL 新增子状态/重复完成/取消、单调 usage/连续序号、父提前结束、人工回复后新 epoch 复用 findings 与累计额度验证，保留 P3 的竞争/归属回归。
+
+首次扩展测试缺少 import，修正后发现不可变 List 的 contains(null) 会抛 NPE，改为流式空项校验；失败与清理日志保留。v2 增加“一次新检索后先读一条，再允许补查”的原生 ToolChoice 和实时已读 ID 提醒，已用协议测试验证；重复已读候选不会强制再读，仍未读的其他候选不会被冒充为已读。
+
+### 付费开发联调（不是架构 A/B/C 或质量评分）
+
+全部使用 `qwen3.7-flash-2026-07-15`、thinking=false；真实 PGVector + SiliconFlow query embedding，语料只读，运行写随机隔离库后删除。只读 queries，不用 gold 拆任务/选支持文档。比较样例使用两份不同 QASPER 文档，docId 从来源映射替换；PLAN 与补查样例使用同一论文的不同研究维度。
+
+| 批次 / 本地目录 | 真实结果 | 模型请求记录 | 已知输入 / 输出 token | 模型 usage unknown |
+| --- | --- | --- | --- | --- |
+| A：`20260917T114900_P4_real_A` | 比较 PARTIAL 14；PLAN PARTIAL 14；串行多跳 COMPLETED 11 且阅读后新查询；并行取消 CANCELLED 3，两个 worker 在途请求本地取消 | 42 | 297590 / 11627 | 2 |
+| B：`20260917T115300_P4_real_B` | v2 受影响路径复测：比较 COMPLETED 13、4 findings；PLAN COMPLETED 14、1 finding。四个 worker 均 COMPLETED、各读 3 个 ID；该批没有额外补查 | 27 | 121346 / 7662 | 0 |
+| C：`20260917T115900_P4_real_C` | 当前 v2 补查压力：两个 worker 均读 2 个 ID 后补查；一名因局部模型额度退出 PARTIAL，另一名 COMPLETED，主 PARTIAL、保留其 2 条 findings 和失败 gaps | 14 | 77735 / 3646 | 0 |
+
+A 的 worker 连续检索后尝试引用未读候选，有限修复仍未闭环；两次 embedding 请求超时也保留，不归因为余额告警。v2 增加阅读节奏、schema 的 1—8 limit 描述、当前可引用 ID、用户条件无需出现在文档中的提醒，并让预算失败 gaps 明确实际已读数量。未放宽引用身份检查或追加全局额度。A 的精确 Java/配置/模板源码已留在该目录 source-snapshot；B/C 的研究源码、配置和当前模板与交付内容一致。
+
+本批共 **83 个模型请求记录，已知输入 496671 / 输出 22935 token，2 个取消请求 usage unknown**。query embedding 按 call_id 去重后 **25 个请求**，23 个已知 total_tokens 合计 196，2 个超时 usage unknown。金额、余额、缓存折扣和未知请求是否计费未核对账单，不能把它们当作正式每题成本或效果提升。原始结果位于 `local-data/agentic-research/runs/`，精简指纹见 [P4 清单](../../eval/agentic-research/manifests/research-p4-smoke-2026-09-17.json)。
+
+仍采用单 JVM，不恢复中间 token，不执行最终生成/页面/SSE，也未启动完整 Web 服务/浏览器 E2E 或运行 A/B/C、EM/F1、语义支持评分。COMPLETED 只表示研究摘要通过引用身份检查，B 的 PLAN 不代表完整计划 JSON 或条件已齐。下一步 P5 从 brief + 主/子 findings + 已读快照生成统一报告/计划，使用预留额度，校验结构和最终引用映射；P4 成功子结果和失败 gaps 都应进入生成输入。
+
+最终静态检查通过：5 份入口 Markdown 的 81 个本地链接/锚点、围栏、whitespace、33 个 P4 变更文件范围、51 份源码/配置/模板与全部原始/归档结果指纹；B/C 当前运行源码一致，P3 原始结果与 `20b1133` 冻结源码未改写。P3 基线的 16 份升级 SQL 保持字节一致，最初基线的 12 份也不变。全批 4 请求和补查单路径 1 请求 dry-run、shell/Python 语法与最终当前源码 clean package 通过。静态程序与检查记录位于 P4 validation 归档，未为这些检查追加付费调用。

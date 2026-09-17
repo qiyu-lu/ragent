@@ -65,12 +65,21 @@ public class BoundedResearchModel implements Model {
         return Flux.defer(() -> {
             session.check();
             List<Msg> withBudget = new ArrayList<>(messages);
-            int remainingCalls = properties.getMaxModelCalls() - properties.getReservedFinalizationModelCalls()
-                    - ((Number) session.budget.snapshot().get("modelCalls")).intValue() - 1;
+            int remainingCalls = session.remainingModelCalls(properties.getMaxWorkerModelCalls()) - 1;
             String reminder = "Server budget reminder: after this request "
                     + remainingCalls + " exploration model calls remain. When at most 2 remain, stop opening new searches, "
                     + "read only indispensable evidence and call finish_research with already-read findings and explicit gaps. "
                     + "Do not spend the finalization reserve. Missing source facts must remain gaps.";
+            if (session.main() && !session.results().isEmpty()) {
+                try { reminder += "\nValidated compressed worker results (read proof checked by server): "
+                        + json.writeValueAsString(session.results()); }
+                catch (com.fasterxml.jackson.core.JsonProcessingException error) { throw new IllegalStateException("子任务摘要序列化失败", error); }
+            } else if (!session.main()) {
+                reminder += "\nOnly these IDs have actually been read by this worker and may be cited: " + session.citableIds()
+                        + ". Unread IDs from the latest search: " + session.unreadCandidates()
+                        + ". Read immediately after a search, before opening another search. When forced to finish, use ONLY the read IDs;"
+                        + " omit unsupported findings and describe gaps. Do not attach a read ID to a fact only seen in another candidate.";
+            }
             // 兼容端点通常只可靠处理开头的系统指令，不在工具结果后追加第二条 system。
             if (!withBudget.isEmpty() && withBudget.get(0).getRole() == MsgRole.SYSTEM) {
                 withBudget.set(0, Msg.builder().role(MsgRole.SYSTEM)
@@ -90,14 +99,14 @@ public class BoundedResearchModel implements Model {
             }
             try {
                 session.check();
-                session.budget.acquireModel(false);
+                session.acquireModel(properties.getMaxWorkerModelCalls());
             } catch (RuntimeException e) {
                 quota.release();
                 return Flux.error(e);
             }
             try {
                 String id = UUID.randomUUID().toString();
-                session.budget.startCall(id, getModelName(), estimate(trimmed, tools));
+                session.budget.startCall(id, getModelName(), estimate(trimmed, tools), session.main() ? "main" : "worker", session.taskId);
                 session.event("MODEL_STARTED", "正在调用研究模型", Map.of("callId", id, "model", getModelName()));
                 AtomicReference<ChatUsage> usage = new AtomicReference<>();
                 AtomicReference<String> requestId = new AtomicReference<>();
@@ -118,7 +127,9 @@ public class BoundedResearchModel implements Model {
                 return Flux.defer(() -> {
                             session.check();
                             // 研究状态只能由原生工具终止；不要让 auto 模式的纯文本绕过终止契约。
-                            ToolChoice choice = remainingCalls <= 1 ? new ToolChoice.Specific("finish_research") : new ToolChoice.Required();
+                            ToolChoice choice = session.remainingModelCalls(properties.getMaxWorkerModelCalls()) <= 1 ? new ToolChoice.Specific("finish_research") : new ToolChoice.Required();
+                            if (!session.main() && session.remainingModelCalls(properties.getMaxWorkerModelCalls()) > 1
+                                    && session.requiresRead()) choice = new ToolChoice.Specific("read_source");
                             GenerateOptions effective = tools == null || tools.isEmpty() ? options
                                     : GenerateOptions.mergeOptions(GenerateOptions.builder().toolChoice(choice).build(), options);
                             return delegate.stream(trimmed, tools, effective);

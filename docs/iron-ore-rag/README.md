@@ -19,6 +19,7 @@
 
 | 任务 | 文档 |
 | --- | --- |
+| 用中文业务描述复习主要流程，减少类名、表名和配置细节 | [面试流程精简笔记](flow-notes/00-interview-summary.md) |
 | 不打开源码复习上游特色、完整业务链、重点改进、技术概念与面试追问 | [项目复习主讲义](project-study-guide.md) |
 | 了解项目与量化结果 | [仓库首页](../../README.md) |
 | 重建本地环境 | [阶段 0：本地基线复现](stages/00-reproduction.md) → [开发栈改动说明](changes/2026-08-12-reproducible-local-development-stack.md) |

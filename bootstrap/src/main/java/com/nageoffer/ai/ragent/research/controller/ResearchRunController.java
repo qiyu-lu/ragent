@@ -42,6 +42,16 @@ public class ResearchRunController {
         return Results.success(service.create(request));
     }
 
+    @GetMapping
+    public Result<List<ResearchRun>> list(@RequestParam String conversationId) {
+        return Results.success(service.list(conversationId));
+    }
+
+    @PostMapping("/{runId}/regenerate")
+    public Result<ResearchRun> regenerate(@PathVariable String runId, @Valid @RequestBody RegenerateRequest request) {
+        return Results.success(service.regenerate(runId, request.clientRequestId()));
+    }
+
     @GetMapping("/{runId}")
     public Result<ResearchRun> get(@PathVariable String runId) { return Results.success(service.get(runId)); }
 
@@ -62,4 +72,5 @@ public class ResearchRunController {
     public Result<ResearchRun> cancel(@PathVariable String runId) { return Results.success(service.cancel(runId)); }
 
     public record InputRequest(@Min(0) long revision, @NotBlank @Size(max = 10000) String answer) { }
+    public record RegenerateRequest(@NotBlank @Size(max = 128) String clientRequestId) { }
 }

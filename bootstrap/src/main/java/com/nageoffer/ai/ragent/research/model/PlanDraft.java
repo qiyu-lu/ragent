@@ -15,10 +15,15 @@
  * limitations under the License.
  */
 
-package com.nageoffer.ai.ragent.ironore.dao.mapper;
+package com.nageoffer.ai.ragent.research.model;
 
-import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.nageoffer.ai.ragent.ironore.dao.entity.IronOreTaskTemplateDO;
+import java.util.List;
 
-public interface IronOreTaskTemplateMapper extends BaseMapper<IronOreTaskTemplateDO> {
+/** 可核对的草稿；缺失参数保留 null，不包含审批或执行状态。 */
+public record PlanDraft(List<Requirement> prerequisites, List<Step> steps,
+                        List<Requirement> resources, List<Requirement> cautions,
+                        List<String> pendingItems) {
+    public record Requirement(String text, List<String> evidenceIds) { }
+    public record Step(Integer order, String action, List<String> evidenceIds, List<Parameter> parameters) { }
+    public record Parameter(String name, String value, String unit, List<String> evidenceIds) { }
 }

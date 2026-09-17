@@ -66,7 +66,7 @@ import java.util.concurrent.*;
 public class ResearchRunCommand {
     public record Case(String id, String collection, List<String> sourceDocumentIds, String goal,
                         ResearchBrief.OutputType outputType, long cancelAfterMillis, String reply, Boolean cancelWhenWorkersRunning) { }
-    public record Job(String runDir, List<Case> cases) { }
+    public record Job(String runDir, List<Case> cases, Boolean generateArtifacts) { }
     @Configuration(proxyBeanMethods = false)
     @EnableTransactionManagement
     static class Transactions { }
@@ -140,7 +140,10 @@ public class ResearchRunCommand {
                     new RetrievalScopeResolver(searchProperties, new KbCollectionProvider(bases)), retrieval, searchProperties);
             var search = new KnowledgeSearchService(engine, bases, docs, catalog, evidence, JSON);
             var reader = new SourceReader(evidence, catalog, new EvidenceSnapshotFactory(JSON));
-            try (var runner = new ResearchAgentFactory(new ResearchModelFactory(models, properties), properties, search, reader, JSON, new HeuristicTokenCounterService())) {
+            var modelFactory = new ResearchModelFactory(models, properties);
+            var finalization = Boolean.TRUE.equals(job.generateArtifacts()) ? new ResearchCompletionService(store,
+                    new ResearchArtifactGenerator(modelFactory, properties, evidence, new PlanDraftValidator(), JSON, new HeuristicTokenCounterService()), JSON) : null;
+            try (var runner = new ResearchAgentFactory(modelFactory, properties, search, reader, JSON, new HeuristicTokenCounterService())) {
             for (Case example : job.cases()) {
                 String kb = corpusJdbc.queryForObject("SELECT id FROM t_knowledge_base WHERE collection_name = ? AND deleted = 0", String.class, example.collection());
                 List<String> documents = new ArrayList<>();
@@ -150,11 +153,11 @@ public class ResearchRunCommand {
                 for (int i = 0; i < documents.size(); i++) goal = goal.replace("[[DOC_" + i + "]]", documents.get(i));
                 var brief = new ResearchBrief(goal, example.outputType(), List.of(), List.of(kb), documents);
                 var run = store.create("p3-real-smoke", "p3-smoke", example.id(), brief);
-                execute(store, runner, run, properties, example.cancelAfterMillis(), Boolean.TRUE.equals(example.cancelWhenWorkersRunning()), cancels);
+                execute(store, runner, finalization, run, properties, example.cancelAfterMillis(), Boolean.TRUE.equals(example.cancelWhenWorkersRunning()), cancels);
                 run = store.get(run.id(), "p3-real-smoke");
                 if (run.status() == ResearchRun.Status.WAITING_INPUT && example.reply() != null) {
                     run = store.input(run.id(), "p3-real-smoke", run.revision(), example.reply());
-                    execute(store, runner, run, properties, 0, false, cancels);
+                    execute(store, runner, finalization, run, properties, 0, false, cancels);
                     run = store.get(run.id(), "p3-real-smoke");
                 }
                 append(predictions, run);
@@ -168,7 +171,7 @@ public class ResearchRunCommand {
         } finally { retrieval.shutdownNow(); cancels.shutdownNow(); }
     }
 
-    private static void execute(ResearchRunStore store, ResearchRunner runner, ResearchRun run,
+    private static void execute(ResearchRunStore store, ResearchRunner runner, ResearchCompletionService finalization, ResearchRun run,
                                  ResearchProperties properties, long cancelAfterMillis, boolean cancelWhenWorkersRunning, ScheduledExecutorService cancels) {
         var claim = store.claim(run.id(), "p3-real-smoke", Duration.ofSeconds(properties.getMaxDurationSeconds() + 30L)).orElseThrow();
         var session = new ResearchSession(store, claim, new ResearchBudget(properties, run.usage()), new ResearchControl());
@@ -188,6 +191,10 @@ public class ResearchRunCommand {
         }, cancelAfterMillis, TimeUnit.MILLISECONDS) : null;
         try {
             var outcome = runner.run(session);
+            if (finalization != null) {
+                finalization.complete(session, outcome, null);
+                return;
+            }
             Map<String, Object> state = new HashMap<>();
             state.put("readEvidenceIds", session.delivered().keySet());
             state.put("acceptedWorkerEvidenceIds", session.acceptedEvidenceIds());
@@ -198,6 +205,10 @@ public class ResearchRunCommand {
                             ? ResearchRun.Status.PARTIAL : ResearchRun.Status.COMPLETED,
                     state, session.budget.snapshot(), null);
         } catch (RuntimeException e) {
+            if (finalization != null) {
+                finalization.researchFailed(session, e);
+                return;
+            }
             Throwable root = e;
             while (root.getCause() != null && !(root instanceof ResearchBudget.Exhausted)) root = root.getCause();
             String reason = root instanceof ResearchBudget.Exhausted ? root.getMessage()

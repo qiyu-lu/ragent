@@ -1,6 +1,6 @@
 # 统一研究 Agent 与计划草稿改造实施计划
 
-> 制定日期：2026-09-17。实施状态：P0—P4 已完成。P2 完成真实语料摄取；P3 接入原生工具、运行服务和预算/取消/epoch；P4 接入主 Agent 委派、独立 worker、专用线程池与共享额度，完成真实比较/计划复测、补查与并行取消验证。当前仍返回结构化研究摘要，完整报告/计划产物和页面从 P5/P6 接续；P5—P8 未开始。当前进度与验证边界见[执行记录](agentic-research-execution-log.md)和[验证报告](agentic-research-validation-report.md)。
+> 制定日期：2026-09-17。实施状态：P0—P5 已实现。P5 接入统一 REPORT/PLAN 生成、有限修复、结构与引用校验及产物原子落库；160 个程序回归通过。P5 真实供应商联调因自动审批拒绝尚未执行，不能作为质量通过；P6—P8 未开始。当前进度与验证边界见[执行记录](agentic-research-execution-log.md)和[验证报告](agentic-research-validation-report.md)。
 >
 > 本文件是后续实施的主要交接入口。它记录本轮已经确定的产品方向、技术选择、删除范围、数据准备、阶段提交和验证方式。后续无需重新阅读完整聊天，也不要重新把方向改回送检助手。
 >
@@ -53,8 +53,8 @@
 | [LLMService](../../infra-ai/src/main/java/com/nageoffer/ai/ragent/infra/chat/LLMService.java) | chat 返回字符串，另有流式回答接口 | 普通问答继续用；研究分支使用原生工具调用模型适配 |
 | [原 TaskAgentController（P1 已退役）](agentic-research-execution-log.md) | 制定时为独立送检、样品、工位、任务推进与确认入口 | 整条业务链退役；历史源码见起始提交 |
 | [原 TaskAgentStore（P1 已退役）](agentic-research-execution-log.md) | 制定时已有归属、短事务、租约、事件等实现 | 执行记录保存必要机制供 P3 重建，不沿用送检状态对象 |
-| [IronOreTaskTemplateService](../../bootstrap/src/main/java/com/nageoffer/ai/ragent/ironore/service/IronOreTaskTemplateService.java) | 从一条回答的单文档证据生成草稿，与审批及模拟逻辑共处一类 | 拆出生成与校验能力，改为接收研究任务的多文档证据 |
-| [IronOreTaskSection](../../frontend/src/components/chat/IronOreTaskSection.tsx) | 草稿、批准、模拟、机器人操作混在同一组件 | 替换为只展示研究结果和计划草稿的组件 |
+| [原 IronOreTaskTemplateService（P5 已退役）](agentic-research-execution-log.md) | 从一条回答的单文档证据生成草稿，与审批及模拟逻辑共处一类 | 拆出生成与校验能力，改为接收研究任务的多文档证据 |
+| [原 IronOreTaskSection（P5 已退役）](agentic-research-execution-log.md) | 草稿、批准、模拟、机器人操作混在同一组件 | 替换为只展示研究结果和计划草稿的组件 |
 
 现有 GroundingChunk 和 SourceRef 是各自用途的证据摘录，不能当作整份原文；引用 ID 校验也不等于语义支持校验。新方案要直接保存本次研究真正读过的文本与来源。
 
@@ -420,6 +420,8 @@ P2 第三批已新增 [eval/agentic-research/](../../eval/agentic-research/READM
 
 ### P5：统一报告与计划草稿输出
 
+**当前状态：已实现，程序验证通过，真实供应商联调待明确授权。** 共用 ResearchArtifactGenerator + PlanDraftValidator；不再设独立计划 Agent。实际实现和验证边界见执行记录 P5。
+
 **工作：**
 
 - 完成共用结果生成输入和 REPORT / PLAN 两类输出。
@@ -603,7 +605,7 @@ npm --prefix frontend run build
 | P2 数据与工具 | 已完成：证据工具、转换抽样、完整训练/开发摄取及真实联调 | 4b8a328、365d3e4、943c11a、4b06f21；验收见执行记录 |
 | P3 单研究运行 | 已完成：原生工具、持久化运行闭环与真实联调 | `feat: implement bounded research runs with native tool calls`；见执行记录与验证报告 |
 | P4 多 Agent | 已完成 | conduct_research、2/4 worker 限制、隔离上下文与共享额度；真实复测和 165 个定向测试；见[执行记录](agentic-research-execution-log.md) |
-| P5 报告与计划 | 未开始 | — |
+| P5 报告与计划 | 已实现；程序验证通过，真实联调待授权 | `feat: generate reports and plan drafts from shared research`；见执行记录 |
 | P6 前端整合 | 未开始 | — |
 | P7 对照与可靠性 | 未开始 | — |
 | P8 清理与交接 | 未开始 | — |

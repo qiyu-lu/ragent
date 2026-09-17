@@ -63,20 +63,30 @@ public class ResearchRunStore {
 
     public ResearchRun create(String owner, String conversationId, String requestId, ResearchBrief brief) {
         identity(owner);
-        String requestHash = SecureUtil.sha256(conversationId + "\n" + encode(brief));
+        String requestHash = SecureUtil.sha256((conversationId == null || conversationId.isBlank() ? "" : conversationId) + "\n" + encode(brief));
         return transactions.execute(tx -> {
             String id = UUID.randomUUID().toString();
+            boolean newConversation = conversationId == null || conversationId.isBlank();
+            String conversation = newConversation ? cn.hutool.core.util.IdUtil.getSnowflakeNextIdStr() : conversationId;
             int inserted = jdbc.update("""
                     INSERT INTO t_research_run (id, owner_user_id, conversation_id, client_request_id, output_type, brief, state)
                     VALUES (?, ?, ?, ?, ?, ?::jsonb, ?::jsonb)
                     ON CONFLICT (owner_user_id, client_request_id) DO NOTHING
-                    """, id, owner, conversationId, requestId, brief.outputType().name(), encode(brief),
+                    """, id, owner, conversation, requestId, brief.outputType().name(), encode(brief),
                     encode(Map.of("requestHash", requestHash)));
             ResearchRun run = findRequest(owner, requestId).orElseThrow();
             if (!requestHash.equals(run.state().get("requestHash"))) {
                 throw new ClientException("同一 clientRequestId 不能提交不同的研究请求");
             }
-            if (inserted == 1) appendLocked(run.id(), "main", "QUEUED", "研究任务已排队", Map.of());
+            if (inserted == 1) {
+                if (newConversation) jdbc.update("""
+                        INSERT INTO t_conversation (id, conversation_id, user_id, title, last_time, deleted)
+                        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, 0)
+                        """, cn.hutool.core.util.IdUtil.getSnowflakeNextIdStr(), conversation, owner,
+                        brief.goal().substring(0, Math.min(brief.goal().length(), 60)));
+                else jdbc.update("UPDATE t_conversation SET last_time = CURRENT_TIMESTAMP WHERE conversation_id = ? AND user_id = ? AND deleted = 0", conversation, owner);
+                appendLocked(run.id(), "main", "QUEUED", "研究任务已排队", Map.of());
+            }
             return get(run.id(), owner);
         });
     }
@@ -85,6 +95,12 @@ public class ResearchRunStore {
         identity(owner);
         return rows(id, owner, false).stream().findFirst()
                 .orElseThrow(() -> new ClientException("研究任务不存在或无权访问"));
+    }
+
+    public List<ResearchRun> list(String conversationId, String owner) {
+        identity(owner);
+        return jdbc.query("SELECT * FROM t_research_run WHERE conversation_id = ? AND owner_user_id = ? ORDER BY create_time, id",
+                (rs, row) -> read(rs), conversationId, owner);
     }
 
     public Optional<Claim> claim(String id, String owner, Duration leaseDuration) {
@@ -149,6 +165,11 @@ public class ResearchRunStore {
 
     public boolean finish(Claim claim, Status status, Map<String, Object> state,
                            Map<String, Object> usage, String error) {
+        return finish(claim, status, state, null, usage, error);
+    }
+
+    public boolean finish(Claim claim, Status status, Map<String, Object> state, Map<String, Object> artifact,
+                           Map<String, Object> usage, String error) {
         if (status != Status.WAITING_INPUT && !status.terminal()) throw new IllegalArgumentException("无效的研究结束状态");
         return transactions.execute(tx -> {
             ResearchRun run = lock(claim.run().id(), claim.owner());
@@ -156,12 +177,13 @@ public class ResearchRunStore {
             Map<String, Object> finishedState = new java.util.LinkedHashMap<>(state);
             finishedState.putAll(closeSubtasks(run, "INTERRUPTED"));
             jdbc.update("""
-                    UPDATE t_research_run SET status = ?, state = state || ?::jsonb, usage = ?::jsonb,
+                    UPDATE t_research_run SET status = ?, state = state || ?::jsonb, artifact = ?::jsonb, usage = ?::jsonb,
                         error_summary = ?, revision = revision + 1, lease_token = NULL, lease_until = NULL,
                         completed_at = CASE WHEN ? THEN CURRENT_TIMESTAMP ELSE NULL END,
                         update_time = CURRENT_TIMESTAMP WHERE id = ? AND owner_user_id = ?
-                    """, status.name(), encode(finishedState), encode(usage), error, status.terminal(),
+                    """, status.name(), encode(finishedState), artifact == null ? null : encode(artifact), encode(usage), error, status.terminal(),
                     claim.run().id(), claim.owner());
+            if (artifact != null) appendLocked(claim.run().id(), "main", "ARTIFACT", "研究产物已完成结构与引用校验", artifact);
             appendLocked(claim.run().id(), "main", status.name(),
                     status == Status.WAITING_INPUT ? "研究等待补充条件" : "研究执行已结束",
                     Map.of("status", status.name()));

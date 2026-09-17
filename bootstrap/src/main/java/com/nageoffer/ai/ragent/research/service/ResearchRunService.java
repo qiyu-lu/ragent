@@ -53,7 +53,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 public class ResearchRunService {
-    public record CreateRequest(@NotBlank @Size(max = 64) String conversationId,
+    public record CreateRequest(@Size(max = 64) String conversationId,
                                  @NotBlank @Size(max = 128) String clientRequestId,
                                  @NotBlank @Size(max = 10000) String goal,
                                  @NotNull ResearchBrief.OutputType outputType,
@@ -68,19 +68,21 @@ public class ResearchRunService {
     private final ResearchRunStore store;
     private final ResearchRunner runner;
     private final ResearchProperties properties;
+    private final ResearchCompletionService completion;
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
     private final ThreadPoolExecutor tasks;
     private final Map<String, Execution> executions = new ConcurrentHashMap<>();
 
     public ResearchRunService(ResearchRunStore store, ResearchRunner runner, ResearchProperties properties,
-                               JdbcTemplate jdbc, ObjectMapper json) {
+                               JdbcTemplate jdbc, ObjectMapper json, ResearchCompletionService completion) {
         properties.validate();
         this.store = store;
         this.runner = runner;
         this.properties = properties;
         this.jdbc = jdbc;
         this.json = json;
+        this.completion = completion;
         AtomicInteger thread = new AtomicInteger();
         this.tasks = new ThreadPoolExecutor(properties.getMaxConcurrentRuns(), properties.getMaxConcurrentRuns(),
                 0, TimeUnit.SECONDS, new ArrayBlockingQueue<>(properties.getQueueCapacity()),
@@ -109,6 +111,19 @@ public class ResearchRunService {
 
     public ResearchRun get(String id) { return store.get(id, owner()); }
     public List<ResearchEvent> events(String id, long after, int limit) { return store.events(id, owner(), after, limit); }
+
+    public List<ResearchRun> list(String conversationId) {
+        validateConversation(owner(), conversationId);
+        return store.list(conversationId, owner());
+    }
+
+    public ResearchRun regenerate(String id, String clientRequestId) {
+        var previous = get(id);
+        if (!previous.status().terminal()) throw new ClientException("运行尚未结束");
+        var brief = previous.brief();
+        return create(new CreateRequest(previous.conversationId(), clientRequestId, brief.goal(), brief.outputType(),
+                brief.constraints(), brief.allowedKbIds(), brief.allowedDocIds()));
+    }
 
     public ResearchRun input(String id, long revision, String answer) {
         String owner = owner();
@@ -146,34 +161,14 @@ public class ResearchRunService {
             claim = store.claim(id, owner, Duration.ofSeconds(properties.getMaxDurationSeconds() + 30L)).orElse(null);
             if (claim == null) return;
             session = new ResearchSession(store, claim, new ResearchBudget(properties, claim.run().usage()), execution.control);
-            ResearchSession.Outcome outcome = runner.run(session);
-            session.check();
-            Map<String, Object> state = new HashMap<>();
-            state.put("promptVersion", ResearchAgentFactory.PROMPT_VERSION);
-            state.put("readEvidenceIds", session.delivered().keySet());
-            state.put("acceptedWorkerEvidenceIds", session.acceptedEvidenceIds());
-            if (outcome.question() != null) {
-                state.put("question", outcome.question());
-                store.finish(claim, Status.WAITING_INPUT, state, session.budget.snapshot(), null);
-            } else {
-                state.put("researchResult", json.convertValue(outcome.result(), Map.class));
-                store.finish(claim, outcome.result().status() == com.nageoffer.ai.ragent.research.model.SubtaskResult.Status.PARTIAL
-                        ? Status.PARTIAL : Status.COMPLETED, state, session.budget.snapshot(), null);
+            try {
+                ResearchSession.Outcome outcome = runner.run(session);
+                completion.complete(session, outcome, null);
+            } catch (RuntimeException failure) {
+                completion.researchFailed(session, failure);
             }
-        } catch (Exception error) {
-            if (claim != null && session != null) {
-                Throwable cause = error;
-                while (cause.getCause() != null && !(cause instanceof ResearchBudget.Exhausted)) cause = cause.getCause();
-                boolean exhausted = cause instanceof ResearchBudget.Exhausted || cause instanceof java.util.concurrent.TimeoutException;
-                String reason = cause instanceof ResearchBudget.Exhausted ? cause.getMessage()
-                        : cause instanceof java.util.concurrent.TimeoutException ? "RESEARCH_TIMEOUT"
-                        : "NATIVE_FINISH_REQUIRED".equals(cause.getMessage()) ? "NATIVE_FINISH_REQUIRED"
-                        : cause instanceof java.util.concurrent.CancellationException ? "EXECUTION_CANCELLED" : "RESEARCH_EXECUTION_FAILED";
-                Status status = (exhausted && !session.citableIds().isEmpty() || !session.acceptedEvidenceIds().isEmpty()) ? Status.PARTIAL : Status.FAILED;
-                Map<String, Object> state = Map.of("researchResult", json.convertValue(session.partial(reason), Map.class),
-                        "readEvidenceIds", session.delivered().keySet(), "acceptedWorkerEvidenceIds", session.acceptedEvidenceIds(), "promptVersion", ResearchAgentFactory.PROMPT_VERSION);
-                store.finish(claim, status, state, session.budget.snapshot(), reason);
-            }
+        } catch (RuntimeException failure) {
+            if (claim != null && session != null) completion.researchFailed(session, failure);
         } finally {
             if (claim != null && session != null) store.cancelledLocally(claim, session.budget.snapshot());
             executions.remove(id, execution);
@@ -185,8 +180,7 @@ public class ResearchRunService {
     }
 
     private void validateScope(String owner, String conversation, ResearchBrief brief) {
-        if (!Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM t_conversation WHERE conversation_id = ? AND user_id = ? AND deleted = 0)",
-                Boolean.class, conversation, owner))) throw new ClientException("会话不存在或无权访问");
+        if (conversation != null && !conversation.isBlank()) validateConversation(owner, conversation);
         for (String kb : brief.allowedKbIds()) {
             if (!Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM t_knowledge_base WHERE id = ? AND deleted = 0 AND collection_name IS NOT NULL AND collection_name <> '')",
                     Boolean.class, kb))) throw new ClientException("研究知识库不可用");
@@ -197,6 +191,11 @@ public class ResearchRunService {
                     (rs, row) -> rs.getString(1), doc);
             if (bases.size() != 1 || !brief.allowedKbIds().contains(bases.get(0))) throw new ClientException("研究文档不可用或超出知识库范围");
         }
+    }
+
+    private void validateConversation(String owner, String conversation) {
+        if (!Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM t_conversation WHERE conversation_id = ? AND user_id = ? AND deleted = 0)",
+                Boolean.class, conversation, owner))) throw new ClientException("会话不存在或无权访问");
     }
 
     private String owner() { return UserContext.requireUser().getUserId(); }

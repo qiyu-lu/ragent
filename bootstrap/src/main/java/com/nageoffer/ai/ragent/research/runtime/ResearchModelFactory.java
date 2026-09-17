@@ -36,6 +36,13 @@ import java.util.Map;
 public class ResearchModelFactory {
     private final AIModelProperties models;
     private final ResearchProperties research;
+    private java.util.concurrent.Semaphore quota;
+
+    /** 主、worker 与产物生成共享同一请求配额。 */
+    public synchronized java.util.concurrent.Semaphore quota() {
+        if (quota == null) quota = new java.util.concurrent.Semaphore(research.getMaxConcurrentModelCalls(), true);
+        return quota;
+    }
 
     public Model create() {
         research.validate();

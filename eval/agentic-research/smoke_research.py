@@ -28,7 +28,7 @@ def main():
     parser.add_argument('--corpus-database', default='research_corpus_v1')
     parser.add_argument('--idea', type=Path, default=Path('.idea/workspace.xml'))
     parser.add_argument('--execute', action='store_true')
-    parser.add_argument('--phase', choices=('p3', 'p4'), default='p3')
+    parser.add_argument('--phase', choices=('p3', 'p4', 'p5'), default='p3')
     parser.add_argument('--case', action='append', choices=('lookup', 'multi-hop', 'insufficient-source', 'waiting-and-resume', 'cancel-in-flight', 'comparison-workers', 'plan-workers', 'cancel-workers', 'follow-up-workers'))
     args = parser.parse_args()
     if not args.corpus_database.startswith('research_corpus_') or not args.corpus_database.replace('_', '').isalnum():
@@ -54,7 +54,7 @@ def main():
         {'id': 'cancel-in-flight', 'collection': 'rs_musique_dev_v1_full', 'sourceDocumentIds': musique['document_ids'],
          'goal': musique['question'], 'outputType': 'REPORT', 'cancelAfterMillis': 800, 'reply': None},
     ]
-    if args.phase == 'p4':
+    if args.phase in ('p4', 'p5'):
         with (args.prepared / 'qasper-validation/queries.jsonl').open() as source:
             other = next(json.loads(line) for line in source if json.loads(line)['document_ids'] != qasper['document_ids'])
         comparison = ('Compare the research approaches in Paper A (document ID [[DOC_0]]) and Paper B (document ID [[DOC_1]]). '
@@ -96,9 +96,9 @@ def main():
     if not cases:
         raise ValueError('The selected case does not belong to the selected phase')
     args.run_dir.mkdir(parents=True, exist_ok=False)
-    job = {'runDir': str(args.run_dir.resolve()), 'cases': cases}
+    job = {'runDir': str(args.run_dir.resolve()), 'cases': cases, 'generateArtifacts': args.phase == 'p5'}
     (args.run_dir / 'job.json').write_text(json.dumps(job, indent=2) + '\n')
-    record = {'started_at': datetime.now(timezone.utc).isoformat(), 'mode': 'P4-worker-smoke' if args.phase == 'p4' else 'serial-research-smoke',
+    record = {'started_at': datetime.now(timezone.utc).isoformat(), 'mode': 'P5-artifact-smoke' if args.phase == 'p5' else 'P4-worker-smoke' if args.phase == 'p4' else 'serial-research-smoke',
               'model_config_id': 'research-flash', 'prompt_version': 'research-main-v3', 'worker_prompt_version': 'research-worker-v2',
               'git_commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=REPO, text=True).strip(),
               'working_tree_modified': bool(subprocess.check_output(['git', 'status', '--porcelain'], cwd=REPO, text=True)),
@@ -110,7 +110,7 @@ def main():
               'config_sha256': digest(REPO / 'bootstrap/src/main/resources/application.yaml'),
               'prompt_sha256': digest(REPO / 'bootstrap/src/main/resources/prompts/research-main-v3.txt'),
               'worker_prompt_sha256': digest(REPO / 'bootstrap/src/main/resources/prompts/research-worker-v2.txt'),
-              'harness_sha256': digest(Path(__file__)), 'command': sys.argv, 'paid_generation': bool(args.execute), 'scoring': False}
+              'artifact_prompt_sha256': digest(REPO / 'bootstrap/src/main/resources/prompts/research-artifact-v1.txt'), 'harness_sha256': digest(Path(__file__)), 'command': sys.argv, 'paid_generation': bool(args.execute), 'scoring': False}
     (args.run_dir / 'run.json').write_text(json.dumps(record, indent=2) + '\n')
     if not args.execute:
         print('Prepared {} smoke probes; no API or database calls made.'.format(len(cases)))
@@ -170,7 +170,7 @@ def main():
                    'unknown_usage_requests': sum(c['usageStatus'] == 'unknown' for c in calls),
                    'actual_models': sorted({c['model'] for c in calls}), 'dependent_search_after_read': dependent_search,
                    'waiting_input_seen': any(t['event']['type'] == 'WAITING_INPUT' for t in traces),
-                   'artifacts_generated': False, 'scoring_run': False}
+                   'artifacts_generated': {p['clientRequestId']: bool(p.get('artifact')) for p in predictions}, 'scoring_run': False}
         (args.run_dir / 'summary.json').write_text(json.dumps(summary, indent=2) + '\n')
         print(json.dumps(summary, indent=2))
     finally:

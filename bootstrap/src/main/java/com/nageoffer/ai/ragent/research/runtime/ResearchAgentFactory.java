@@ -71,7 +71,7 @@ public class ResearchAgentFactory implements ResearchRunner, AutoCloseable {
         this.reader = reader;
         this.json = json;
         this.tokens = tokens;
-        this.modelQuota = new Semaphore(properties.getMaxConcurrentModelCalls(), true);
+        this.modelQuota = models.quota();
         this.prompt = load(PROMPT_VERSION);
         this.workerPrompt = load(WORKER_PROMPT_VERSION);
         this.coordinator = new ResearchWorkerCoordinator(properties, search, this::run, json);

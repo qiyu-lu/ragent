@@ -36,61 +36,6 @@ export interface SourceRef {
   cellRange?: string;
 }
 
-export type CandidateTaskStatus = "DRAFT" | "APPROVED";
-
-export interface TaskEvidenceItem {
-  text: string;
-  evidenceChunkIds: string[];
-}
-
-export interface TaskParameter {
-  name: string;
-  value: string;
-  unit?: string | null;
-}
-
-export interface CandidateTaskStep {
-  order: number;
-  action: string;
-  tools: string[];
-  parameters: TaskParameter[];
-  evidenceChunkIds: string[];
-}
-
-export interface TaskTemplatePayload {
-  title: string;
-  procedureName: string;
-  documentVersion?: string | null;
-  prerequisites: TaskEvidenceItem[];
-  steps: CandidateTaskStep[];
-  qualityCriteria: TaskEvidenceItem[];
-  exceptionHandling: TaskEvidenceItem[];
-  safetyConstraints: TaskEvidenceItem[];
-}
-
-export interface TaskEvidenceRef {
-  chunkId: string;
-  docId: string;
-  docName?: string | null;
-  documentVersion?: string | null;
-  sheetName?: string | null;
-  cellRange?: string | null;
-  excerpt?: string | null;
-}
-
-export interface CandidateTaskTemplate {
-  id: string;
-  conversationId: string;
-  sourceMessageId: string;
-  docId: string;
-  status: CandidateTaskStatus;
-  template: TaskTemplatePayload;
-  evidenceRefs: TaskEvidenceRef[];
-  approvedBy?: string | null;
-  approvedAt?: string | null;
-  createTime?: string | null;
-}
-
 export interface Message {
   id: string;
   role: Role;

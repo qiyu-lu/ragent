@@ -4,7 +4,7 @@
 
 ## 当前接续点
 
-P0—P4 已完成；P5—P8 未开始。P4 已实现主 Agent 批量委派、独立 worker、专用池最多 2 个并行/累计 4 个、共享预算与模型配额、父子取消和 epoch 保护。比较/PLAN 的真实 worker-v2 复测完成；补查压力样例保留成功子结果并按预算返回 PARTIAL，A 批负结果和并行取消记录完整保留。最新定向回归 165/165。当前结果仍是结构化研究摘要，artifact 为空；下一步从 P5 的统一报告/计划生成、引用映射与结构校验接续。
+P0—P5 已实现，P6—P8 未开始。P5 已将 REPORT/PLAN 统一生成接到 P4 的研究摘要和主/子已读证据，产物通过结构/引用校验后原子落库，旧草稿/审批入口退役。160 个定向程序用例通过，前端 build 通过；两条真实供应商样例因自动审批拒绝未执行，待明确外发/付费授权。下一步 P6 接聊天模式、SSE 进度、输入/取消及服务端会话恢复。
 
 ## P0：基线、分支与接入准备（2026-09-17，已完成）
 
@@ -279,3 +279,22 @@ A 的 worker 连续检索后尝试引用未读候选，有限修复仍未闭环�
 仍采用单 JVM，不恢复中间 token，不执行最终生成/页面/SSE，也未启动完整 Web 服务/浏览器 E2E 或运行 A/B/C、EM/F1、语义支持评分。COMPLETED 只表示研究摘要通过引用身份检查，B 的 PLAN 不代表完整计划 JSON 或条件已齐。下一步 P5 从 brief + 主/子 findings + 已读快照生成统一报告/计划，使用预留额度，校验结构和最终引用映射；P4 成功子结果和失败 gaps 都应进入生成输入。
 
 最终静态检查通过：5 份入口 Markdown 的 81 个本地链接/锚点、围栏、whitespace、33 个 P4 变更文件范围、51 份源码/配置/模板与全部原始/归档结果指纹；B/C 当前运行源码一致，P3 原始结果与 `20b1133` 冻结源码未改写。P3 基线的 16 份升级 SQL 保持字节一致，最初基线的 12 份也不变。全批 4 请求和补查单路径 1 请求 dry-run、shell/Python 语法与最终当前源码 clean package 通过。静态程序与检查记录位于 P4 validation 归档，未为这些检查追加付费调用。
+
+
+## P5：统一报告与计划草稿输出（2026-09-17）
+
+起始提交 `af28188`（P4），分支 `feat/agentic-research`，开始时工作区干净。阶段提交标题 `feat: generate reports and plan drafts from shared research`；不自动 push/合并。
+
+实现共用 [ResearchArtifactGenerator](../../bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/ResearchArtifactGenerator.java)、[ResearchArtifact](../../bootstrap/src/main/java/com/nageoffer/ai/ragent/research/model/ResearchArtifact.java) 和 [PlanDraftValidator](../../bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/PlanDraftValidator.java)。输入包括 brief、主 findings、全部已验证 worker 结果（含失败 gaps）和本次实际已读快照。输出类型在 brief 内，不新建计划运行器；最终提示词为 `research-artifact-v1`。结构/JSON/引用错误最多修复一次，均使用 P3/P4 预留额度；主、worker、生成共享模型并发信号量、16 次调用和累计活动时限。生成输入按 token 估算裁剪最长证据，保留身份、单位和真实位置字段，来源标注截断；修复对象无法完整容纳时明确失败，不静默丢证据。
+
+REPORT 为 sections + evidenceIds，PLAN 为前置条件、顺序步骤、材料/设备、参数、注意事项、待确认项。已填参数独立绑定证据，未知参数留空并自动加待确认。用户限制由程序从 brief 保存为 `user_input`，不能由模型编造文档来源。最终引用从 1 连续编号，正文、来源及落库映射一致；程序验证本 run 的实际读证明、范围和引用身份，**不等同于语义支持通过**。主/子失败 gaps 和冲突由程序保留。
+
+[ResearchCompletionService](../../bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/ResearchCompletionService.java) 供在线运行与 P5 smoke 共用：校验后的 artifact 与 ARTIFACT/终态事件在同一短事务、相同 epoch/lease 保护下提交。COMPLETED/PARTIAL 在新在线路径表示已经形成合法产物；生成失败为 FAILED，保留研究摘要及失败原因，不发布非法产物。取消信号连接生成阶段 SDK/HTTP；取消或旧 epoch 的迟到完成不能写入 artifact。供应商计算是否停止仍 unknown。
+
+增加按会话读取运行和带新 clientRequestId 的 regenerate；再生成复用同一研究流程和范围。创建研究可不传 conversationId，服务端在首次幂等创建的短事务同时建会话；重复请求不会多建会话或再次调度模型。已有会话仍校验 owner。旧单回答/单文档草稿生成、人工审批、重复 DAO/类型/提示词和前端入口已删除；新建 schema 移除 `t_iron_ore_task_template`，既有表与 16 份历史升级 SQL 不执行删除、不改写。
+
+验证：后端 package 通过；22 个定向类 **160/160**，0 失败/错误/跳过。相对 P4 删除 13 个旧草稿测试，新增 6 个 SDK/本地 HTTP 生成测试及 2 个 PostgreSQL 用例。覆盖双文档引用、用户条件/未知参数、14→16 次生成/修复预留、两次非法 JSON 后失败、未读快照拒绝、生成取消与配额释放、产物/事件原子提交、重复/取消后迟到回调及新会话幂等。保留普通问答、检索、摄取、版本比较和 P3/P4 取消/epoch 回归。前端 build 通过。模型 HTTP 为本地可控响应，不是供应商效果；PostgreSQL 随机库已清理。首次小集 82/82，新增数据库用例后最终扩大到 160；旧批次日志保留。
+
+[验证脚本](../../scripts/validate-agentic-research-p5.sh) 使用原有隔离数据库 guard。smoke 新增 `--phase p5` 并与在线结束处理一致；两条 REPORT/PLAN dry-run 通过，无数据库/模型调用。尝试 `--execute` 被自动审批拒绝：理由为当前用户实现授权没有明确覆盖向外部供应商发送具体语料内容并产生费用。没有执行付费请求，也没有绕过拒绝；P5 真实供应商/多文档产物联调留待明确授权。P4 已有真实研究摘要不能冒充这次最终产物验证，未跑质量评分或 A/B/C。
+
+程序日志位于 `local-data/agentic-research/runs/20260917T122800_P5_validation/`，dry-run 位于 `20260917T122500_P5_dryrun/`；[P5 程序验证清单](../../eval/agentic-research/manifests/research-p5-validation-2026-09-17.json)保存源码/模板指纹和检查边界。下一步 P6：在现有归属、run 和事件序号上实现只读 SSE 订阅及聊天 REPORT/PLAN 展示，刷新从数据库取回。

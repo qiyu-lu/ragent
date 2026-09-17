@@ -49,15 +49,22 @@ public class BoundedResearchModel implements Model {
     private final Semaphore quota;
     private final ObjectMapper json;
     private final TokenCounterService tokens;
+    private final boolean finalization;
 
     public BoundedResearchModel(Model delegate, ResearchSession session, ResearchProperties properties,
                                  Semaphore quota, ObjectMapper json, TokenCounterService tokens) {
+        this(delegate, session, properties, quota, json, tokens, false);
+    }
+
+    public BoundedResearchModel(Model delegate, ResearchSession session, ResearchProperties properties,
+                                 Semaphore quota, ObjectMapper json, TokenCounterService tokens, boolean finalization) {
         this.delegate = delegate;
         this.session = session;
         this.properties = properties;
         this.quota = quota;
         this.json = json;
         this.tokens = tokens;
+        this.finalization = finalization;
     }
 
     @Override
@@ -81,7 +88,9 @@ public class BoundedResearchModel implements Model {
                         + " omit unsupported findings and describe gaps. Do not attach a read ID to a fact only seen in another candidate.";
             }
             // 兼容端点通常只可靠处理开头的系统指令，不在工具结果后追加第二条 system。
-            if (!withBudget.isEmpty() && withBudget.get(0).getRole() == MsgRole.SYSTEM) {
+            if (finalization) {
+                // 生成输入已按证据裁剪，不混入要求调用研究工具的提示。
+            } else if (!withBudget.isEmpty() && withBudget.get(0).getRole() == MsgRole.SYSTEM) {
                 withBudget.set(0, Msg.builder().role(MsgRole.SYSTEM)
                         .textContent(withBudget.get(0).getTextContent() + "\n" + reminder).build());
             } else withBudget.add(0, Msg.builder().role(MsgRole.SYSTEM).textContent(reminder).build());
@@ -99,14 +108,15 @@ public class BoundedResearchModel implements Model {
             }
             try {
                 session.check();
-                session.acquireModel(properties.getMaxWorkerModelCalls());
+                if (finalization) session.budget.acquireModel(true);
+                else session.acquireModel(properties.getMaxWorkerModelCalls());
             } catch (RuntimeException e) {
                 quota.release();
                 return Flux.error(e);
             }
             try {
                 String id = UUID.randomUUID().toString();
-                session.budget.startCall(id, getModelName(), estimate(trimmed, tools), session.main() ? "main" : "worker", session.taskId);
+                session.budget.startCall(id, getModelName(), estimate(trimmed, tools), finalization ? "finalization" : session.main() ? "main" : "worker", session.taskId);
                 session.event("MODEL_STARTED", "正在调用研究模型", Map.of("callId", id, "model", getModelName()));
                 AtomicReference<ChatUsage> usage = new AtomicReference<>();
                 AtomicReference<String> requestId = new AtomicReference<>();

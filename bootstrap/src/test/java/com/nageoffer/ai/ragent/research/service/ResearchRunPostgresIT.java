@@ -201,6 +201,38 @@ class ResearchRunPostgresIT {
     }
 
     @Test
+    void finalArtifactAndPublicationEventCommitTogetherAndLateArtifactCannotOverwriteCancel() {
+        var run = run();
+        var active = claim(run);
+        Map<String, Object> artifact = Map.of("outputType", "REPORT", "title", "已校验报告");
+        assertTrue(store.finish(active, Status.COMPLETED, Map.of("researchResult", Map.of()), artifact, Map.of(), null));
+        assertEquals(artifact, store.get(run.id(), owner).artifact());
+        var events = store.events(run.id(), owner, 0, 100);
+        assertEquals("ARTIFACT", events.get(events.size() - 2).type());
+        assertEquals(artifact, events.get(events.size() - 2).payload());
+        assertFalse(store.finish(active, Status.COMPLETED, Map.of(), Map.of("title", "重复回调"), Map.of(), null));
+        var cancelled = run();
+        var old = claim(cancelled);
+        store.cancel(cancelled.id(), owner);
+        assertFalse(store.finish(old, Status.COMPLETED, Map.of(), artifact, Map.of(), null));
+        assertNull(store.get(cancelled.id(), owner).artifact());
+        assertTrue(store.events(cancelled.id(), owner, 0, 100).stream().noneMatch(e -> e.type().equals("ARTIFACT")));
+    }
+
+    @Test
+    void firstResearchCreatesOneConversationAtomicallyAndOwnerListsOnlyTheirRuns() {
+        var first = store.create(owner, null, "new-research", brief());
+        assertEquals(first.id(), store.create(owner, null, "new-research", brief()).id());
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM t_conversation WHERE conversation_id = ? AND user_id = ?", Integer.class, first.conversationId(), owner));
+        assertEquals(List.of(first.id()), store.list(first.conversationId(), owner).stream().map(ResearchRun::id).toList());
+        assertTrue(store.list(first.conversationId(), "foreign").isEmpty());
+    }
+
+    private ResearchCompletionService completion() {
+        return new ResearchCompletionService(store, org.mockito.Mockito.mock(ResearchArtifactGenerator.class), json);
+    }
+
+    @Test
     void serviceRunsWithoutAdvanceDoesNotHoldTransactionAndCancelledModelCannotOverwrite() throws Exception {
         var entered = new CountDownLatch(1);
         var returnModel = new CountDownLatch(1);
@@ -213,7 +245,7 @@ class ResearchRunPostgresIT {
             catch (InterruptedException e) { throw new RuntimeException(e); }
             return new ResearchSession.Outcome(null, new SubtaskResult("main", List.of(), List.of("unavailable"), List.of(), SubtaskResult.Status.COMPLETED));
         };
-        var service = new ResearchRunService(store, runner, new ResearchProperties(), jdbc, json);
+        var service = new ResearchRunService(store, runner, new ResearchProperties(), jdbc, json, completion());
         try {
             var request = new ResearchRunService.CreateRequest(conversation, "same", "compare", ResearchBrief.OutputType.REPORT, List.of(), List.of(kb), List.of());
             var created = service.create(request);
@@ -232,7 +264,7 @@ class ResearchRunPostgresIT {
 
     @Test
     void servicePersistsModelFailureAndRejectsForeignConversationOrScope() throws Exception {
-        var service = new ResearchRunService(store, session -> { throw new IllegalStateException("provider failed"); }, new ResearchProperties(), jdbc, json);
+        var service = new ResearchRunService(store, session -> { throw new IllegalStateException("provider failed"); }, new ResearchProperties(), jdbc, json, completion());
         try {
             var created = service.create(new ResearchRunService.CreateRequest(conversation, "failed", "compare", ResearchBrief.OutputType.REPORT, List.of(), List.of(kb), List.of()));
             await(() -> store.get(created.id(), owner).status().terminal());

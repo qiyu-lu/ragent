@@ -308,33 +308,6 @@ CREATE TABLE t_research_event (
 );
 COMMENT ON TABLE t_research_event IS '可展示的阶段和工具事件；不保存隐藏推理或逐 token 行';
 
-CREATE TABLE t_iron_ore_task_template (
-    id               VARCHAR(20)  NOT NULL PRIMARY KEY,
-    conversation_id  VARCHAR(20)  NOT NULL,
-    source_message_id VARCHAR(20) NOT NULL,
-    doc_id            VARCHAR(20) NOT NULL,
-    owner_user_id     VARCHAR(20) NOT NULL,
-    title             VARCHAR(256) NOT NULL,
-    procedure_name    VARCHAR(256),
-    document_version  VARCHAR(32),
-    status             VARCHAR(16) NOT NULL,
-    template_data      JSONB       NOT NULL,
-    evidence_refs      JSONB       NOT NULL DEFAULT '[]'::jsonb,
-    approved_by        VARCHAR(64),
-    approved_at        TIMESTAMP,
-    created_by         VARCHAR(64),
-    updated_by         VARCHAR(64),
-    create_time        TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_time        TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted            SMALLINT    NOT NULL DEFAULT 0
-);
-CREATE UNIQUE INDEX ux_iron_ore_task_source
-    ON t_iron_ore_task_template (source_message_id, doc_id, owner_user_id)
-    WHERE deleted = 0;
-CREATE INDEX idx_iron_ore_task_conversation
-    ON t_iron_ore_task_template (conversation_id, owner_user_id);
-COMMENT ON TABLE t_iron_ore_task_template IS '铁矿演示候选任务模板';
-
 CREATE TABLE t_knowledge_document_chunk_log (
     id                 VARCHAR(20)      NOT NULL PRIMARY KEY,
     doc_id             VARCHAR(20)      NOT NULL,

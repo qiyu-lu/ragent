@@ -1,6 +1,6 @@
 # 统一研究工作流验证报告
 
-日期：2026-09-17。当前范围：P0 基线与 P1 旧业务退役，两阶段已完成。新研究接口、模型工具调用、数据入库与 A/B/C 评测均未运行。
+日期：2026-09-17。P0/P1 已完成；P2 首批完成契约、知识库作用域、块级证据快照与存储 SQL，P2 仍进行中。研究接口、原生模型工具调用、数据入库与 A/B/C 评测尚未运行。
 
 ## P0 基线
 
@@ -64,11 +64,41 @@ bash scripts/validate-agentic-research-p1-database.sh
 
 本轮 PostgreSQL 是实际 SQL 验证；Java mapper 与 SDK 模型均未对真实业务库/供应商联调。既有业务库的升级脚本和 Redis 缓存清理仍由部署时应用，不能把隔离验证写成已完成部署。
 
+## P2 首批实际验证
+
+范围是数据契约、知识库作用域、单块证据快照和研究表 SQL；P2 的文档筛选、邻接展开、转换与导入尚未完成。本批原始日志、JUnit XML 和 checks.json 保存在本地忽略目录 `local-data/agentic-research/runs/20260917T072920_P2A/`，没有生成模型问答成绩。
+
+```bash
+./mvnw -o -pl bootstrap -am -DskipTests clean package
+./mvnw -o -pl bootstrap -am '-Dtest=ResearchEvidenceToolsTest,ResearchEvidenceStoreTest,MultiChannelRetrievalEngineTest,RetrievalScopeResolverTest,VectorSearchChannelTest,KeywordSearchChannelTest,PgVectorRetrieverServiceTest,RetrievalEngineTest,StreamChatPipelineTest,IngestionTaskServiceImplTest,TableChunkerTest,WorkbookDiffServiceTest,TaskTemplateGeneratorTest,IronOreTaskTemplateServiceTest,TaskTemplateValidatorTest,StreamTaskManagerCancelTraceTest' -Dsurefire.failIfNoSpecifiedTests=false test
+bash -n scripts/validate-agentic-research-p2-database.sh
+bash scripts/validate-agentic-research-p2-database.sh
+git diff --check
+```
+
+| 检查 | 实际结果与边界 |
+| --- | --- |
+| 后端 clean package | 通过；包含新契约/服务和测试源码编译，未接入 SDK 或新依赖 |
+| 首次定向检查 | 3 个类 28/28 通过；用于验证新工具和检索入口 |
+| 最终定向回归 | 16 个类 101/101 通过，0 失败/错误/跳过；覆盖新工具与普通问答、召回通道、摄取、版本比较、草稿、取消 |
+| 本批新增用例 | 共 23 个：工具 15、store 5、检索引擎 3；包括真实 H2 归属 SELECT/UPDATE，以及可控召回/来源响应 |
+| 作用域 | 测试验证服务端范围传入召回上下文、无意图回退/补充扩大、空范围不查询、越界通道结果在重排前拒绝；不代表已有租户文档 ACL |
+| 证据 | 检查数据库正文优先、多文档、跨 worker 稳定 ID、运行/版本/正文/块身份分离、截断和代理对、已读状态、虚构 ID、来源停用/变更和 hash 错误；不检查引用语义支持 |
+| PostgreSQL 16 隔离 SQL | 当前 schema + init 成功；删除隔离库内研究表后重复增量执行两次，列/默认值/约束与新建一致；历史草稿、请求/事件唯一键、FK、状态约束、归属查询和首次快照保留通过，测试库已清理 |
+| SQL 首次失败 | schema 中残留一个补丁前缀字符，修正后相同脚本通过；保留失败/清理日志，不把首次失败改写为通过 |
+| 入口文档与历史文件 | 68 个本地文件链接解析、Markdown 围栏、whitespace、脚本语法与历史升级 SQL 字节不变检查通过 |
+| 前端、在线 SDK、数据与模型 | 本批未修改前端，未重跑前端 build/type/lint；未注册原生工具、启动研究接口、转换/入库或调用真实供应商 |
+
+PostgreSQL 验证使用合成存储夹具和实际 SQL，没有导入公开语料。Java store 的 SELECT/UPDATE 及结果映射由 H2 验证；Java INSERT ON CONFLICT、来源 MyBatis 读取和 Spring 事务仍需 PostgreSQL 联调。示例事件 SQL 只验证存储与序号原语，事件写入器和并发任务运行尚未实现；请求唯一约束也不能代替幂等调度测试。
+
+本批未调用真实 embedding、rerank 或研究模型，没有生成 token/cost/EM/F1 等模型评测指标。未升级已有业务库；部署时仍需应用增量 SQL。
+
 ## 尚未验证的业务和评测
 
 - 未启动全套服务或浏览器进行登录、普通问答、入库、版本比较、草稿生成 E2E。
 - 已做 PostgreSQL 隔离库的新建/退役 SQL 检查；未升级既有业务库或清除其意图缓存，不自动 DROP 既有数据。
 - 未导入 QASPER/MuSiQue、生成固定回归题目、调用研究模型或产生模型费用/效果指标。
-- REPORT / PLAN、新运行器、并发 worker、研究 SSE 与调用记录器仍属于后续阶段。
+- P2 的文档筛选、可靠邻接展开、QASPER/MuSiQue 转换与幂等导入仍未完成；Java 证据存储/来源回查未对 PostgreSQL 联调。
+- REPORT / PLAN 原生工具、新运行器、并发 worker、研究 SSE 与调用记录器仍属于后续阶段。
 
 后续每阶段追加实际结果，保留失败和未运行边界，不以单元测试替代真实模型或页面效果。

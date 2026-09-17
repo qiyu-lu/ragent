@@ -28,6 +28,14 @@ P1 已移除送检、任务模拟与 ROS1 代码。新环境的 `schema_pg.sql` 
 
 `260915_task_agent.sql`、`260812_ros1_robot_mission.sql` 与 `260812_iron_ore_demo.sql` 保留为历史升级记录，不能作为新环境的追加初始化流程。历史执行表停止访问；已有 SIMULATED 草稿只在过渡期视图中按已确认草稿展示，不回读模拟记录，也不改写历史数据。
 
+## 2026-09-17：研究证据存储（P2 首批）
+
+新环境的 `schema_pg.sql` 已包含 `t_research_run`、`t_research_evidence` 和 `t_research_event`。已有环境手工执行 `upgrades/v1.1.0/260917_02_research_evidence.sql`；脚本可重复执行，仅增加新表、索引和约束，不改写历史草稿或退役业务数据。仓库没有自动应用这个脚本的 Flyway 流程。
+
+本批仅接入任务归属检查、纯知识检索与块级证据快照读写；任务调度、租约、取消、事件写入和模型调用在 P3/P4 实现。`event_sequence` 为后续原子序号分配预留，事件表主键不能代替并发分配器。
+
+可运行 `bash scripts/validate-agentic-research-p2-database.sh`，在开发 PostgreSQL 容器中随机创建隔离库，验证新建 schema 与两次增量执行的结构一致、历史草稿保留和存储约束。`P2_POSTGRES_CONTAINER` 可覆盖容器名；脚本只删除本次成功创建的测试库，不能视为已有业务环境已升级。
+
 ## 示例与参考
 
 `examples/` 只保存可选教程或功能参考，不参与全量初始化和增量升级：

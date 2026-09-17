@@ -27,6 +27,7 @@ import com.nageoffer.ai.ragent.rag.core.retrieval.channel.RetrievalScope;
 import com.nageoffer.ai.ragent.rag.core.retrieval.channel.RetrievalScopeResolver;
 import com.nageoffer.ai.ragent.rag.core.retrieval.channel.SearchChannel;
 import com.nageoffer.ai.ragent.rag.core.retrieval.channel.SearchChannelResult;
+import com.nageoffer.ai.ragent.rag.core.retrieval.channel.SearchChannelType;
 import com.nageoffer.ai.ragent.rag.core.retrieval.channel.SearchContext;
 import com.nageoffer.ai.ragent.rag.core.retrieval.postprocessor.SearchResultPostProcessor;
 import com.nageoffer.ai.ragent.rag.dto.SubQuestionIntent;
@@ -87,7 +88,40 @@ public class MultiChannelRetrievalEngine {
                                                                RetrievalCapture capture) {
         SearchContext context = buildSearchContext(subIntent, budget);
 
-        List<SearchChannelResult> channelResults = executeSearchChannels(context);
+        return retrieve(subIntent, context, capture, false);
+    }
+
+    /**
+     * 研究专用入口：服务端提供范围，召回前生效，不走意图回退或联网通道。
+     * 当前只使用可回查持久块的向量与关键词通道。
+     */
+    public KnowledgeRetrievalResult retrieveScopedKnowledgeChannels(String query,
+                                                                    RetrievalBudget budget,
+                                                                    List<String> allowedCollections) {
+        Objects.requireNonNull(allowedCollections, "必须指定知识库范围");
+        if (allowedCollections.stream().anyMatch(name -> name == null || name.isBlank())) {
+            throw new IllegalArgumentException("知识库范围不能包含空名称");
+        }
+        if (allowedCollections.isEmpty()) {
+            return KnowledgeRetrievalResult.empty();
+        }
+        SubQuestionIntent subIntent = new SubQuestionIntent(query, List.of());
+        SearchContext context = SearchContext.builder()
+                .originalQuestion(query).rewrittenQuestion(query).intents(List.of(subIntent))
+                .budget(budget)
+                .retrievalScope(RetrievalScope.global(0, allowedCollections.stream().distinct().toList()))
+                .build();
+        return retrieve(subIntent, context, null, true);
+    }
+
+    private KnowledgeRetrievalResult retrieve(SubQuestionIntent subIntent, SearchContext context,
+                                               RetrievalCapture capture, boolean sourceBound) {
+
+        List<SearchChannelResult> channelResults = executeSearchChannels(context, sourceBound);
+        if (sourceBound && channelResults.stream().flatMap(result -> result.getChunks().stream())
+                .anyMatch(chunk -> !context.getRetrievalScope().targetCollections().contains(chunk.getCollectionName()))) {
+            throw new IllegalStateException("检索通道返回了研究范围外的来源");
+        }
         if (capture != null) {
             channelResults.forEach(result -> capture.record(subIntent.subQuestion(),
                     "channel-" + result.getChannelName(), result.getChunks(), result.getLatencyMs(),
@@ -140,10 +174,12 @@ public class MultiChannelRetrievalEngine {
         return intentIdsByChunkKey;
     }
 
-    private List<SearchChannelResult> executeSearchChannels(SearchContext context) {
+    private List<SearchChannelResult> executeSearchChannels(SearchContext context, boolean sourceBound) {
         // 按通道类型枚举序做稳定排序：通道并行执行、下游融合（RRF）与归因均与顺序无关，
         // 这里排序仅为日志/派发顺序稳定可复现，不承载任何检索优先级语义
         List<SearchChannel> enabledChannels = searchChannels.stream()
+                .filter(channel -> !sourceBound || channel.getType() == SearchChannelType.VECTOR
+                        || channel.getType() == SearchChannelType.KEYWORD)
                 .filter(channel -> channel.isEnabled(context))
                 .sorted(Comparator.comparingInt(channel -> channel.getType().ordinal()))
                 .toList();

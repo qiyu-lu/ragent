@@ -4,7 +4,7 @@
 
 ## 当前接续点
 
-本轮边界为 P0、P1，两阶段已完成；P2—P8 未开始。后续从 P2 的数据契约、证据读取和检索作用域开始，不要把 SDK 版本准备、旧能力退役或单元测试通过写成新研究 Agent 已完成。
+P0、P1 已完成；P2 进行中，首批已完成数据契约、知识库作用域、块级证据快照和研究表 SQL；P3—P8 未开始。接下来继续 P2 的文档筛选、可靠邻接读取、QASPER/MuSiQue 转换与幂等导入。首批提供 Java 服务，尚未接入 SDK 工具、研究运行器或聊天入口，不能把单元测试和隔离 SQL 通过写成研究 Agent 已完成。
 
 ## P0：基线、分支与接入准备（2026-09-17，已完成）
 
@@ -78,13 +78,38 @@ app 严格类型检查仍有 24 个既有诊断，与 P0 的诊断逐条一致�
 
 范围与 P1 一致。额外的退役意图升级脚本用于防止普通问答继续路由到被删除工具；提前更新首页和历史说明是为避免留下不可用启动入口。暂存草稿与人工确认接口按计划保留到 P5。
 
-阶段起始提交：`8a9c79d`。本阶段提交标题：`refactor: retire inspection and robot execution demos`；按唯一标题从 Git log 查询 SHA，下一阶段补记即可。
+阶段起始提交：`8a9c79d`。阶段提交：`a1b61d7`，标题 `refactor: retire inspection and robot execution demos`。
 
-## 下一阶段：P2 的直接执行顺序
+## P2 首批：契约、纯知识检索与块级证据（2026-09-17，已完成；P2 仍进行中）
 
-1. 读取主计划第 4.2/4.3/6/7 节及预算补充，核对分支、Git 状态和本记录；不要重新接入送检工具。
-2. 先实现 ResearchBrief / EvidenceRecord / SubtaskResult 与新增 run/evidence/event SQL。同步更新新建 schema；增量 SQL 手工执行方式沿用数据库说明，不假定 Flyway 自动迁移。
-3. 核对真实知识库共享规则，增加 KnowledgeSearchService 的召回前 scope 限制，复用 MultiChannelRetrievalEngine；不得调用包含业务 MCP 的完整 RetrievalEngine 或聊天管道。
-4. SourceReader 依据服务端 evidenceId、存储块正文/hash/version 与可靠 metadata 读取；旧元数据不足时只做可信块级读取。GroundingChunk 仍是摘录，不能作为全文。
-5. 在 `eval/agentic-research/` 实现 QASPER/MuSiQue 转换、清单和分离的 corpus/questions，防止答案和 gold decomposition 入库。原始数据和清单路径已存在，固定 ID/种子与真实入库能力仍未实现。
-6. P2 的实际向量化/导入需记录 usage、幂等批次和错误；P3 再接入 SDK、首期研究模型及每次模型调用记录。已有 24 个类型诊断和 lint 配置问题应作为历史基线记录，不静默宣称全仓检查通过。
+### 范围与实现
+
+- 从 `feat/agentic-research@a1b61d7` 的干净工作区继续；本批没有切换分支、push 或合并。
+- 新增 ResearchBrief / EvidenceRecord / SubtaskResult，以及候选摘要、内部快照和原文读取结果契约。ResearchBrief 必须保存明确的 allowedKbIds；本批尚未实现运行创建接口，由 P3 负责按真实共享规则计算和保存初始范围。
+- [KnowledgeSearchService](../../bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/KnowledgeSearchService.java) 先检查运行归属与保存的范围，模型只能选其中的知识库。当前知识库全局共享，createdBy 是审计字段，不能据此宣称已有租户文档权限。
+- MultiChannelRetrievalEngine 新增显式范围入口，在召回前设置目标 collection，不走意图回退或补充到其他库；只使用可回查持久块的向量/关键词通道，原始越界结果在重排前拒绝。研究入口不调用聊天管道、完整 RetrievalEngine、MCP 或联网通道；原普通问答入口保留原行为。
+- 检索后在只读短事务中回查数据库 chunk/document/KB 的正文、启用状态、版本和实际位置，不采信索引内的摘录。摘要上限为 1024 个 Java 字符，标注 truncated；保存完整块内部快照和首次来源 taskId。
+- evidenceId 为 `ev-` 加 SHA-256，身份包含 run、知识库、文档、版本、块、正文及位置 hash。同一运行的不同 worker 共用 ID；不同运行、版本、内容或源块不合并。数据库冲突时保留首次快照。
+- [SourceReader](../../bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/SourceReader.java) 只接收 evidenceId，检查它属于本运行/用户，校验快照 hash，再检查当前来源。来源停用/删除时拒绝；正文、版本或位置变化时返回旧快照并标记 CHANGED。读取正文上限为 16000 个 Java 字符，保留剩余截断说明，不切断 UTF-16 代理对。
+- 检索候选初始 read=false；实际 read_source 后保存已提供文本、截断与 read=true。多文档证据共享运行命名空间；MuSiQue 等段落资料标记 AVAILABLE_EXCERPT，其余为 CHUNK，均不称为整篇全文。旧 metadata 不足时只返回真实块序号，不编造章节、页码或拼接邻块。
+- 新建 schema 与 [增量 SQL](../../resources/database/upgrades/v1.1.0/260917_02_research_evidence.sql) 增加 run/evidence/event 三张表、同用户请求唯一键和 run 内事件序号主键。运行租约、epoch、usage、事件计数为 P3 预留字段，尚未实现调度、取消或事件写入器。已有环境仍需手工执行 SQL，未升级业务库。
+- 新增 [P2 数据库验证脚本](../../scripts/validate-agentic-research-p2-database.sh)，随机创建隔离库，验证新建和重复升级后列、默认值、约束一致，以及历史草稿保留和存储约束；仅清理本次成功创建的测试库。
+
+调用顺序是：未来运行器保存服务端 ResearchBrief → search(run/owner/task, query, narrowedKbIds, limit) → 返回候选 evidenceId → read(run/owner, evidenceId) → 返回已读正文与 CURRENT/CHANGED。run/owner/task 标识只能由执行器传入，不能开放为模型可改参数；原生工具注册在 P3 实现。
+
+### 实际验证与边界
+
+- 后端 clean package 通过；16 个定向测试类共 101 个用例全部通过，0 失败/错误/跳过。本批新增 23 个用例，覆盖召回前范围、归属、稳定 ID、多文档、截断、来源变更/停用、虚构来源和 hash 不一致；同时复跑普通问答、检索、摄取、版本比较、草稿及取消检查。
+- PostgreSQL 16 隔离库实际通过 schema/init、两次增量执行、请求/事件唯一约束、来源快照冲突保留、归属 SQL 和历史草稿保留；测试库已清理。H2 只验证 Java store 的 SELECT/UPDATE 与结果映射；Java INSERT ON CONFLICT、MyBatis 来源读取和 Spring 事务未对 PostgreSQL 联调。
+- 首次 SQL 验证发现新建 schema 中残留的补丁前缀字符，修正后复跑通过，首次失败与清理日志保留。原始日志、JUnit 结果和 checks.json 位于本地忽略目录 `local-data/agentic-research/runs/20260917T072920_P2A/`，详细命令见验证报告。
+- 本批没有修改前端、接入 SDK、调用真实 embedding/rerank/研究模型、转换/导入数据或执行模型评测；不生成效果或费用成绩。前端检查沿用 P0/P1 的历史记录，本批未重跑。
+
+本批起始提交：`a1b61d7`。提交标题：`feat: add scoped research evidence snapshots`；从 Git log 按唯一标题查询 SHA，下一批补记。
+
+## P2 剩余工作的直接接续顺序
+
+1. 核对分支、Git 状态及本记录，继续主计划第 4.2/4.3/6/7 节；不要重新接入送检工具或直接跳到 P3。
+2. 为工具加入允许范围内的文档筛选，并在向量与关键词召回前生效。当前 Brief/工具只限制知识库，不能将事后过滤当作文档作用域。依据可靠 sectionPath/sourceParagraphId/sheet 等 metadata 支持受限邻接读取；旧元数据仍回退到块级，不跨章节、工作表或版本。
+3. 在 `eval/agentic-research/` 实现 QASPER/MuSiQue 转换、固定 ID/抽样种子、清单与 corpus/questions 分离，保留原文身份；答案、支持标签和 gold decomposition 不进入检索库或规划器。当前只有已下载的原始文件清单，本批未生成转换产物。
+4. 实现真实摄取链的幂等批次、分批重试、进度与 usage 记录；先导入小样例，再处理真实批量。补充 Java evidence store 与来源读取的 PostgreSQL 集成验证，记录当前库/语料快照及错误，不把隔离 SQL 或 mock 当作真实入库。
+5. 满足 P2 完成证据后再接入 P3 的 AgentScope 原生工具、首期研究模型、任务调度与调用记录器。本批的证据存储仍需结合 P3 的状态/epoch 写入条件处理取消和迟到结果；同用户唯一键不等于请求幂等执行已经实现。

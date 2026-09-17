@@ -43,14 +43,60 @@ import java.util.concurrent.Executors;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 class MultiChannelRetrievalEngineTest {
+
+    @Test
+    void researchScopeIsUsedBeforeRecallWithoutIntentFallbackOrWebSearch() {
+        SearchChannel vector = channel("vector", SearchChannelType.VECTOR,
+                channelResult(SearchChannelType.VECTOR, "vector", chunk("1", "body", "allowed", 0.9F)));
+        SearchChannel web = channel("web", SearchChannelType.WEB_SEARCH,
+                channelResult(SearchChannelType.WEB_SEARCH, "web", chunk("web", "web body", 1F)));
+        SearchChannel graph = channel("graph", SearchChannelType.GRAPH,
+                channelResult(SearchChannelType.GRAPH, "graph", chunk("graph", "summary", 1F)));
+        RetrievalScopeResolver resolver = mock(RetrievalScopeResolver.class);
+        var engine = new MultiChannelRetrievalEngine(List.of(vector, web, graph), List.of(),
+                resolver, Runnable::run, new SearchChannelProperties());
+
+        var result = engine.retrieveScopedKnowledgeChannels("query", RetrievalBudget.uniform(10),
+                List.of("allowed"));
+        ArgumentCaptor<SearchContext> context = ArgumentCaptor.forClass(SearchContext.class);
+        verify(vector).search(context.capture());
+        assertEquals(List.of("allowed"), context.getValue().getRetrievalScope().targetCollections());
+        assertTrue(context.getValue().getRetrievalScope().supplementCollections().isEmpty());
+        assertEquals(1, result.chunks().size());
+        verifyNoInteractions(resolver);
+        verify(web, never()).search(any());
+        verify(graph, never()).search(any());
+    }
+
+    @Test
+    void emptyResearchScopeNeverQueriesGlobalCollections() {
+        SearchChannel vector = mock(SearchChannel.class);
+        assertTrue(engine(List.of(vector), List.of(), RetrievalScope.global(0, List.of("other")))
+                .retrieveScopedKnowledgeChannels("query", RetrievalBudget.uniform(10), List.of()).chunks().isEmpty());
+        verifyNoInteractions(vector);
+    }
+
+    @Test
+    void scopeViolationsAreRejectedBeforeAnyRerank() {
+        SearchChannel vector = channel("vector", SearchChannelType.VECTOR,
+                channelResult(SearchChannelType.VECTOR, "vector", chunk("1", "body", "other", 0.9F)));
+        SearchResultPostProcessor rerank = mock(SearchResultPostProcessor.class);
+        assertThrows(IllegalStateException.class, () ->
+                engine(List.of(vector), List.of(rerank), RetrievalScope.global(0, List.of("other")))
+                        .retrieveScopedKnowledgeChannels("query", RetrievalBudget.uniform(10), List.of("allowed")));
+        verifyNoInteractions(rerank);
+    }
 
     @Test
     void derivesAttributionFromFinalChunksByCollection() {

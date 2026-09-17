@@ -2,7 +2,7 @@
 
 日期：2026-09-17。配合[实施计划](agentic-research-implementation-plan-2026-09-17.md)使用。
 
-本文件记录已核实的数据与配置、模型建议、费用假设及后续评测要求。当前仅完成文件清点和文档补充，尚未导入语料、切换模型或执行付费评测；下文费用均为预算估算。
+本文件记录已核实的数据与配置、模型建议、费用假设及后续评测要求。P2 已完成训练/开发转换和小批真实 embedding/search/read，完整语料导入正在执行；尚未切换研究生成模型或执行问答评分，下文生成费用仍为预算估算。
 
 ## 1. 模型与 API key
 
@@ -16,7 +16,7 @@
 | 向量化 | SiliconFlow 的 Qwen/Qwen3-Embedding-8B，1536 维 | 沿用 SILICONFLOW_API_KEY；相同语料与配置复用向量 |
 | 重排 | 百炼 qwen3-rerank | 沿用 BAILIAN_API_KEY，记录实际输入 usage |
 
-配置依据为 `bootstrap/src/main/resources/application.yaml`。当前 `qwen-flash` 不等于 `qwen3.7-flash`，仅选择旧 FAST 路由不会自动换成推荐模型；当前没有 DeepSeek 提供方配置。使用上述方案无需新增 DeepSeek 账户充值。凭证余额和有效性尚未通过付费调用验证。
+配置依据为 `bootstrap/src/main/resources/application.yaml`。当前 `qwen-flash` 不等于 `qwen3.7-flash`，仅选择旧 FAST 路由不会自动换成推荐模型；当前没有 DeepSeek 提供方配置。使用上述方案无需新增 DeepSeek 账户充值。P2 已通过 SiliconFlow 的真实 embedding 验证凭证有效性；百炼研究模型与 rerank 尚未调用，余额未核对。
 
 评测固定模型 ID、区域、thinking 设置、采样参数及各角色提示词版本。首次比较可统一关闭 thinking；如开启，单独记录并计入输出费用。架构之间允许职责对应的提示词不同，但每个模板必须版本化。评测配置不应静默回退到 Max 或其他高价模型；失败、重试和实际使用的模型都应进入结果记录。
 
@@ -41,7 +41,7 @@
 | B：单研究 Agent | 40,000 | 6,000 | 0.0128 元 |
 | C：主 Agent 按需委派 | 80,000 | 10,000 | 0.0240 元 |
 
-计算方式为逐次请求的 `输入 token × 对应单价 / 1,000,000 + 输出 token × 对应单价 / 1,000,000`，再汇总到题目和批次。当前没有实测 usage；这些 token 数只是预算场景，不能作为系统性能数据。
+计算方式为逐次请求的 `输入 token × 对应单价 / 1,000,000 + 输出 token × 对应单价 / 1,000,000`，再汇总到题目和批次。本表没有实测研究生成 usage；这些 token 数只是预算场景，不能作为系统性能数据。P2 embedding 的实际 usage 独立留档。
 
 - 固定 400 题各跑 A/B/C，共 1,200 次完整任务：Flash 生成费约 **15.68 元**；同样 token 假设下 Max 约 **196 元**。一次任务可能调用模型多次。
 - QASPER validation 1,005 题加 MuSiQue Full dev 4,834 题全部跑 A/B/C，共 17,517 次完整任务：Flash 生成费约 **228.89 元**。
@@ -69,7 +69,7 @@ MuSiQue Full 包含 Ans 的可回答样本，两个版本不能累计成独立�
 
 ## 4. 每批必须保留的记录
 
-每次运行创建独立 `runId`，例如 `20260917T140000_flash_regression_C`，结果落在 `local-data/agentic-research/runs/<runId>/`。以下文件是待实施的记录约定，目前未生成评测结果：
+每次运行创建独立 `runId`，例如 `20260917T140000_flash_regression_C`，结果落在 `local-data/agentic-research/runs/<runId>/`。以下是评测记录约定；P2 摄取已生成 traces/usage/source-probes 与批次摘要，不是预测/评分结果：
 
 | 文件 | 必需内容 |
 | --- | --- |

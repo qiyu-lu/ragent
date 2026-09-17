@@ -35,14 +35,14 @@ psql_p2 < resources/database/init_data_pg.sql
 
 p2_catalog_sql="SELECT table_name, column_name, udt_name, is_nullable, column_default
   FROM information_schema.columns
-  WHERE table_schema = 'public' AND table_name IN ('t_research_run', 't_research_evidence', 't_research_event')
+  WHERE table_schema = 'public' AND table_name IN ('t_research_run', 't_research_evidence', 't_research_event', 't_research_corpus_document')
   ORDER BY table_name, ordinal_position;
   SELECT conrelid::regclass, conname, pg_get_constraintdef(oid)
   FROM pg_constraint
-  WHERE conrelid IN ('t_research_run'::regclass, 't_research_evidence'::regclass, 't_research_event'::regclass)
+  WHERE conrelid IN ('t_research_run'::regclass, 't_research_evidence'::regclass, 't_research_event'::regclass, 't_research_corpus_document'::regclass)
   ORDER BY conrelid::regclass::text, conname;
   SELECT tablename, indexname, indexdef FROM pg_indexes
-  WHERE schemaname = 'public' AND tablename IN ('t_research_run', 't_research_evidence', 't_research_event')
+  WHERE schemaname = 'public' AND tablename IN ('t_research_run', 't_research_evidence', 't_research_event', 't_research_corpus_document', 't_knowledge_vector')
   ORDER BY tablename, indexname;"
 psql_p2 -Atc "$p2_catalog_sql" > "$p2_scratch/fresh-catalog.txt"
 
@@ -55,11 +55,15 @@ VALUES ('p2-history', 'conversation', 'answer', 'document', 'owner', 'History se
 DROP TABLE t_research_event;
 DROP TABLE t_research_evidence;
 DROP TABLE t_research_run;
+DROP TABLE t_research_corpus_document;
+DROP INDEX idx_vector_collection_doc;
 SQL
 psql_p2 < resources/database/upgrades/v1.1.0/260917_02_research_evidence.sql
 psql_p2 < resources/database/upgrades/v1.1.0/260917_03_research_neighbors.sql
+psql_p2 < resources/database/upgrades/v1.1.0/260917_04_research_corpus.sql
 psql_p2 < resources/database/upgrades/v1.1.0/260917_02_research_evidence.sql
 psql_p2 < resources/database/upgrades/v1.1.0/260917_03_research_neighbors.sql
+psql_p2 < resources/database/upgrades/v1.1.0/260917_04_research_corpus.sql
 psql_p2 -Atc "$p2_catalog_sql" > "$p2_scratch/upgraded-catalog.txt"
 diff -u "$p2_scratch/fresh-catalog.txt" "$p2_scratch/upgraded-catalog.txt"
 

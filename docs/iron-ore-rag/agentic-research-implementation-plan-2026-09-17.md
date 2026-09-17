@@ -1,6 +1,6 @@
 # 统一研究 Agent 与计划草稿改造实施计划
 
-> 制定日期：2026-09-17。实施状态：P0、P1 已完成；P2 进行中，已完成数据契约、知识库/文档作用域、块级及受限邻接证据快照，以及 QASPER/MuSiQue 训练/开发数据转换与固定抽样；真实幂等导入待续，P3—P8 未开始。当前进度与验证边界见[执行记录](agentic-research-execution-log.md)和[验证报告](agentic-research-validation-report.md)。
+> 制定日期：2026-09-17。实施状态：P0、P1 已完成；P2 进行中，已完成数据契约、知识库/文档作用域、块级及受限邻接证据快照，以及 QASPER/MuSiQue 训练/开发数据转换与固定抽样；第四批已接通真实来源摄取、身份映射和幂等导入，小批真实 search/read 已通过，完整批次正在执行；P3—P8 未开始。当前进度与验证边界见[执行记录](agentic-research-execution-log.md)和[验证报告](agentic-research-validation-report.md)。
 >
 > 本文件是后续实施的主要交接入口。它记录本轮已经确定的产品方向、技术选择、删除范围、数据准备、阶段提交和验证方式。后续无需重新阅读完整聊天，也不要重新把方向改回送检助手。
 >
@@ -308,7 +308,7 @@ local-data/agentic-research/
 
 ### 6.3 实施者负责的数据处理
 
-P2 第三批已新增 [eval/agentic-research/](../../eval/agentic-research/README.md)，复用现有分批 Parquet 读取及文件指纹函数，实现以下转换、字段隔离与固定抽样要求；真实幂等导入仍待接续。整体约定如下。
+P2 第三批已新增 [eval/agentic-research/](../../eval/agentic-research/README.md)，复用现有分批 Parquet 读取及文件指纹函数，实现以下转换、字段隔离与固定抽样要求；第四批已补齐真实摄取、身份映射、幂等批次和 usage，小批联调通过，完整批次正在执行。整体约定如下。
 
 - 记录原始文件名、大小、SHA-256、数据集版本/来源、split、转换脚本版本和语料条数，形成 manifest。
 - 把语料与问题标注分开：corpus.jsonl 保存可检索正文；questions.jsonl 保存问题、答案和 gold evidence，只供评测器使用。
@@ -334,7 +334,7 @@ P2 第三批已新增 [eval/agentic-research/](../../eval/agentic-research/READM
 
 2026-09-17 已核对实际目录 `local-data/agentic-research/raw/`：QASPER 共 1,585 篇论文、5,049 个问题；MuSiQue Ans 的 train/dev 分别有 19,938/2,417 题，Full 的 train/dev 分别有 39,876/4,834 题。Full 包含 Ans 的可回答题，不能相加为独立样本总数；MuSiQue test 文件没有答案字段，不能直接计算本地 gold 答案指标。
 
-原始文件大小、SHA-256 和实际条数已保存到本地 `local-data/agentic-research/manifests/source-inventory-2026-09-17.json`。该记录只证明下载清点。P2 第三批已转换完整 QASPER train/validation 与 MuSiQue Full train/dev，实际条数、来源、转换源码及产物指纹见[紧凑清单](../../eval/agentic-research/manifests/prepared-development-2026-09-17.json)；真实 test 未转换。语料尚未导入，没有质量评测或付费模型调用；原始及转换大文件继续留在 Git 忽略目录。
+原始文件大小、SHA-256 和实际条数已保存到本地 `local-data/agentic-research/manifests/source-inventory-2026-09-17.json`。该记录只证明下载清点。P2 第三批已转换完整 QASPER train/validation 与 MuSiQue Full train/dev，实际条数、来源、转换源码及产物指纹见[紧凑清单](../../eval/agentic-research/manifests/prepared-development-2026-09-17.json)；真实 test 未转换。第四批已用真实 embedding 导入小批并验证搜索/阅读，完整训练/开发批次正在执行；没有问答质量评分，原始及转换大文件继续留在 Git 忽略目录。
 
 ## 7. 分阶段实施与提交
 
@@ -370,7 +370,7 @@ P2 第三批已新增 [eval/agentic-research/](../../eval/agentic-research/READM
 
 ### P2：数据适配、统一证据与检索阅读工具
 
-**当前状态（2026-09-17）：进行中。** 已实现 ResearchBrief / EvidenceRecord / SubtaskResult、KnowledgeSearchService、SourceReader 和三张研究表。第二批加入文档限制、可靠邻块与首次快照复用，Java 存储及来源事务已在隔离 PostgreSQL 联调。第三批完成 QASPER/MuSiQue 训练/开发转换、20/200 固定抽样、gold-free queries 和完整字段/来源校验，真实开发 split 重跑逐字节一致。当前在线工具仍是可供 P3 注册的 Java 服务；实际 metadata 摄取接线、幂等批量导入及真实入库复核待完成，不能据此视为 P2 全部完成或新研究 Agent 已上线。
+**当前状态（2026-09-17）：进行中。** 已实现 ResearchBrief / EvidenceRecord / SubtaskResult、KnowledgeSearchService、SourceReader 和三张研究表。第二批加入文档限制、可靠邻块与首次快照复用，Java 存储及来源事务已在隔离 PostgreSQL 联调。第三批完成 QASPER/MuSiQue 训练/开发转换、20/200 固定抽样、gold-free queries 和完整字段/来源校验，真实开发 split 重跑逐字节一致。当前在线工具仍是可供 P3 注册的 Java 服务；第四批已实现实际 metadata 摄取接线与幂等批量导入，小批真实入库/search/read 已通过，完整训练/开发批次正在执行。完整批次验收前 P2 仍未完成；新研究 Agent 在 P3 接续。
 
 **工作：**
 

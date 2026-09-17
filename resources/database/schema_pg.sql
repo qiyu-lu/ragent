@@ -958,3 +958,16 @@ COMMENT ON COLUMN t_agent_prompt.update_by IS '更新人';
 COMMENT ON COLUMN t_agent_prompt.create_time IS '创建时间';
 COMMENT ON COLUMN t_agent_prompt.update_time IS '更新时间';
 COMMENT ON COLUMN t_agent_prompt.deleted IS '是否删除 0：正常 1：删除';
+
+-- P2 public corpus identity mapping. Existing databases apply 260917_04_research_corpus.sql.
+-- Run explicitly with psql. Existing historical upgrades remain unchanged.
+CREATE TABLE t_research_corpus_document (
+    kb_id VARCHAR(20) NOT NULL REFERENCES t_knowledge_base(id),
+    source_document_id VARCHAR(256) NOT NULL,
+    doc_id VARCHAR(20) NOT NULL UNIQUE REFERENCES t_knowledge_document(id),
+    import_hash VARCHAR(64) NOT NULL,
+    create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (kb_id, source_document_id)
+);
+-- Existing PG sink performs a document-scoped delete before replacement.
+CREATE INDEX idx_vector_collection_doc ON t_knowledge_vector (collection_name, (metadata->>'doc_id'));

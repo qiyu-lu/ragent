@@ -4,7 +4,7 @@
 
 ## 当前接续点
 
-P0、P1 已完成；P2 进行中，已完成证据工具、Java/PG 联调、QASPER/MuSiQue 训练/开发转换、固定抽样和字段隔离/来源校验；P3—P8 未开始。接下来补齐真实来源 metadata 摄取、离线身份到实际 docId/chunkId 的映射与幂等导入。当前没有公开语料入库或模型调用，Java 服务尚未接入 SDK 工具、运行器或聊天入口，不能把离线转换通过写成研究 Agent 已完成。
+P0、P1 已完成；P2 进行中，已完成证据工具、Java/PG 联调、QASPER/MuSiQue 训练/开发转换、固定抽样和字段隔离/来源校验；P3—P8 未开始。第四批已接通真实来源 metadata、实际主键映射与幂等摄取，并完成小批真实 embedding/search/read；完整训练/开发批次正在执行。Java 服务尚未接入 SDK 工具、运行器或聊天入口，不能将 P2 链路联调写成新研究 Agent 已上线。
 
 ## P0：基线、分支与接入准备（2026-09-17，已完成）
 
@@ -151,10 +151,25 @@ app 严格类型检查仍有 24 个既有诊断，与 P0 的诊断逐条一致�
 
 本批起始提交：`365d3e4`。提交标题：`feat: prepare reproducible research datasets`；从 Git log 按唯一标题查询 SHA，下一批补记。
 
-## P2 剩余工作的直接接续顺序
+## P2 第四批：来源摄取、幂等导入与真实联调（2026-09-17）
 
-1. 核对分支、Git 状态及本记录，继续主计划第 4.2/4.3/6/7 节；不要重新接入送检工具或直接跳到 P3。
-2. 读取 research-data-v1 各 manifest 并用 verify_prepared 复核。真实摄取只消费 corpus，不上传 questions/queries 的 gold；QASPER 按 paper 和原章节/段落下标还原顺序，MuSiQue 每个去重段落单独保存为可用片段。真实 test 留到最终配置确定后。
-3. 补齐来源 metadata 接线与离线 source/document ID → 实际 docId/chunkId 的映射。KnowledgeDocumentUploadRequest 当前不接受任意 metadata，直接上传 Markdown 不能证明原始身份进入每个 chunk；重复章节名称的邻接还需结合 section_index，旧 metadata 缺失时仍回退块级。离线 SHA-256 ID 不能直接填入数据库 20 字符主键。
-4. 实现真实摄取链的幂等批次、分批重试、进度与 usage 记录；先小样例再真实批量，用入库来源复核 search/read 与引用映射。明确 corpus 段落数和实际生成 chunk 数、原始分组数与模型运行记录数；Java/PG 合成测试和离线转换不能替代此验证。
-5. 满足 P2 完成证据后再接入 P3 的 AgentScope 原生工具、首期研究模型、任务调度与调用记录器。本批的证据存储仍需结合 P3 的状态/epoch 写入条件处理取消和迟到结果；同用户唯一键不等于请求幂等执行已经实现。
+用户要求直接完成 P2，沿真实链路导入可用训练/开发语料，保持实现简单；本批从干净 `943c11a` 开始，没有接入 P3 SDK/运行器。
+
+### 实现
+
+- 新增 [ResearchCorpusImporter](../../bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/ResearchCorpusImporter.java)，处理已解析的可信来源段落，复用 ParagraphChunker / ChunkAssembler / ChunkEmbeddingService 以及关系、PG 向量落点。QASPER 按原始字段/章节/段落下标还原论文；MuSiQue 每个摘录独立成文档，保持 AVAILABLE_EXCERPT。
+- 来源 metadata 随每块进入关系/向量索引，保留 source_paragraph_id、raw source hash、原始标题与 paper/section/paragraph 位置。正文可能经过现有 TextSplitter 规范化/切分，原段落 hash 与实际块 hash 分开记录；不把原始段落数当块数。
+- `section_index` / `source_field` 加入 SourceReader 来源边界，重复章节名不跨原章节展开；无章节名但有可靠原下标的正文仍可在同章节展开。
+- 新增显式增量 [260917_04_research_corpus.sql](../../resources/database/upgrades/v1.1.0/260917_04_research_corpus.sql)，来源文档与真实主键映射在索引短事务中一并提交。同来源/配置重试保留 docId/chunkId，不再调用 embedding；变更内容/metadata/分块预算/模型要求新语料库。失败批次回滚，网络调用不持有 DB 事务。没有增加通用工作流、模型回退或新权限体系。
+- 新增 [导入命令](../../eval/agentic-research/import_corpus.py) 与独立 Java 命令入口。SQLite 分组排序，分批续入、重试与进度记录；只把 corpus 送到摄取层，gold-free queries 仅供验证。固定模型为现有 SiliconFlow Qwen/Qwen3-Embedding-8B / 1536 维；单请求最多 32 条，QASPER 默认 8 篇/批、MuSiQue 256 条/批，最多四个 split 并行，每个 split 最多 8 个独立批次在途，最多 16 个 embedding 请求在途。未启动 Web/MQ 或生成模型。
+- 逐 HTTP 请求保存开始/完成与原始供应商 usage，按 call_id 合并计量。没有回包的请求保持 unknown，不填免费 0。导入后审计完整文档/段落/块/向量映射与标注字段隔离，再用三条实际 query 做 scoped search/read，检查越界和缺失证据错误。
+
+### 当前验证
+
+- Python 19 个转换/导入准备测试通过；普通 Java 回归 123 个和新增 usage 测试 3 个通过；实际 PostgreSQL 11 个用例通过，涵盖完整 Java 摄取写入、重复身份/配置、同名章节边界、MuSiQue 同标题独立摘录、供应商失败及索引失败后的回滚/再入库。
+- 数据库脚本证明 fresh schema 与重复执行 02/03/04 升级的列、约束和索引一致，历史草稿保留；后端 package 通过。临时测试库已清理。
+- 两种格式已用真实 SiliconFlow 向量小批入库；QASPER 的 17 篇/801 块已完成实际搜索/邻读，重复续入 801 块没有重新向量化；MuSiQue 的 392 条摘录已入库，真实阅读返回 AVAILABLE_EXCERPT。
+- 小批首次网络超时、独立命令漏注册已有时间填充器导致回滚，以及停止旧顺序命令的记录保留。时间填充接线已修正，最终命令在新库/升级库与小批实际入库上验证。
+- 完整 QASPER train/validation 和 MuSiQue Full train/dev 批量正在执行，结果保存在独立 `research_corpus_v1`，不改现有业务库。小批原始记录在 `local-data/agentic-research/runs/20260917T084500_P2D_smoke/`，完整批次在 `local-data/agentic-research/runs/20260917T085000_P2D_full/`。
+
+本批只证明真实数据摄取及检索阅读链路，不运行答案生成、A/B/C 或 EM/F1；真实 test 仍不转换/入库。Milvus/ES 服务、SDK 原生工具、研究取消/epoch 和页面 E2E 尚未验证，属于后续阶段。

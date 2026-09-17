@@ -64,6 +64,7 @@ class ResearchEvidencePostgresIT {
     private static ResearchSourceCatalog catalog;
     private static KnowledgeBaseMapper bases;
     private static KnowledgeDocumentMapper documents;
+    private static KnowledgeChunkMapper chunkRows;
     private static AnnotationConfigApplicationContext context;
     private static final List<Boolean> sourceTransactions = new CopyOnWriteArrayList<>();
     private static final ObjectMapper json = new ObjectMapper();
@@ -97,7 +98,7 @@ class ResearchEvidencePostgresIT {
         var config = new MybatisConfiguration();
         config.setMapUnderscoreToCamelCase(true);
         config.setEnvironment(new Environment("isolated-pg", new SpringManagedTransactionFactory(), dataSource));
-        GlobalConfigUtils.setGlobalConfig(config, new GlobalConfig().setDbConfig(new GlobalConfig.DbConfig()));
+        GlobalConfigUtils.setGlobalConfig(config, new GlobalConfig().setDbConfig(new GlobalConfig.DbConfig()).setMetaObjectHandler(new com.nageoffer.ai.ragent.framework.database.MyMetaObjectHandler()));
         config.addInterceptor(new ObserveSourceTransactions());
         config.addMapper(KnowledgeBaseMapper.class);
         config.addMapper(KnowledgeChunkMapper.class);
@@ -107,6 +108,7 @@ class ResearchEvidencePostgresIT {
         bases = session.getMapper(KnowledgeBaseMapper.class);
         documents = session.getMapper(KnowledgeDocumentMapper.class);
         var chunks = session.getMapper(KnowledgeChunkMapper.class);
+        chunkRows = chunks;
         context = new AnnotationConfigApplicationContext();
         context.register(Transactions.class);
         context.registerBean("transactionManager", PlatformTransactionManager.class,
@@ -161,6 +163,118 @@ class ResearchEvidencePostgresIT {
         assertEquals(saved, store.save(owner, second));
         assertEquals("first", saved.sourceText());
         assertTrue(store.markRead(owner, saved).read());
+    }
+
+    @Test
+    void corpusImportPreservesOrderSameNamedSectionBoundariesAndReusesChunks() {
+        var embedding = corpusEmbeddings();
+        var importer = corpusImporter(embedding, new com.nageoffer.ai.ragent.rag.core.vector.PgVectorStoreService(jdbc, json));
+        var source = new ResearchCorpusImporter.Document("qasper:" + prefix,
+                List.of(corpusUnit("later", "later body", 1, 0), corpusUnit("second", "second body", 0, 1),
+                        corpusUnit("first", "first body", 0, 0)));
+        var kb = bases.selectById(kbId);
+        var first = importer.importBatch(kb, List.of(source), com.nageoffer.ai.ragent.core.chunk.model.ChunkBudget.defaults());
+        assertEquals(List.of(prefix + "-first", prefix + "-second", prefix + "-later"), first.mappings().stream().map(ResearchCorpusImporter.Mapping::sourceId).toList());
+        var middle = first.mappings().get(1);
+        var neighborhood = catalog.neighbors(middle.chunkId(), Set.of(kbId), Set.of(middle.docId()));
+        assertEquals(List.of("first body", "second body"), neighborhood.sources().stream().map(s -> s.chunk().getContent()).toList());
+        var reused = importer.importBatch(kb, List.of(source), com.nageoffer.ai.ragent.core.chunk.model.ChunkBudget.defaults());
+        assertEquals(first.mappings(), reused.mappings());
+        assertEquals(1, reused.reusedDocuments());
+        assertEquals(0, reused.embeddedChunks());
+        verify(embedding, times(1)).embedBatch(anyList(), eq("fixture"));
+        assertThrows(IllegalArgumentException.class, () -> importer.importBatch(kb, List.of(source), new com.nageoffer.ai.ragent.core.chunk.model.ChunkBudget(512,64,50)));
+        com.nageoffer.ai.ragent.framework.context.UserContext.clear();
+    }
+
+    @Test
+    void failedCorpusBatchRollsBackDocumentsMappingsChunksAndVectorsAndCanRetry() {
+        var embedding = corpusEmbeddings();
+        var vectors = new com.nageoffer.ai.ragent.rag.core.vector.PgVectorStoreService(jdbc, json);
+        var failing = spy(vectors);
+        doAnswer(invocation -> { invocation.callRealMethod(); throw new IllegalStateException("injected index failure"); })
+                .when(failing).indexDocumentChunks(anyString(), anyString(), anyList());
+        var source = new ResearchCorpusImporter.Document("qasper:" + prefix, List.of(corpusUnit("p", "source body", 0, 0)));
+        var kb = bases.selectById(kbId);
+        int before = jdbc.queryForObject("SELECT count(*) FROM t_knowledge_document WHERE kb_id=?", Integer.class, kbId);
+        assertThrows(IllegalStateException.class, () -> corpusImporter(embedding, failing).importBatch(kb, List.of(source), com.nageoffer.ai.ragent.core.chunk.model.ChunkBudget.defaults()));
+        assertEquals(before, jdbc.queryForObject("SELECT count(*) FROM t_knowledge_document WHERE kb_id=?", Integer.class, kbId));
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM t_research_corpus_document WHERE kb_id=?", Integer.class, kbId));
+        var imported = corpusImporter(embedding, vectors).importBatch(kb, List.of(source), com.nageoffer.ai.ragent.core.chunk.model.ChunkBudget.defaults());
+        assertEquals(1, imported.importedDocuments());
+        assertEquals("source body", catalog.load(imported.mappings().get(0).chunkId(), Set.of(kbId)).chunk().getContent());
+        com.nageoffer.ai.ragent.framework.context.UserContext.clear();
+    }
+
+    @Test
+    void corpusAnnotationsAndProviderFailuresCannotPublishDocuments() {
+        var embedding = corpusEmbeddings();
+        var importer = corpusImporter(embedding, new com.nageoffer.ai.ragent.rag.core.vector.PgVectorStoreService(jdbc, json));
+        var unit = corpusUnit("p", "source body", 0, 0);
+        Map<String,Object> leaked = new HashMap<>(unit.metadata()); leaked.put("answer", "gold secret");
+        var invalid = new ResearchCorpusImporter.Unit(unit.schema_version(),unit.id(),unit.dataset(),unit.split(),unit.document_id(),unit.title(),unit.text(),unit.content_hash(),unit.source_extent(),leaked);
+        var kb = bases.selectById(kbId);
+        assertThrows(IllegalArgumentException.class, () -> importer.importBatch(kb, List.of(new ResearchCorpusImporter.Document(unit.document_id(),List.of(invalid))), com.nageoffer.ai.ragent.core.chunk.model.ChunkBudget.defaults()));
+        verifyNoInteractions(embedding);
+        when(embedding.embedBatch(anyList(), anyString())).thenThrow(new IllegalStateException("provider failure"));
+        assertThrows(IllegalStateException.class, () -> importer.importBatch(kb, List.of(new ResearchCorpusImporter.Document(unit.document_id(),List.of(unit))), com.nageoffer.ai.ragent.core.chunk.model.ChunkBudget.defaults()));
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM t_research_corpus_document WHERE kb_id=?", Integer.class, kbId));
+        com.nageoffer.ai.ragent.framework.context.UserContext.clear();
+    }
+
+    @Test
+    void musiqueImportsIndependentAvailableExcerptsWithTheSameTitle() {
+        var embedding = corpusEmbeddings();
+        var importer = corpusImporter(embedding,new com.nageoffer.ai.ragent.rag.core.vector.PgVectorStoreService(jdbc,json));
+        List<ResearchCorpusImporter.Document> sources = new ArrayList<>();
+        for (String suffix : List.of("a","b")) {
+            String id = prefix + "-" + suffix, body = "Independent source " + suffix;
+            var unit = new ResearchCorpusImporter.Unit("research-corpus-v1",id,"musique","dev",id,"Same article",body,
+                    SecureUtil.sha256(body),"AVAILABLE_EXCERPT",Map.of("dataset","musique","split","dev",
+                    "source_paragraph_id",id,"source_extent","available_excerpt","document_version","musique-v1.0",
+                    "block_type","paragraph","source_field","paragraph_text"));
+            sources.add(new ResearchCorpusImporter.Document(id,List.of(unit)));
+        }
+        var budget = new com.nageoffer.ai.ragent.core.chunk.model.ChunkBudget(768,96,50,2);
+        var result = importer.importBatch(bases.selectById(kbId),sources,budget);
+        assertEquals(2,result.importedDocuments());
+        assertEquals(2,result.mappings().stream().map(ResearchCorpusImporter.Mapping::docId).distinct().count());
+        for (var mapping : result.mappings()) {
+            var spec = new com.nageoffer.ai.ragent.knowledge.support.IngestionSpecCodec(json).read(
+                    jdbc.queryForObject("SELECT ingestion_spec::text FROM t_knowledge_document WHERE id=?",String.class,mapping.docId()));
+            assertEquals(budget,spec.budget());
+            var source = catalog.load(mapping.chunkId(),Set.of(kbId));
+            assertEquals(EvidenceRecord.SourceExtent.AVAILABLE_EXCERPT,source.extent());
+            assertEquals(1,catalog.neighbors(mapping.chunkId(),Set.of(kbId),Set.of(mapping.docId())).sources().size());
+        }
+        com.nageoffer.ai.ragent.framework.context.UserContext.clear();
+    }
+
+    private ResearchCorpusImporter.Unit corpusUnit(String suffix, String body, int section, int paragraph) {
+        String id = prefix + "-" + suffix;
+        return new ResearchCorpusImporter.Unit("research-corpus-v1",id,"qasper","train","qasper:"+prefix,"paper",body,
+                SecureUtil.sha256(body),"CHUNK",Map.of("dataset","qasper","split","train","source_paragraph_id",id,
+                "source_extent","chunk","document_version","V1","section_path",List.of("Same name"),"section_index",section,
+                "paragraph_index",paragraph,"source_field","full_text"));
+    }
+    private EmbeddingService corpusEmbeddings() {
+        com.nageoffer.ai.ragent.framework.context.UserContext.set(com.nageoffer.ai.ragent.framework.context.LoginUser.builder().userId("p2-tester").username("p2-tester").build());
+        var embedding = mock(EmbeddingService.class);
+        when(embedding.embedBatch(anyList(), eq("fixture"))).thenAnswer(invocation ->
+                ((List<?>)invocation.getArgument(0)).stream().map(t -> {
+                    List<Float> v = new ArrayList<>(Collections.nCopies(1536,0F)); v.set(0,1F); return v;
+                }).toList());
+        return embedding;
+    }
+    private ResearchCorpusImporter corpusImporter(EmbeddingService embedding, com.nageoffer.ai.ragent.rag.core.vector.VectorStoreService vectors) {
+        var transactions = new org.springframework.transaction.support.TransactionTemplate(context.getBean(PlatformTransactionManager.class));
+        var defaults = new com.nageoffer.ai.ragent.rag.config.RAGDefaultProperties(); defaults.setDimension(1536);
+        var writer = new com.nageoffer.ai.ragent.core.ingest.sink.ChunkIndexWriter(List.of(
+                new com.nageoffer.ai.ragent.knowledge.sink.RelationalChunkSink(chunkRows,new com.nageoffer.ai.ragent.infra.token.HeuristicTokenCounterService(),json),
+                new com.nageoffer.ai.ragent.rag.core.vector.sink.VectorChunkSink(vectors)),transactions);
+        return new ResearchCorpusImporter(jdbc,json,new com.nageoffer.ai.ragent.core.chunk.blockaware.ParagraphChunker(),
+                new com.nageoffer.ai.ragent.core.ingest.embed.ChunkEmbeddingService(embedding),writer,
+                new com.nageoffer.ai.ragent.knowledge.support.VectorTargetResolver(defaults),transactions);
     }
 
     @Test

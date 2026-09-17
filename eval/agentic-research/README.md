@@ -1,6 +1,6 @@
 # 统一研究工作流的数据准备
 
-这里实现 P2 的离线转换与校验。运行转换不创建知识库、不生成向量、不调用模型，也不产生问答成绩。真实摄取的幂等导入、usage 记录和研究运行器仍待接续，进度见[执行记录](../../docs/iron-ore-rag/agentic-research-execution-log.md)。
+这里实现 P2 的离线转换、校验与真实幂等摄取。转换不调用模型；`import_corpus.py --execute` 复用项目已有分块、向量化和索引落点，再用知识搜索/原文读取服务回查。研究运行器在 P3 接续，进度见[执行记录](../../docs/iron-ore-rag/agentic-research-execution-log.md)。
 
 ## 来源与环境
 
@@ -55,12 +55,25 @@ MuSiQue corpus 按原始标题与精确正文去重，同标题不同正文仍�
 
 固定 profile 按记录抽样，不保证两个版本都入选；Full 的 group sufficiency 等成对指标需要另行固定完整分组样本，不能直接在本批 200 行子集上冒用官方完整分组成绩。
 
-## 下一步摄取接线
+## 真实摄取
 
-QASPER 应按 document_id 聚合段落，按 source_field / section_index / paragraph_index 还原顺序；不要按 corpus.jsonl 的 hash 排序拼正文。重复章节名要保留 section_index，邻接检查不能只凭相同标题跨节点。MuSiQue 每个去重段落单独作为可用片段导入。
+[import_corpus.py](import_corpus.py) 校验转换产物，按 source_field / section_index / paragraph_index 聚合和排序 QASPER 论文；MuSiQue 每个段落独立成文档。仅 documents.jsonl 进入 Java 摄取命令，questions 的答案/支持/分解标注不进入正文、metadata 或模型请求。
 
-现有 [KnowledgeDocumentUploadRequest](../../bootstrap/src/main/java/com/nageoffer/ai/ragent/knowledge/controller/request/KnowledgeDocumentUploadRequest.java) 没有任意来源 metadata 参数；直接上传 Markdown 不证明 paper/paragraph 身份已进入每个 chunk。后续需让受控摄取保留这些 metadata，沿真实分块、embedding、关系表及向量持久化链执行；保留离线 source/document ID → 实际 docId/chunkId 的映射与首批状态。正文 ID/hash 不是已生成向量的证明。
+先构建后端，再准备输入。省略 `--execute` 只生成输入，不创建数据库或调用供应商：
 
-接续实现幂等批次、失败重试、进度与供应商 usage，先导入小样例，再做真实批量；检索/read_source 用实际入库来源复核。已有 Java/PG 合成测试保持独立，P3 的 SDK/运行器/取消机制不属于本转换工具。
+```bash
+./mvnw -o -pl bootstrap -am -DskipTests package
+python3 eval/agentic-research/import_corpus.py --prepared local-data/agentic-research/prepared/research-data-v1/qasper-validation --prepared local-data/agentic-research/prepared/research-data-v1/musique-dev --run-dir local-data/agentic-research/runs/p2-smoke --profile smoke
+```
 
-本批实际转换条数和指纹见[紧凑清单](manifests/prepared-development-2026-09-17.json)，成功/失败日志与原始生成物路径见[验证报告](../../docs/iron-ore-rag/agentic-research-validation-report.md)。
+加 `--execute` 执行真实摄取；`--profile full` 导入所列 split 的全部语料。默认只创建/复用本机独立 `research_corpus_v1` 数据库，保留结果供 P3 使用；不加载业务种子、不启动 Web/MQ 服务、不运行答案生成或质量评分。`--prepared` 可重复指定四份训练/开发产物，真实 test 仍不使用。PostgreSQL 容器默认 `ragent-iron-ore-dev-postgres-1`。API key 只从环境/IDEA 的 RagentApplication 配置读取，沿用已有提取器，不输出或落盘凭证。
+
+[ResearchCorpusImporter](../../bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/ResearchCorpusImporter.java) 使用已有 ParagraphChunker、ChunkAssembler、ChunkEmbeddingService、RelationalChunkSink 和 PgVectorStoreService。每个来源段落独立分块，不经 Markdown 标题猜测或跨段打包；源 hash/标题、paper/paragraph/section 位置进入关系库和向量 metadata。长段落切成多块仍共享原始 source_paragraph_id。section_index 参与邻块边界，相同章节名不能跨节点展开。
+
+[260917_04_research_corpus.sql](../../resources/database/upgrades/v1.1.0/260917_04_research_corpus.sql) 显式增量创建来源文档映射；新库使用 schema_pg.sql，不假定 Flyway 自动发现脚本。映射与实际 doc/chunk/vector 在短事务内提交；embedding 在事务外执行。已提交的同内容/配置重试复用原 docId/chunkId，不重新向量化；内容、metadata、预算或模型变化需新建语料库。单批失败回滚，命令按批重试；重启使用相同目录和命令，依据 DB 映射继续，进度文件仅供展示。
+
+默认 QASPER 每批 8 篇，MuSiQue 每批 256 条；可用 `--batch-documents` 调整。每次供应商请求最多 32 条，单 split 最多 16 个同步请求，最多四个 split 并行，每个 split 最多 8 个独立批次在途，最多 16 个 embedding 请求在途。固定模型为 SiliconFlow Qwen/Qwen3-Embedding-8B，默认 1536 维，没有模型回退。已有数据库必须维度一致。
+
+每个 split 保存 input/job、documents、mapping、progress/complete、traces、usage 和 source-probes。usage 逐请求保留实际 token、状态与耗时，未提供 usage 的失败标为 unknown；批次重试产生的额外请求也保留。mapping 记录离线来源文档/段落到实际 docId/chunkId/序号/hash；启动时重新导出已提交映射。导入结束用前三个 gold-free query 验证实际 scoped search 与原文/邻块读取，并检查越范围与不存在证据错误。这是链路联调，不是三题答案质量成绩。
+
+转换条数和指纹见[转换清单](manifests/prepared-development-2026-09-17.json)，实际导入、失败及验证记录见[验证报告](../../docs/iron-ore-rag/agentic-research-validation-report.md)。

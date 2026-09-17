@@ -39,6 +39,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.time.Instant;
 
 /**
  * OpenAI 兼容协议 EmbeddingClient 抽象基类
@@ -138,56 +141,86 @@ public abstract class AbstractOpenAIStyleEmbeddingClient implements EmbeddingCli
         }
         Request request = requestBuilder.build();
 
-        JsonObject json;
-        try (Response response = httpClient.newCall(request).execute()) {
-            if (!response.isSuccessful()) {
-                String errBody = HttpResponseHelper.readBody(response.body());
-                log.warn("{} embedding 请求失败: status={}, body={}", provider(), response.code(), errBody);
+        JsonObject json = null;
+        Map<String, Object> observation = new LinkedHashMap<>();
+        observation.put("call_id", java.util.UUID.randomUUID().toString());
+        observation.put("started_at", Instant.now().toString());
+        observation.put("provider", provider());
+        observation.put("model", target.candidate().getModel());
+        observation.put("inputs", texts.size());
+        observation.put("dimensions", target.candidate().getDimension());
+        observation.put("usage", null);
+        observation.put("usage_status", "unknown");
+        observation.put("success", false);
+        observation.put("request_state", "STARTED");
+        EmbeddingUsageCapture.record(observation);
+        long started = System.nanoTime();
+        try {
+            try (Response response = httpClient.newCall(request).execute()) {
+                observation.put("http_status", response.code());
+                observation.put("request_id", response.header("x-request-id"));
+                if (!response.isSuccessful()) {
+                    String errBody = HttpResponseHelper.readBody(response.body());
+                    log.warn("{} embedding 请求失败: status={}, body={}", provider(), response.code(), errBody);
+                    throw new ModelClientException(
+                            provider() + " embedding 请求失败: HTTP " + response.code(),
+                            ModelClientErrorType.fromHttpStatus(response.code()),
+                            response.code()
+                    );
+                }
+                json = HttpResponseHelper.parseJson(response.body(), provider());
+                if (json.has("usage") && !json.get("usage").isJsonNull()) {
+                    observation.put("usage", new com.google.gson.Gson().fromJson(json.get("usage"), Map.class));
+                    observation.put("usage_status", "provider");
+                }
+                if (json.has("id")) observation.put("request_id", json.get("id").getAsString());
+            } catch (IOException e) {
                 throw new ModelClientException(
-                        provider() + " embedding 请求失败: HTTP " + response.code(),
-                        ModelClientErrorType.fromHttpStatus(response.code()),
-                        response.code()
-                );
+                        provider() + " embedding 请求失败: " + e.getMessage(),
+                        ModelClientErrorType.NETWORK_ERROR, null, e);
             }
-            json = HttpResponseHelper.parseJson(response.body(), provider());
-        } catch (IOException e) {
-            throw new ModelClientException(
-                    provider() + " embedding 请求失败: " + e.getMessage(),
-                    ModelClientErrorType.NETWORK_ERROR, null, e);
-        }
 
-        if (json.has("error")) {
-            JsonObject err = json.getAsJsonObject("error");
-            String code = err.has("code") ? err.get("code").getAsString() : "unknown";
-            String msg = err.has("message") ? err.get("message").getAsString() : "unknown";
-            throw new ModelClientException(
-                    provider() + " embedding 错误: " + code + " - " + msg,
-                    ModelClientErrorType.PROVIDER_ERROR, null);
-        }
-
-        JsonArray data = json.getAsJsonArray("data");
-        if (data == null || data.isEmpty()) {
-            throw new ModelClientException(
-                    provider() + " embedding 响应中缺少 data 数组",
-                    ModelClientErrorType.INVALID_RESPONSE, null);
-        }
-
-        List<List<Float>> results = new ArrayList<>(data.size());
-        for (JsonElement el : data) {
-            JsonObject obj = el.getAsJsonObject();
-            JsonArray emb = obj.getAsJsonArray("embedding");
-            if (emb == null || emb.isEmpty()) {
+            if (json.has("error")) {
+                JsonObject err = json.getAsJsonObject("error");
+                String code = err.has("code") ? err.get("code").getAsString() : "unknown";
+                String msg = err.has("message") ? err.get("message").getAsString() : "unknown";
                 throw new ModelClientException(
-                        provider() + " embedding 响应中缺少 embedding 字段",
+                        provider() + " embedding 错误: " + code + " - " + msg,
+                        ModelClientErrorType.PROVIDER_ERROR, null);
+            }
+
+            JsonArray data = json.getAsJsonArray("data");
+            if (data == null || data.isEmpty()) {
+                throw new ModelClientException(
+                        provider() + " embedding 响应中缺少 data 数组",
                         ModelClientErrorType.INVALID_RESPONSE, null);
             }
-            List<Float> vector = new ArrayList<>(emb.size());
-            for (JsonElement v : emb) {
-                vector.add(v.getAsFloat());
-            }
-            results.add(vector);
-        }
 
-        return results;
+            List<List<Float>> results = new ArrayList<>(data.size());
+            for (JsonElement el : data) {
+                JsonObject obj = el.getAsJsonObject();
+                JsonArray emb = obj.getAsJsonArray("embedding");
+                if (emb == null || emb.isEmpty()) {
+                    throw new ModelClientException(
+                            provider() + " embedding 响应中缺少 embedding 字段",
+                            ModelClientErrorType.INVALID_RESPONSE, null);
+                }
+                List<Float> vector = new ArrayList<>(emb.size());
+                for (JsonElement v : emb) {
+                    vector.add(v.getAsFloat());
+                }
+                results.add(vector);
+            }
+
+            observation.put("success", true);
+            return results;
+        } catch (RuntimeException failure) {
+            observation.put("error_type", failure.getClass().getSimpleName());
+            throw failure;
+        } finally {
+            observation.put("request_state", "COMPLETED");
+            observation.put("elapsed_ms", (System.nanoTime() - started) / 1_000_000);
+            EmbeddingUsageCapture.record(observation);
+        }
     }
 }

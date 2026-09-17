@@ -1,6 +1,6 @@
 # 统一研究工作流验证报告
 
-日期：2026-09-17。P0/P1 已完成；P2 已完成证据工具、Java/PG 联调、训练/开发数据转换和固定抽样，P2 仍进行中。研究接口、原生模型工具调用、公开数据入库与 A/B/C 评测尚未运行。下方按批次保留历史结果，以最新批次说明当前验证边界。
+日期：2026-09-17。P0/P1 已完成；P2 已完成证据工具、Java/PG 联调、训练/开发数据转换和固定抽样，P2 仍进行中。第四批已完成公开语料小批摄取/search/read 联调，完整批次正在运行。研究接口、原生模型工具调用与 A/B/C 评测尚未运行。下方按批次保留历史结果，以最新批次说明当前验证边界。
 
 ## P0 基线
 
@@ -168,12 +168,30 @@ python3 eval/agentic-research/prepare_dataset.py --dataset musique --split dev -
 
 当前输出是来源段落，不是实际分块/向量数；离线完整 SHA-256 ID 也不是数据库 20 字符主键。下一步须补实际 metadata 摄取与 source/document → docId/chunkId 映射。直接调用现有上传接口不证明 paper/paragraph 身份已进入 chunk；重复章节名须结合 section_index，QASPER 正文还原须按原始下标，不能按 hash 行序。转换通过不代替真实入库或 SDK 工具/引用验证。
 
+## P2 第四批：来源摄取与真实批次
+
+本批实现及命令见[执行记录](agentic-research-execution-log.md#p2-第四批来源摄取幂等导入与真实联调2026-09-17)和[导入说明](../../eval/agentic-research/README.md#真实摄取)。完整语料导入正在执行；小批联调、程序回归和完整批次分别记录。
+
+| 验证 | 实际结果 |
+| --- | --- |
+| 后端构建 | package 通过；没有 SDK/前端修改 |
+| 普通 Java 回归 | 原有 18 类 123/123 通过；新增 EmbeddingUsageCaptureTest 3/3 通过，实际供应商用量/unknown、观察者恢复、HTTP 200 坏响应留失败 |
+| Python | 19/19，通过完整源顺序重建、独立摘录和输入幂等；既有转换/字段隔离测试仍通过 |
+| 实际 PostgreSQL | 11/11，实际 JdbcTemplate/MyBatis/PG sink 与短事务，包括已提交 identity 复用、配置变更拒绝、来源字段/同名章节、同标题 MuSiQue 独立摘录、provider/index 故障与回滚后重入 |
+| SQL | fresh 与重复 02/03/04 升级的列/约束/索引一致；旧草稿保留；仅随机测试库被清理 |
+| 小批真实数据 | QASPER validation 固定 20 query 覆盖 17 篇/801 来源段落；MuSiQue Full dev 20 query 覆盖 392 摘录；实际 embedding 为现有 SiliconFlow 模型 1536 维，使用实际库 search/read 验证正文/位置/extent |
+| 续入 | 已提交 QASPER 801 个块保留真实 doc/chunk ID，不重复向量化；批次完成状态来自 DB 映射，progress 不作为恢复依据 |
+| 失败保留 | 初次网络超时、时间填充接线遗漏、停止旧顺序导入；修正后回归和真实续入通过，不把失败费用记为 0 |
+| 完整批次 | 正在导入四个可用训练/开发 split，见下方目录；完成前不声称 P2 验收通过 |
+
+原始路径：`local-data/agentic-research/runs/20260917T084500_P2D_smoke/` 和 `local-data/agentic-research/runs/20260917T085000_P2D_full/`。每份 split 保留 input/job、documents、mapping、progress/complete、corpus-audit、source-probes、usage、traces 和 Java 日志；完整批次输入的源清单/代码 SHA 在 run/invocations 中保存。逐请求日志按 call_id 合并，STARTED 没有 COMPLETED 的记录保留未知状态，不重复累加 token。金额以实际账单核对，不能把 token 记录当结算账单。
+
 ## 尚未验证的业务和评测
 
-- 未启动全套服务或浏览器进行登录、普通问答、入库、版本比较、草稿生成 E2E。
-- 已做 PostgreSQL 隔离库的新建/退役 SQL 检查；未升级既有业务库或清除其意图缓存，不自动 DROP 既有数据。
-- 已生成训练/开发的固定样本，未导入 QASPER/MuSiQue、调用研究模型或产生模型费用/效果指标；真实 test 转换留到最终配置确定后。
-- P2 的真实 metadata 摄取、来源映射、幂等导入与 usage 仍未完成；文档筛选和邻接读取尚需实际入库语料复核。Milvus/ES 未做实际服务联调。
-- REPORT / PLAN 原生工具、新运行器、并发 worker、研究 SSE 与调用记录器仍属于后续阶段。
+- 未启动全套服务或浏览器进行登录、普通问答、文档管理、版本比较、草稿生成 E2E。
+- 已做 PostgreSQL 隔离库的新建/增量检查和真实公开语料摄取；未升级既有业务库或清除其意图缓存，不自动 DROP 既有数据。
+- 已生成训练/开发固定样本，未调用研究/生成模型或执行 A/B/C、EM/F1；真实 test 转换留到最终配置确定后。完整导入不等于完整问答评分。
+- Milvus/ES 未做实际服务联调；本次真实索引落点为 PostgreSQL。
+- REPORT / PLAN 原生工具、新运行器、并发 worker、研究 SSE 与取消/epoch 控制属于 P3—P8。
 
 后续每阶段追加实际结果，保留失败和未运行边界，不以单元测试替代真实模型或页面效果。

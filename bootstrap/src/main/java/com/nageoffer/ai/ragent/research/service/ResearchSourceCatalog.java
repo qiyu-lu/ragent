@@ -52,7 +52,7 @@ public class ResearchSourceCatalog {
             "section_path", "sectionPath", "section_name", "outline_path",
             "source_paragraph_id", "sourceParagraphId", "paper_id", "page_number",
             "start_page", "end_page", "sheet_name", "cell_range", "source_file",
-            "block_type", "dataset", "split", "source_extent");
+            "block_type", "dataset", "split", "source_extent", "section_index", "paragraph_index", "source_field", "source_content_hash", "source_title");
 
     private final KnowledgeChunkMapper chunkMapper;
     private final KnowledgeDocumentMapper documentMapper;
@@ -67,7 +67,7 @@ public class ResearchSourceCatalog {
 
     public record Neighborhood(List<SourceChunk> sources, String note) { }
 
-    private record Boundary(List<String> section, String sheet, String paragraph) { }
+    private record Boundary(List<String> section, Object sectionIndex, Object sourceField, String sheet, String paragraph) { }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public List<SourceChunk> loadAll(List<String> chunkIds, Set<String> kbIds, Set<String> docIds) {
@@ -133,12 +133,15 @@ public class ResearchSourceCatalog {
         if (paragraph == null) paragraph = stringLocation(location.get("sourceParagraphId"));
         // 可用段落不跨原始段落；普通章节允许读该章节内相邻的不同段落。
         if (source.extent() == SourceExtent.AVAILABLE_EXCERPT) {
-            return paragraph == null ? null : new Boundary(section, sheet, paragraph);
+            return paragraph == null ? null : new Boundary(section, location.get("section_index"), location.get("source_field"), sheet, paragraph);
         }
         if (!section.isEmpty() || sheet != null) {
-            return new Boundary(section, sheet, null);
+            return new Boundary(section, location.get("section_index"), location.get("source_field"), sheet, null);
         }
-        return paragraph == null ? null : new Boundary(List.of(), null, paragraph);
+        if (location.get("section_index") instanceof Number && "full_text".equals(location.get("source_field"))) {
+            return new Boundary(section, location.get("section_index"), location.get("source_field"), null, null);
+        }
+        return paragraph == null ? null : new Boundary(List.of(), null, null, null, paragraph);
     }
 
     private String stringLocation(Object value) {

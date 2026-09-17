@@ -82,7 +82,7 @@ public class KeywordSearchChannel implements SearchChannel {
             // 一起被通道级 catch 丢掉。当前 ES 实现恰好自己吞了异常，但那是实现的偶然、不是通道的保证
             CompletableFuture<List<RetrievedChunk>> supplementTask = quota.supplement() > 0
                     ? CompletableFuture.supplyAsync(
-                    () -> keywordRetriever.search(question, scope.supplementCollections(), quota.supplement()),
+                    () -> searchWithinDocuments(question, scope.supplementCollections(), quota.supplement(), context),
                     innerRetrievalExecutor)
                     .exceptionally(e -> {
                         log.warn("关键词补充路检索失败，仅丢弃补充证据: {}", e.getMessage());
@@ -90,7 +90,7 @@ public class KeywordSearchChannel implements SearchChannel {
                     })
                     : CompletableFuture.completedFuture(List.of());
 
-            List<RetrievedChunk> primary = keywordRetriever.search(question, collections, quota.primary());
+            List<RetrievedChunk> primary = searchWithinDocuments(question, collections, quota.primary(), context);
             List<RetrievedChunk> supplement = supplementTask.join();
 
             long latency = System.currentTimeMillis() - startTime;
@@ -111,5 +111,12 @@ public class KeywordSearchChannel implements SearchChannel {
 
     private double supplementRatio() {
         return properties.getScope().getSupplementRatio();
+    }
+
+    private List<RetrievedChunk> searchWithinDocuments(String question, List<String> collections,
+                                                      int limit, SearchContext context) {
+        return context.getDocumentIds().isEmpty()
+                ? keywordRetriever.search(question, collections, limit)
+                : keywordRetriever.search(question, collections, limit, context.getDocumentIds());
     }
 }

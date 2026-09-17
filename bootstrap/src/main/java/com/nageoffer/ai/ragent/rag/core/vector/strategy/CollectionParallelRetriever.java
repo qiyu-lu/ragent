@@ -64,12 +64,17 @@ public class CollectionParallelRetriever {
                                                          List<String> collections,
                                                          int topK,
                                                          float[] queryVector) {
+        return executeParallelRetrieval(question, collections, topK, queryVector, List.of());
+    }
+
+    public List<RetrievedChunk> executeParallelRetrieval(String question, List<String> collections,
+                                                         int topK, float[] queryVector, List<String> documentIds) {
         record RetrievalFuture(String collection, CompletableFuture<List<RetrievedChunk>> future) {
         }
 
         List<RetrievalFuture> futures = collections.stream()
                 .map(collection -> new RetrievalFuture(collection, CompletableFuture.supplyAsync(
-                        () -> retrieveOne(question, collection, queryVector, topK),
+                        () -> retrieveOne(question, collection, queryVector, topK, documentIds),
                         executor
                 )))
                 .toList();
@@ -101,12 +106,14 @@ public class CollectionParallelRetriever {
     /**
      * 单库取数，失败返回空列表兑现「单库失败只损失自己」
      */
-    private List<RetrievedChunk> retrieveOne(String question, String collectionName, float[] queryVector, int topK) {
+    private List<RetrievedChunk> retrieveOne(String question, String collectionName, float[] queryVector,
+                                            int topK, List<String> documentIds) {
         try {
             return retrieverService.retrieveByVector(
                     queryVector,
                     RetrieveRequest.builder()
                             .collectionName(collectionName)
+                            .documentIds(documentIds)
                             .query(question)
                             .topK(topK)
                             .build()

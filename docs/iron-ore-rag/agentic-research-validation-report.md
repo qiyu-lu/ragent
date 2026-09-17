@@ -1,6 +1,6 @@
 # 统一研究工作流验证报告
 
-日期：2026-09-17。P0/P1 已完成；P2 首批完成契约、知识库作用域、块级证据快照与存储 SQL，P2 仍进行中。研究接口、原生模型工具调用、数据入库与 A/B/C 评测尚未运行。
+日期：2026-09-17。P0/P1 已完成；P2 已完成契约、知识库/文档作用域、块级/邻接证据快照及 Java/PG 联调，P2 仍进行中。研究接口、原生模型工具调用、公开数据入库与 A/B/C 评测尚未运行。下方按批次保留历史结果，以最新批次说明当前验证边界。
 
 ## P0 基线
 
@@ -66,7 +66,7 @@ bash scripts/validate-agentic-research-p1-database.sh
 
 ## P2 首批实际验证
 
-范围是数据契约、知识库作用域、单块证据快照和研究表 SQL；P2 的文档筛选、邻接展开、转换与导入尚未完成。本批原始日志、JUnit XML 和 checks.json 保存在本地忽略目录 `local-data/agentic-research/runs/20260917T072920_P2A/`，没有生成模型问答成绩。
+范围是数据契约、知识库作用域、单块证据快照和研究表 SQL；该批结束时文档筛选、邻接展开、转换与导入尚未完成。本批原始日志、JUnit XML 和 checks.json 保存在本地忽略目录 `local-data/agentic-research/runs/20260917T072920_P2A/`，没有生成模型问答成绩。
 
 ```bash
 ./mvnw -o -pl bootstrap -am -DskipTests clean package
@@ -89,16 +89,45 @@ git diff --check
 | 入口文档与历史文件 | 68 个本地文件链接解析、Markdown 围栏、whitespace、脚本语法与历史升级 SQL 字节不变检查通过 |
 | 前端、在线 SDK、数据与模型 | 本批未修改前端，未重跑前端 build/type/lint；未注册原生工具、启动研究接口、转换/入库或调用真实供应商 |
 
-PostgreSQL 验证使用合成存储夹具和实际 SQL，没有导入公开语料。Java store 的 SELECT/UPDATE 及结果映射由 H2 验证；Java INSERT ON CONFLICT、来源 MyBatis 读取和 Spring 事务仍需 PostgreSQL 联调。示例事件 SQL 只验证存储与序号原语，事件写入器和并发任务运行尚未实现；请求唯一约束也不能代替幂等调度测试。
+该批 PostgreSQL 验证使用合成存储夹具和实际 SQL，没有导入公开语料。Java store 的 SELECT/UPDATE 及结果映射由 H2 验证；当时 Java INSERT ON CONFLICT、来源 MyBatis 读取和 Spring 事务仍需 PostgreSQL 联调，第二批结果见下文。示例事件 SQL 只验证存储与序号原语，事件写入器和并发任务运行尚未实现；请求唯一约束也不能代替幂等调度测试。
 
 本批未调用真实 embedding、rerank 或研究模型，没有生成 token/cost/EM/F1 等模型评测指标。未升级已有业务库；部署时仍需应用增量 SQL。
+
+## P2 第二批实际验证
+
+范围是召回前文档筛选、受限邻接读取、首次展开快照复用和实际 Java/PG 联调。起始提交为 `4b8a328`；原始成功/失败日志、普通与 PostgreSQL JUnit、checks.json 和源码 hash 保存在本地忽略目录 `local-data/agentic-research/runs/20260917T075350_P2B/`。
+
+```bash
+./mvnw -o -pl bootstrap -am -DskipTests clean package
+./mvnw -o -pl bootstrap -am '-Dtest=ResearchEvidenceToolsTest,ResearchEvidenceStoreTest,MultiChannelRetrievalEngineTest,RetrievalScopeResolverTest,VectorSearchChannelTest,KeywordSearchChannelTest,PgVectorRetrieverServiceTest,MilvusVectorRetrieverServiceTest,EsKeywordRetrieverServiceTest,RetrievalEngineTest,StreamChatPipelineTest,IngestionTaskServiceImplTest,TableChunkerTest,WorkbookDiffServiceTest,TaskTemplateGeneratorTest,IronOreTaskTemplateServiceTest,TaskTemplateValidatorTest,StreamTaskManagerCancelTraceTest' -Dsurefire.failIfNoSpecifiedTests=false test
+bash -n scripts/validate-agentic-research-p2-database.sh
+P2_RUN_JAVA_TESTS=true bash scripts/validate-agentic-research-p2-database.sh
+git diff --check
+```
+
+| 检查 | 实际结果与边界 |
+| --- | --- |
+| 后端 clean package | 通过，包含全部测试源码编译；本批未引入 SDK 或新依赖 |
+| 最终定向回归 | 18 个类 123/123 通过，0 失败/错误/跳过；比首批增加 22 个普通回归用例 |
+| 文档限制 | 验证空工具参数继承 Brief、不能放大范围、无效/停用/错库文档拒绝、召回前条件传递及原始越界结果拒绝；数据库来源再次校验范围 |
+| PGVector 过滤 | 真实 PGVector 用较高相似度的其他文档作为干扰：不筛文档时 Top1 为干扰项，筛文档时 Top1 返回目标块；验证参数绑定及真实 docId 映射，不证明 ANN 参数或大规模检索性能 |
+| Milvus / ES | SDK 请求捕获验证 JSON doc_id / bool terms 与知识库条件同时存在、TopK 设置及 Milvus 来源映射；过滤语法按[Milvus 官方 JSON 文档](https://milvus.io/docs/json-field-overview.md)核对；未访问实际 Milvus/ES 服务 |
+| 邻接边界与快照 | 每侧最多一个块，章节/工作表/原始段落、资料类型和文档版本边界检查；没有可靠分组时回退原块；返回真实位置、新 evidenceId 与 requestedEvidenceId，首次展开复用，变更标记 CHANGED，停用拒绝 |
+| PostgreSQL 16 结构 | schema + init、两份研究升级 SQL 各执行两次成功；新建与升级的列/默认值/约束/索引一致，历史草稿哨兵保留，测试库清理成功 |
+| Java / PG 集成 | `ResearchEvidencePostgresIT` 7/7 通过，0 失败/错误/跳过：实际 INSERT/SELECT/UPDATE、owner/run 边界、两写者并发展开唯一性、实际向量过滤、MyBatis 搜索/邻接读取及变更/停用路径 |
+| 来源事务 | 在实际 MyBatis StatementHandler 读取连接属性，验证 neighbors/loadAll 的只读 REPEATABLE READ；断言仅统计来源读取，不把事务外的范围列表查询混入 |
+| 保留的失败 | 测试辅助方法参数、checked exception 声明、Mockito 对 final SDK API 的测试构造问题均修正；首次 PG 7 个用例中事务探针断言 1 失败，限定观察范围后相同集 7/7 通过；日志与首次 PG JUnit 保留 |
+| 静态检查 | 修改入口文档的本地链接/围栏、所有本批文件 whitespace、脚本语法与旧升级 SQL 字节不变检查通过 |
+| 在线业务与模型 | 未修改前端、未启动全套应用/浏览器、未注册原生工具或调用供应商；使用合成正文/向量，没有公开语料导入、模型 token/cost 或 EM/F1 等效果指标 |
+
+真实 PostgreSQL 测试由脚本随机创建本机隔离库并最终删除，只接受该类测试 URL，凭证只通过临时子进程环境传递，日志不包含密钥。Java/PG 通过补足首批的存储与来源回查验证，但不能代替真实语料摄取、运行器取消/epoch 保护、事件并发分配、SDK 工具协议或最终引用语义测试。旧业务库未应用本批升级。
 
 ## 尚未验证的业务和评测
 
 - 未启动全套服务或浏览器进行登录、普通问答、入库、版本比较、草稿生成 E2E。
 - 已做 PostgreSQL 隔离库的新建/退役 SQL 检查；未升级既有业务库或清除其意图缓存，不自动 DROP 既有数据。
 - 未导入 QASPER/MuSiQue、生成固定回归题目、调用研究模型或产生模型费用/效果指标。
-- P2 的文档筛选、可靠邻接展开、QASPER/MuSiQue 转换与幂等导入仍未完成；Java 证据存储/来源回查未对 PostgreSQL 联调。
+- P2 的 QASPER/MuSiQue 转换与幂等导入仍未完成；文档筛选和邻接读取尚需实际导入语料复核。Milvus/ES 未做实际服务联调。
 - REPORT / PLAN 原生工具、新运行器、并发 worker、研究 SSE 与调用记录器仍属于后续阶段。
 
 后续每阶段追加实际结果，保留失败和未运行边界，不以单元测试替代真实模型或页面效果。

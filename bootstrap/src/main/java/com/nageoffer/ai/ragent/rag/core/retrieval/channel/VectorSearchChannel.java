@@ -119,7 +119,7 @@ public class VectorSearchChannel implements SearchChannel {
         // 通道级 catch 丢掉——兜底路把主路带走，鲁棒性方向正好反了
         CompletableFuture<List<RetrievedChunk>> supplementTask = quota.supplement() > 0
                 ? CompletableFuture.<List<RetrievedChunk>>supplyAsync(
-                () -> retrieveOver(question, queryVector, scope.supplementCollections(), quota.supplement()),
+                () -> retrieveOver(question, queryVector, scope.supplementCollections(), quota.supplement(), context.getDocumentIds()),
                 retrievalExecutor)
                 .exceptionally(e -> {
                     log.warn("向量补充路检索失败，仅丢弃补充证据: {}", e.getMessage());
@@ -127,7 +127,7 @@ public class VectorSearchChannel implements SearchChannel {
                 })
                 : CompletableFuture.completedFuture(List.of());
 
-        List<RetrievedChunk> directed = retrieveOver(question, queryVector, scope.targetCollections(), quota.primary());
+        List<RetrievedChunk> directed = retrieveOver(question, queryVector, scope.targetCollections(), quota.primary(), context.getDocumentIds());
         List<RetrievedChunk> supplement = supplementTask.join();
 
         log.info("向量检索完成（定向），意图 top1={}，命中 {} 库 {} 条（最高余弦 {}），补充 {} 库 {} 条（最高余弦 {}）",
@@ -165,7 +165,7 @@ public class VectorSearchChannel implements SearchChannel {
         }
         String question = context.getMainQuestion();
         List<RetrievedChunk> chunks = retrieveOver(question, retrieverService.embedAndNormalize(question),
-                scope.targetCollections(), context.getBudget().recallBudget());
+                scope.targetCollections(), context.getBudget().recallBudget(), context.getDocumentIds());
 
         log.info("向量检索完成（全局），意图 top1={}，{} 库 {} 条（最高余弦 {}）",
                 scope.topScore(), scope.targetCollections().size(), chunks.size(), ChunkRanking.topScoreOf(chunks));
@@ -182,17 +182,19 @@ public class VectorSearchChannel implements SearchChannel {
      * 排序在截断之前，且后端返回序不能直接信：PG 开了 {@code hnsw.iterative_scan=relaxed_order}，
      * pgvector 在该模式下允许轻微乱序且规划器不补 Sort 节点，先排后截才是取全局最优的前 budget 条
      */
-    private List<RetrievedChunk> retrieveOver(String question, float[] queryVector, List<String> collections, int budget) {
+    private List<RetrievedChunk> retrieveOver(String question, float[] queryVector, List<String> collections,
+                                             int budget, List<String> documentIds) {
         if (collections.isEmpty()) {
             return List.of();
         }
         List<RetrievedChunk> chunks = retrieverService.supportsGlobalRetrieval()
                 ? retrieverService.retrieveByVector(queryVector, RetrieveRequest.builder()
                 .collectionNames(collections)
+                .documentIds(documentIds)
                 .query(question)
                 .topK(budget)
                 .build())
-                : globalRetriever.executeParallelRetrieval(question, collections, budget, queryVector);
+                : globalRetriever.executeParallelRetrieval(question, collections, budget, queryVector, documentIds);
         return ScopeQuota.cap(ChunkRanking.sortedByScore(chunks), budget);
     }
 

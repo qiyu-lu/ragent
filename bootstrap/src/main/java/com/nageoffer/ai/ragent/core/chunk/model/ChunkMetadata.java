@@ -52,6 +52,7 @@ public record ChunkMetadata(
     public static final String KEY_SHEET_NAME = "sheet_name";
     public static final String KEY_CELL_RANGE = "cell_range";
     public static final String KEY_BLOCK_TYPE = "block_type";
+    public static final String KEY_SECTION_PATH = "section_path";
 
     public ChunkMetadata {
         outlinePath = immutableCopy(outlinePath);
@@ -85,6 +86,9 @@ public record ChunkMetadata(
         Map<String, Object> map = new LinkedHashMap<>();
         // 扩展位先写，结构化键后写：结构化事实是权威，加工产物不得覆盖它
         map.putAll(extras);
+        if (!outlinePath.isEmpty()) {
+            map.put(KEY_SECTION_PATH, outlinePath);
+        }
         if (!assets.isEmpty()) {
             List<Map<String, Object>> assetMaps = new ArrayList<>(assets.size());
             for (AssetRef asset : assets) {

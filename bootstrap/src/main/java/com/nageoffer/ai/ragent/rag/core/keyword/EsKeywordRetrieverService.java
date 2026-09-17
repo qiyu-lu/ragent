@@ -55,10 +55,16 @@ public class EsKeywordRetrieverService implements KeywordRetrieverService {
 
     @Override
     public List<RetrievedChunk> search(String query, List<String> collectionNames, int topK) {
+        return search(query, collectionNames, topK, List.of());
+    }
+
+    @Override
+    public List<RetrievedChunk> search(String query, List<String> collectionNames, int topK, List<String> documentIds) {
         String index = keywordProperties.sharedIndex();
         List<FieldValue> collectionFilter = CollUtil.isEmpty(collectionNames)
                 ? List.of()
                 : collectionNames.stream().map(FieldValue::of).toList();
+        List<FieldValue> documentFilter = documentIds.stream().map(FieldValue::of).toList();
 
         try {
             SearchResponse<KeywordHitDocument> resp = esClient.search(s -> s
@@ -73,6 +79,10 @@ public class EsKeywordRetrieverService implements KeywordRetrieverService {
                                     b.filter(f -> f.terms(t -> t
                                             .field("collection_name")
                                             .terms(tv -> tv.value(collectionFilter))));
+                                }
+                                if (!documentFilter.isEmpty()) {
+                                    b.filter(f -> f.terms(t -> t.field("doc_id")
+                                            .terms(tv -> tv.value(documentFilter))));
                                 }
                                 return b;
                             })),
@@ -99,6 +109,7 @@ public class EsKeywordRetrieverService implements KeywordRetrieverService {
                 .id(hit.id())
                 .text(content)
                 .collectionName(source == null ? null : source.getCollectionName())
+                .docId(source == null ? null : source.getDocId())
                 .score(score)
                 .build();
     }
@@ -112,5 +123,8 @@ public class EsKeywordRetrieverService implements KeywordRetrieverService {
 
         @JsonProperty("collection_name")
         private String collectionName;
+
+        @JsonProperty("doc_id")
+        private String docId;
     }
 }

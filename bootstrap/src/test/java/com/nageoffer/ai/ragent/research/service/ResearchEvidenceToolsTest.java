@@ -40,6 +40,10 @@ import org.junit.jupiter.api.Test;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import com.nageoffer.ai.ragent.research.model.SourceReadResult.ReadMode;
+import com.nageoffer.ai.ragent.research.model.SourceReadResult.ExpansionState;
+import com.nageoffer.ai.ragent.core.chunk.model.ChunkMetadata;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -54,6 +58,7 @@ class ResearchEvidenceToolsTest {
     private final Map<String, KnowledgeChunkDO> chunkRows = new HashMap<>();
     private final Map<String, KnowledgeDocumentDO> documentRows = new HashMap<>();
     private final Map<String, EvidenceSnapshot> snapshots = new HashMap<>();
+    private final Map<String, String> expansions = new HashMap<>();
     private KnowledgeSearchService search;
     private SourceReader reader;
 
@@ -64,6 +69,9 @@ class ResearchEvidenceToolsTest {
         when(bases.selectList(any())).thenReturn(List.of(kb));
         when(chunks.selectById(anyString())).thenAnswer(call -> chunkRows.get(call.getArgument(0)));
         when(documents.selectById(anyString())).thenAnswer(call -> documentRows.get(call.getArgument(0)));
+        when(documents.selectList(any())).thenAnswer(call -> List.copyOf(documentRows.values()));
+        when(chunks.selectList(any())).thenAnswer(call -> chunkRows.values().stream()
+                .filter(row -> row.getId().startsWith("neighbor-")).toList());
         when(store.requireBrief(anyString(), eq("owner"))).thenReturn(
                 new ResearchBrief("compare", ResearchBrief.OutputType.REPORT, List.of(), List.of("kb-a")));
         when(store.save(eq("owner"), any())).thenAnswer(call -> {
@@ -86,9 +94,18 @@ class ResearchEvidenceToolsTest {
                     snapshot.sourceMetadataHash()));
             return read;
         });
+        when(store.findExpansion(anyString(), eq("owner"), anyString())).thenAnswer(call ->
+                Optional.ofNullable(expansions.get(call.getArgument(2))).map(snapshots::get));
+        when(store.saveExpansion(eq("owner"), anyString(), any())).thenAnswer(call -> {
+            EvidenceSnapshot snapshot = call.getArgument(2);
+            String origin = call.getArgument(1);
+            expansions.putIfAbsent(origin, snapshot.evidence().evidenceId());
+            snapshots.putIfAbsent(snapshot.evidence().evidenceId(), snapshot);
+            return snapshots.get(expansions.get(origin));
+        });
         var catalog = new ResearchSourceCatalog(chunks, documents, bases, new ObjectMapper());
-        search = new KnowledgeSearchService(engine, bases, catalog, store, new ObjectMapper());
-        reader = new SourceReader(store, catalog);
+        search = new KnowledgeSearchService(engine, bases, documents, catalog, store, new ObjectMapper());
+        reader = new SourceReader(store, catalog, new EvidenceSnapshotFactory(new ObjectMapper()));
         addSource("chunk-a", "doc-a", "V1", "old body with 5 mg", "{}");
         returnCandidates("chunk-a");
     }
@@ -241,6 +258,170 @@ class ResearchEvidenceToolsTest {
                 search.search("run-a", "owner", "main", "query", null, 0));
         assertThrows(ClientException.class, () ->
                 search.search("run-a", "owner", "main", "query", null, 21));
+    }
+
+    @Test
+    void emptyToolDocumentParameterPreservesServerDocumentRestriction() {
+        allowDocuments("doc-a");
+        returnDocumentCandidates("chunk-a");
+        var hits = search.search("run-a", "owner", "main", "query", null, List.of(), 10);
+        assertEquals("doc-a", hits.get(0).docId());
+        verify(engine).retrieveScopedKnowledgeChannels(eq("query"), any(), eq(List.of("collection-a")),
+                eq(List.of("doc-a")));
+        verify(engine, never()).retrieveScopedKnowledgeChannels(anyString(), any(), anyList());
+    }
+
+    @Test
+    void documentSelectionCannotWidenSavedScope() {
+        allowDocuments("doc-a");
+        assertThrows(ClientException.class, () ->
+                search.search("run-a", "owner", "main", "query", null, List.of("doc-other"), 10));
+        verifyNoInteractions(engine);
+    }
+
+    @Test
+    void selectedDocumentMustExistAndBelongToSelectedKnowledgeBase() {
+        addSource("chunk-b", "doc-b", "V1", "body", "{}");
+        documentRows.get("doc-b").setKbId("kb-other");
+        assertThrows(ClientException.class, () ->
+                search.search("run-a", "owner", "main", "query", null, List.of("doc-b"), 10));
+        assertThrows(ClientException.class, () ->
+                search.search("run-a", "owner", "main", "query", null, List.of("missing"), 10));
+        verifyNoInteractions(engine);
+    }
+
+    @Test
+    void staleIndexCannotReturnDocumentOutsideResolvedScope() {
+        addSource("chunk-b", "doc-b", "V1", "other body", "{}");
+        allowDocuments("doc-a");
+        returnDocumentCandidates("chunk-b");
+        assertThrows(ClientException.class, () ->
+                search.search("run-a", "owner", "main", "query", null, List.of(), 10));
+        verify(store, never()).save(anyString(), any());
+    }
+
+    @Test
+    void previouslySavedEvidenceCannotBypassCurrentDocumentScope() {
+        String id = search("run-a", "main");
+        allowDocuments("doc-other");
+        assertThrows(ClientException.class, () -> reader.read("run-a", "owner", id));
+        verify(store, never()).markRead(anyString(), any());
+    }
+
+    @Test
+    void neighborsUseStoredChapterAndPreservePerBlockLocations() throws Exception {
+        // authoritative parser outline overrides conflicting extras before storage.
+        String metadata = new ObjectMapper().writeValueAsString(new ChunkMetadata(List.of("Methods"),
+                List.of(), null, "text", Map.of("section_path", List.of("Fake"))).toMap());
+        neighboringSources(metadata, metadata, metadata);
+        String id = search("run-a", "main");
+        var result = reader.read("run-a", "owner", id, ReadMode.NEIGHBORS);
+        assertEquals(ExpansionState.NEIGHBORS, result.expansionState());
+        assertEquals(List.of("neighbor-before", "chunk-a", "neighbor-after"), result.evidence().chunkIds());
+        assertEquals("before\n\nold body with 5 mg\n\nafter", result.evidence().text());
+        assertNotEquals(id, result.evidence().evidenceId());
+        assertEquals(id, result.requestedEvidenceId());
+        assertTrue(result.evidence().read());
+        var locations = (List<?>) result.evidence().sourceLocation().get("chunks");
+        assertEquals(List.of("Methods"), ((Map<?, ?>) locations.get(0)).get("section_path"));
+        assertEquals(3, locations.size());
+    }
+
+    @Test
+    void repeatedNeighborReadReusesFirstSnapshotAndMarksChangedNeighbor() {
+        String metadata = "{\"section_path\":[\"Methods\"]}";
+        neighboringSources(metadata, metadata, metadata);
+        String id = search("run-a", "main");
+        var first = reader.read("run-a", "owner", id, ReadMode.NEIGHBORS);
+        setContent("neighbor-after", "new neighbor content");
+        var second = reader.read("run-a", "owner", id, ReadMode.NEIGHBORS);
+        assertEquals(first.evidence(), second.evidence());
+        assertEquals(SourceState.CHANGED, second.sourceState());
+        verify(store, times(1)).saveExpansion(anyString(), anyString(), any());
+    }
+
+    @Test
+    void missingChapterMetadataFallsBackToPinnedSingleBlock() {
+        String id = search("run-a", "main");
+        var result = reader.read("run-a", "owner", id, ReadMode.NEIGHBORS);
+        assertEquals(ExpansionState.BLOCK_ONLY, result.expansionState());
+        assertEquals(id, result.evidence().evidenceId());
+        assertNotNull(result.note());
+        verify(chunks, never()).selectList(any());
+    }
+
+    @Test
+    void neighborsNeverCrossSectionsOrSheets() {
+        neighboringSources("{\"section_path\":[\"Methods\"],\"sheet_name\":\"A\"}",
+                "{\"section_path\":[\"Intro\"],\"sheet_name\":\"A\"}",
+                "{\"section_path\":[\"Methods\"],\"sheet_name\":\"B\"}");
+        var result = reader.read("run-a", "owner", search("run-a", "main"), ReadMode.NEIGHBORS);
+        assertEquals(ExpansionState.BLOCK_ONLY, result.expansionState());
+        assertEquals(List.of("chunk-a"), result.evidence().chunkIds());
+    }
+
+    @Test
+    void availableExcerptCanExpandWithinButNotAcrossOriginalParagraphs() {
+        String seed = "{\"dataset\":\"musique\",\"source_paragraph_id\":\"p-7\"}";
+        neighboringSources(seed, seed, "{\"dataset\":\"musique\",\"source_paragraph_id\":\"p-8\"}");
+        var result = reader.read("run-a", "owner", search("run-a", "main"), ReadMode.NEIGHBORS);
+        assertEquals(List.of("neighbor-before", "chunk-a"), result.evidence().chunkIds());
+        assertEquals(EvidenceRecord.SourceExtent.AVAILABLE_EXCERPT, result.evidence().sourceExtent());
+    }
+
+    @Test
+    void changedSeedCannotBeCombinedWithCurrentNeighbors() {
+        String metadata = "{\"section_path\":[\"Methods\"]}";
+        neighboringSources(metadata, metadata, metadata);
+        String id = search("run-a", "main");
+        documentRows.get("doc-a").setDocumentVersion("V2");
+        var result = reader.read("run-a", "owner", id, ReadMode.NEIGHBORS);
+        assertEquals(SourceState.CHANGED, result.sourceState());
+        assertEquals(ExpansionState.BLOCK_ONLY, result.expansionState());
+        assertEquals("V1", result.evidence().documentVersion());
+        verify(store, never()).saveExpansion(anyString(), anyString(), any());
+    }
+
+    @Test
+    void disabledPinnedNeighborRevokesExpandedRead() {
+        String metadata = "{\"section_path\":[\"Methods\"]}";
+        neighboringSources(metadata, metadata, metadata);
+        String id = search("run-a", "main");
+        reader.read("run-a", "owner", id, ReadMode.NEIGHBORS);
+        chunkRows.get("neighbor-before").setEnabled(0);
+        clearInvocations(store);
+        assertThrows(ClientException.class, () -> reader.read("run-a", "owner", id, ReadMode.NEIGHBORS));
+        verify(store, never()).markRead(anyString(), any());
+    }
+
+    @Test
+    void mismatchedChunkVersionCannotEnterNeighborSnapshot() {
+        String metadata = "{\"section_path\":[\"Methods\"]}";
+        neighboringSources(metadata, metadata, "{\"section_path\":[\"Methods\"],\"document_version\":\"V0\"}");
+        assertThrows(ClientException.class, () ->
+                reader.read("run-a", "owner", search("run-a", "main"), ReadMode.NEIGHBORS));
+        verify(store, never()).saveExpansion(anyString(), anyString(), any());
+    }
+
+    private void allowDocuments(String... ids) {
+        when(store.requireBrief(anyString(), eq("owner"))).thenReturn(
+                new ResearchBrief("compare", ResearchBrief.OutputType.REPORT, List.of(), List.of("kb-a"), List.of(ids)));
+    }
+
+    private void returnDocumentCandidates(String... ids) {
+        var results = java.util.Arrays.stream(ids).map(id -> RetrievedChunk.builder().id(id)
+                .collectionName("collection-a").docId(chunkRows.get(id).getDocId()).build()).toList();
+        when(engine.retrieveScopedKnowledgeChannels(anyString(), any(), anyList(), anyList()))
+                .thenReturn(new KnowledgeRetrievalResult(results, Map.of(), java.util.Set.of()));
+    }
+
+    private void neighboringSources(String seed, String before, String after) {
+        chunkRows.get("chunk-a").setChunkIndex(1);
+        chunkRows.get("chunk-a").setMetadata(seed);
+        addSource("neighbor-before", "doc-a", "V1", "before", before);
+        chunkRows.get("neighbor-before").setChunkIndex(0);
+        addSource("neighbor-after", "doc-a", "V1", "after", after);
+        chunkRows.get("neighbor-after").setChunkIndex(2);
     }
 
     private String search(String runId, String taskId) {

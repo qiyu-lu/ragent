@@ -44,6 +44,23 @@ import static org.mockito.Mockito.when;
 
 class VectorSearchChannelTest {
 
+    @Test
+    void documentScopeIsPassedToVectorBackendBeforeRecall() {
+        VectorRetrieverService retriever = mock(VectorRetrieverService.class);
+        when(retriever.supportsGlobalRetrieval()).thenReturn(true);
+        when(retriever.embedAndNormalize("query")).thenReturn(new float[]{1, 0});
+        when(retriever.retrieveByVector(any(float[].class), any(RetrieveRequest.class)))
+                .thenReturn(List.of(chunk("one", 0.9F)));
+        var context = SearchContext.builder().originalQuestion("query").budget(RetrievalBudget.uniform(2))
+                .retrievalScope(RetrievalScope.global(0, List.of("kb-a")))
+                .documentIds(List.of("doc-a")).build();
+        new VectorSearchChannel(retriever, new SearchChannelProperties(), Runnable::run).search(context);
+        ArgumentCaptor<RetrieveRequest> request = ArgumentCaptor.forClass(RetrieveRequest.class);
+        verify(retriever).retrieveByVector(any(float[].class), request.capture());
+        assertEquals(List.of("doc-a"), request.getValue().getEffectiveDocumentIds());
+        assertEquals(List.of("kb-a"), request.getValue().getEffectiveCollectionNames());
+    }
+
     private static final String QUESTION = "报销发票贴哪张表？";
     private static final List<String> SUPPLEMENT = List.of("kb-hr", "kb-tech");
     private static final float[] QUERY_VECTOR = {0.6F, 0.8F};

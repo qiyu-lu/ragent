@@ -24,6 +24,8 @@ import com.nageoffer.ai.ragent.framework.convention.RetrievedChunk;
 import com.nageoffer.ai.ragent.framework.exception.ClientException;
 import com.nageoffer.ai.ragent.knowledge.dao.entity.KnowledgeBaseDO;
 import com.nageoffer.ai.ragent.knowledge.dao.mapper.KnowledgeBaseMapper;
+import com.nageoffer.ai.ragent.knowledge.dao.entity.KnowledgeDocumentDO;
+import com.nageoffer.ai.ragent.knowledge.dao.mapper.KnowledgeDocumentMapper;
 import com.nageoffer.ai.ragent.rag.core.retrieval.MultiChannelRetrievalEngine;
 import com.nageoffer.ai.ragent.rag.core.retrieval.RetrievalBudget;
 import com.nageoffer.ai.ragent.research.model.EvidenceRecord;
@@ -47,12 +49,19 @@ import java.util.Set;
 public class KnowledgeSearchService {
     private final MultiChannelRetrievalEngine retrievalEngine;
     private final KnowledgeBaseMapper knowledgeBaseMapper;
+    private final KnowledgeDocumentMapper documentMapper;
     private final ResearchSourceCatalog sourceCatalog;
     private final ResearchEvidenceStore evidenceStore;
     private final ObjectMapper objectMapper;
 
     public List<KnowledgeSearchHit> search(String runId, String ownerUserId, String taskId,
                                           String query, List<String> narrowedKbIds, int limit) {
+        return search(runId, ownerUserId, taskId, query, narrowedKbIds, List.of(), limit);
+    }
+
+    public List<KnowledgeSearchHit> search(String runId, String ownerUserId, String taskId,
+                                          String query, List<String> narrowedKbIds,
+                                          List<String> narrowedDocIds, int limit) {
         ResearchBrief brief = evidenceStore.requireBrief(runId, ownerUserId);
         if (query == null || query.isBlank() || query.length() > 10000
                 || taskId == null || taskId.isBlank() || limit < 1 || limit > 20) {
@@ -77,8 +86,16 @@ public class KnowledgeSearchService {
         if (collections.isEmpty()) {
             throw new ClientException("研究范围内没有可用的知识库");
         }
-        var result = retrievalEngine.retrieveScopedKnowledgeChannels(query,
-                new RetrievalBudget(Math.max(20, limit), 40, limit), collections);
+        Set<String> activeKbIds = active.stream()
+                .filter(kb -> selectedSet.contains(kb.getId()) && !Integer.valueOf(1).equals(kb.getDeleted())
+                        && kb.getCollectionName() != null && !kb.getCollectionName().isBlank())
+                .map(KnowledgeBaseDO::getId).collect(java.util.stream.Collectors.toSet());
+        List<String> documents = resolveDocuments(brief, narrowedDocIds, activeKbIds);
+        Set<String> documentSet = Set.copyOf(documents);
+        RetrievalBudget budget = new RetrievalBudget(Math.max(20, limit), 40, limit);
+        var result = documents.isEmpty()
+                ? retrievalEngine.retrieveScopedKnowledgeChannels(query, budget, collections)
+                : retrievalEngine.retrieveScopedKnowledgeChannels(query, budget, collections, documents);
         List<KnowledgeSearchHit> hits = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();
         for (RetrievedChunk candidate : result.chunks()) {
@@ -89,7 +106,7 @@ public class KnowledgeSearchService {
                     || !collections.contains(candidate.getCollectionName())) {
                 throw new ClientException("检索结果缺少可信来源或超出允许范围");
             }
-            var source = sourceCatalog.load(candidate.getId(), selectedSet);
+            var source = sourceCatalog.load(candidate.getId(), activeKbIds, documentSet);
             if (!Objects.equals(source.collectionName(), candidate.getCollectionName())) {
                 throw new ClientException("检索索引与数据库来源不一致");
             }
@@ -113,6 +130,33 @@ public class KnowledgeSearchService {
                     summary.length() < stored.sourceText().length(), saved.sourceLocation(), saved.sourceExtent()));
         }
         return List.copyOf(hits);
+    }
+
+    private List<String> resolveDocuments(ResearchBrief brief, List<String> requested, Set<String> kbIds) {
+        boolean explicit = requested != null && !requested.isEmpty();
+        List<String> selected = explicit ? requested : brief.allowedDocIds();
+        if (selected.isEmpty()) {
+            return List.of();
+        }
+        if (selected.stream().anyMatch(id -> id == null || id.isBlank()
+                || (!brief.allowedDocIds().isEmpty() && !brief.allowedDocIds().contains(id)))) {
+            throw new ClientException("检索文档不能超出研究任务允许的范围");
+        }
+        List<KnowledgeDocumentDO> rows = documentMapper.selectList(
+                Wrappers.lambdaQuery(KnowledgeDocumentDO.class).in(KnowledgeDocumentDO::getId, selected)
+                        .in(KnowledgeDocumentDO::getKbId, kbIds)
+                        .eq(KnowledgeDocumentDO::getEnabled, 1).eq(KnowledgeDocumentDO::getDeleted, 0));
+        Set<String> current = rows.stream().filter(doc -> kbIds.contains(doc.getKbId())
+                        && Integer.valueOf(1).equals(doc.getEnabled()) && !Integer.valueOf(1).equals(doc.getDeleted()))
+                .map(KnowledgeDocumentDO::getId).collect(java.util.stream.Collectors.toSet());
+        if (explicit && !current.containsAll(selected)) {
+            throw new ClientException("选定文档不存在、已停用或不属于选定知识库");
+        }
+        List<String> resolved = selected.stream().filter(current::contains).distinct().toList();
+        if (resolved.isEmpty()) {
+            throw new ClientException("研究文档范围内没有可用来源");
+        }
+        return resolved;
     }
 
     private String stableId(String runId, ResearchSourceCatalog.SourceChunk source) {

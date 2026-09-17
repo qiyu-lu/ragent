@@ -41,6 +41,20 @@ import static org.mockito.Mockito.when;
 
 class KeywordSearchChannelTest {
 
+    @Test
+    void documentScopeIsPassedToKeywordBackendBeforeRecall() {
+        KeywordRetrieverService retriever = mock(KeywordRetrieverService.class);
+        when(retriever.search("query", List.of("kb-a"), 2, List.of("doc-a"))).thenReturn(List.of());
+        var context = SearchContext.builder().originalQuestion("query").budget(RetrievalBudget.uniform(2))
+                .retrievalScope(RetrievalScope.global(0, List.of("kb-a")))
+                .documentIds(List.of("doc-a")).build();
+        new KeywordSearchChannel(retriever, new SearchChannelProperties(), Runnable::run).search(context);
+        org.mockito.Mockito.verify(retriever).search("query", List.of("kb-a"), 2, List.of("doc-a"));
+        org.mockito.Mockito.verify(retriever, org.mockito.Mockito.never()).search(
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyList(),
+                org.mockito.ArgumentMatchers.anyInt());
+    }
+
     private static final String QUESTION = "报销发票贴哪张表？";
     private static final List<String> ACTIVE = List.of("kb-finance", "kb-hr", "kb-tech");
     private static final List<String> SUPPLEMENT = List.of("kb-hr", "kb-tech");

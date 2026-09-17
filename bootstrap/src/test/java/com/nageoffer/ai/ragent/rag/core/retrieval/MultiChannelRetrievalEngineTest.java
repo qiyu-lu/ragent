@@ -56,6 +56,22 @@ import static org.mockito.Mockito.verifyNoInteractions;
 class MultiChannelRetrievalEngineTest {
 
     @Test
+    void documentScopeReachesChannelAndRejectsOtherDocumentsBeforeRerank() {
+        SearchChannel vector = channel("vector", SearchChannelType.VECTOR,
+                channelResult(SearchChannelType.VECTOR, "vector", RetrievedChunk.builder()
+                        .id("1").collectionName("allowed").docId("other-doc").build()));
+        SearchResultPostProcessor rerank = mock(SearchResultPostProcessor.class);
+        assertThrows(IllegalStateException.class, () ->
+                engine(List.of(vector), List.of(rerank), RetrievalScope.empty(0))
+                        .retrieveScopedKnowledgeChannels("query", RetrievalBudget.uniform(10),
+                                List.of("allowed"), List.of("doc-a")));
+        ArgumentCaptor<SearchContext> context = ArgumentCaptor.forClass(SearchContext.class);
+        verify(vector).search(context.capture());
+        assertEquals(List.of("doc-a"), context.getValue().getDocumentIds());
+        verifyNoInteractions(rerank);
+    }
+
+    @Test
     void researchScopeIsUsedBeforeRecallWithoutIntentFallbackOrWebSearch() {
         SearchChannel vector = channel("vector", SearchChannelType.VECTOR,
                 channelResult(SearchChannelType.VECTOR, "vector", chunk("1", "body", "allowed", 0.9F)));

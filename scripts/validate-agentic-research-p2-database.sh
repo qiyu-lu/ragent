@@ -40,7 +40,10 @@ p2_catalog_sql="SELECT table_name, column_name, udt_name, is_nullable, column_de
   SELECT conrelid::regclass, conname, pg_get_constraintdef(oid)
   FROM pg_constraint
   WHERE conrelid IN ('t_research_run'::regclass, 't_research_evidence'::regclass, 't_research_event'::regclass)
-  ORDER BY conrelid::regclass::text, conname;"
+  ORDER BY conrelid::regclass::text, conname;
+  SELECT tablename, indexname, indexdef FROM pg_indexes
+  WHERE schemaname = 'public' AND tablename IN ('t_research_run', 't_research_evidence', 't_research_event')
+  ORDER BY tablename, indexname;"
 psql_p2 -Atc "$p2_catalog_sql" > "$p2_scratch/fresh-catalog.txt"
 
 psql_p2 <<'SQL'
@@ -54,7 +57,9 @@ DROP TABLE t_research_evidence;
 DROP TABLE t_research_run;
 SQL
 psql_p2 < resources/database/upgrades/v1.1.0/260917_02_research_evidence.sql
+psql_p2 < resources/database/upgrades/v1.1.0/260917_03_research_neighbors.sql
 psql_p2 < resources/database/upgrades/v1.1.0/260917_02_research_evidence.sql
+psql_p2 < resources/database/upgrades/v1.1.0/260917_03_research_neighbors.sql
 psql_p2 -Atc "$p2_catalog_sql" > "$p2_scratch/upgraded-catalog.txt"
 diff -u "$p2_scratch/fresh-catalog.txt" "$p2_scratch/upgraded-catalog.txt"
 
@@ -152,4 +157,13 @@ BEGIN
     END;
 END $$;
 SQL
+if [ "${P2_RUN_JAVA_TESTS:-false}" = true ]; then
+  p2_pg_port=$(docker inspect --format '{{(index (index .NetworkSettings.Ports "5432/tcp") 0).HostPort}}' "$p2_container")
+  p2_pg_user=$(docker exec "$p2_container" sh -c 'printf "%s" "$POSTGRES_USER"')
+  p2_pg_password=$(docker exec "$p2_container" sh -c 'printf "%s" "$POSTGRES_PASSWORD"')
+  RESEARCH_TEST_PG_URL="jdbc:postgresql://127.0.0.1:${p2_pg_port}/${p2_validation_db}" \
+    RESEARCH_TEST_PG_USER="$p2_pg_user" RESEARCH_TEST_PG_PASSWORD="$p2_pg_password" \
+    ./mvnw -o -pl bootstrap -am -Dtest=ResearchEvidencePostgresIT -Dsurefire.failIfNoSpecifiedTests=false test
+  unset p2_pg_password
+fi
 echo 'P2 fresh schema, repeated incremental upgrade, ownership and storage checks passed.'

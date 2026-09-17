@@ -43,4 +43,11 @@ public interface KeywordRetrieverService {
      * @return 命中 Chunk 列表，按相关性（BM25）倒序，id 与向量库主键 chunkId 对齐
      */
     List<RetrievedChunk> search(String query, List<String> collectionNames, int topK);
+
+    default List<RetrievedChunk> search(String query, List<String> collectionNames, int topK, List<String> documentIds) {
+        if (documentIds.isEmpty()) {
+            return search(query, collectionNames, topK);
+        }
+        throw new UnsupportedOperationException("当前关键词后端未实现召回前文档筛选");
+    }
 }

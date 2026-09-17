@@ -20,6 +20,13 @@ package com.nageoffer.ai.ragent.research.model;
 /**
  * CHANGED 时仍返回本任务的原快照，来源位置和正文不会被新版本替换。
  */
-public record SourceReadResult(EvidenceRecord evidence, SourceState sourceState) {
+public record SourceReadResult(EvidenceRecord evidence, SourceState sourceState,
+                               ExpansionState expansionState, String requestedEvidenceId, String note) {
     public enum SourceState { CURRENT, CHANGED }
+    public enum ReadMode { CHUNK, NEIGHBORS }
+    public enum ExpansionState { CHUNK, NEIGHBORS, BLOCK_ONLY }
+
+    public SourceReadResult(EvidenceRecord evidence, SourceState sourceState) {
+        this(evidence, sourceState, ExpansionState.CHUNK, evidence.evidenceId(), null);
+    }
 }

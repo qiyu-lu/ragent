@@ -1,6 +1,6 @@
 # 统一研究 Agent 与计划草稿改造实施计划
 
-> 制定日期：2026-09-17。实施状态：P0、P1 已完成；P2 进行中，首批完成数据契约、知识库作用域与块级证据快照；P3—P8 未开始。当前进度与验证边界见[执行记录](agentic-research-execution-log.md)和[验证报告](agentic-research-validation-report.md)。
+> 制定日期：2026-09-17。实施状态：P0、P1 已完成；P2 进行中，已完成数据契约、知识库/文档作用域、块级及受限邻接证据快照；数据转换与导入待续，P3—P8 未开始。当前进度与验证边界见[执行记录](agentic-research-execution-log.md)和[验证报告](agentic-research-validation-report.md)。
 >
 > 本文件是后续实施的主要交接入口。它记录本轮已经确定的产品方向、技术选择、删除范围、数据准备、阶段提交和验证方式。后续无需重新阅读完整聊天，也不要重新把方向改回送检助手。
 >
@@ -370,7 +370,7 @@ local-data/agentic-research/
 
 ### P2：数据适配、统一证据与检索阅读工具
 
-**当前状态（2026-09-17）：进行中。** 首批已实现 ResearchBrief / EvidenceRecord / SubtaskResult、KnowledgeSearchService、SourceReader 和三张研究表。当前工具是可供 P3 注册的 Java 服务，只支持服务端知识库范围内的检索和单块展开；文档筛选、可靠邻接展开、数据集转换与幂等批量导入仍待完成，不能将本批视为 P2 全部完成或新研究 Agent 已上线。
+**当前状态（2026-09-17）：进行中。** 已实现 ResearchBrief / EvidenceRecord / SubtaskResult、KnowledgeSearchService、SourceReader 和三张研究表。第二批加入服务端文档限制、召回前文档筛选、每侧至多一个可靠邻块及首次展开快照复用，Java 证据读写与来源一致性事务已在隔离 PostgreSQL 联调。当前工具仍是可供 P3 注册的 Java 服务；数据集转换与幂等批量导入待完成，不能据此视为 P2 全部完成或新研究 Agent 已上线。
 
 **工作：**
 
@@ -596,7 +596,7 @@ npm --prefix frontend run build
 | --- | --- | --- |
 | P0 基线与分支 | 已完成 | 8a9c79d；见执行记录 |
 | P1 退役旧业务 | 已完成 | a1b61d7；见执行记录与验证报告 |
-| P2 数据与工具 | 进行中：首批契约/范围/块级证据完成 | feat: add scoped research evidence snapshots；见执行记录，转换/导入等待续 |
+| P2 数据与工具 | 进行中：契约、文档范围、块级/邻接证据完成 | 首批 4b8a328；第二批见执行记录，转换/导入待续 |
 | P3 单研究运行 | 未开始 | — |
 | P4 多 Agent | 未开始 | — |
 | P5 报告与计划 | 未开始 | — |

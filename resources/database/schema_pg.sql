@@ -283,14 +283,18 @@ CREATE TABLE t_research_evidence (
     read                    BOOLEAN NOT NULL DEFAULT FALSE,
     source_extent           VARCHAR(32) NOT NULL CHECK (source_extent IN ('CHUNK', 'AVAILABLE_EXCERPT')),
     create_time             TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_time             TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    update_time             TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    origin_evidence_id      VARCHAR(67) REFERENCES t_research_evidence(evidence_id)
 );
 CREATE INDEX idx_research_evidence_run ON t_research_evidence (run_id);
+CREATE UNIQUE INDEX ux_research_evidence_origin ON t_research_evidence (run_id, origin_evidence_id)
+    WHERE origin_evidence_id IS NOT NULL;
 COMMENT ON TABLE t_research_evidence IS '研究证据快照；稳定 ID 包含 run、文档版本、块、正文与位置 hash';
 COMMENT ON COLUMN t_research_evidence.source_text IS '首次回查的完整块快照；内部保存，不直接作为工具输出';
 COMMENT ON COLUMN t_research_evidence.text IS '候选摘要或 read_source 实际提供的有长度限制的正文';
 COMMENT ON COLUMN t_research_evidence.read IS '已通过 read_source 提供正文；检索命中不等于已读';
 COMMENT ON COLUMN t_research_evidence.source_extent IS 'CHUNK 仅是块，AVAILABLE_EXCERPT 仅是可用段落，均不代表整篇全文';
+COMMENT ON COLUMN t_research_evidence.origin_evidence_id IS '邻接证据关联原候选；同一候选仅保存首次展开快照';
 
 CREATE TABLE t_research_event (
     run_id          VARCHAR(64) NOT NULL REFERENCES t_research_run(id),

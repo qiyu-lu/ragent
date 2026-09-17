@@ -42,6 +42,25 @@ import static org.mockito.Mockito.when;
 class PgVectorRetrieverServiceTest {
 
     @Test
+    @SuppressWarnings("unchecked")
+    void multipleDocumentsAreBoundBeforeOrderAndLimit() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        when(jdbc.query(anyString(), any(RowMapper.class), any(Object[].class))).thenReturn(List.of());
+        new PgVectorRetrieverService(jdbc, mock(EmbeddingService.class)).retrieveByVector(new float[]{1, 0},
+                RetrieveRequest.builder().collectionNames(List.of("kb-a", "kb-b"))
+                        .documentIds(List.of("doc-'a", "doc-b")).topK(3).build());
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Object[]> args = ArgumentCaptor.forClass(Object[].class);
+        verify(jdbc).query(sql.capture(), any(RowMapper.class), args.capture());
+        assertTrue(sql.getValue().contains("metadata->>'doc_id' IN (?, ?)"));
+        assertTrue(sql.getValue().indexOf("metadata->>'doc_id' IN") < sql.getValue().indexOf("ORDER BY"));
+        assertFalse(sql.getValue().contains("doc-'a"));
+        assertEquals("doc-'a", args.getValue()[3]);
+        assertEquals("doc-b", args.getValue()[4]);
+        assertEquals(3, args.getValue()[6]);
+    }
+
+    @Test
     @DisplayName("限定规程在召回LIMIT之前过滤且文档ID仅通过参数传入")
     @SuppressWarnings("unchecked")
     void bindsSelectedDocumentFilterBeforeLimit() {

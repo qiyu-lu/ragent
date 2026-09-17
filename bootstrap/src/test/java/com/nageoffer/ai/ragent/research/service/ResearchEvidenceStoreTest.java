@@ -48,7 +48,7 @@ class ResearchEvidenceStoreTest {
                     document_name VARCHAR, document_version VARCHAR, chunk_ids TEXT, content_hash VARCHAR,
                     source_text TEXT, text TEXT, source_location TEXT, source_metadata_hash VARCHAR,
                     retrieved_by_task_id VARCHAR, truncated BOOLEAN, read BOOLEAN, source_extent VARCHAR,
-                    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+                    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP, origin_evidence_id VARCHAR)
                 """);
         jdbc.update("INSERT INTO t_research_run VALUES (?, ?, ?)", "run-a", "owner-a",
                 "{\"goal\":\"compare\",\"outputType\":\"REPORT\",\"constraints\":[],\"allowedKbIds\":[\"kb-a\"]}");
@@ -108,5 +108,19 @@ class ResearchEvidenceStoreTest {
         var read = store.markRead("owner-a", store.find("run-a", "owner-a", "ev-a"));
         assertEquals(16000, read.text().length());
         assertTrue(read.truncated());
+    }
+
+    @Test
+    void expansionLookupRequiresRunAndOwner() {
+        jdbc.update("""
+                INSERT INTO t_research_evidence
+                SELECT 'ev-expanded', run_id, kb_id, doc_id, document_name, document_version, chunk_ids,
+                       content_hash, source_text, text, source_location, source_metadata_hash,
+                       retrieved_by_task_id, truncated, read, source_extent, update_time, evidence_id
+                FROM t_research_evidence WHERE evidence_id = 'ev-a'
+                """);
+        assertEquals("ev-expanded", store.findExpansion("run-a", "owner-a", "ev-a").orElseThrow().evidence().evidenceId());
+        assertTrue(store.findExpansion("run-a", "owner-b", "ev-a").isEmpty());
+        assertTrue(store.findExpansion("run-b", "owner-b", "ev-a").isEmpty());
     }
 }

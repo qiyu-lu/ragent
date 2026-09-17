@@ -98,7 +98,18 @@ public class MultiChannelRetrievalEngine {
     public KnowledgeRetrievalResult retrieveScopedKnowledgeChannels(String query,
                                                                     RetrievalBudget budget,
                                                                     List<String> allowedCollections) {
+        return retrieveScopedKnowledgeChannels(query, budget, allowedCollections, List.of());
+    }
+
+    public KnowledgeRetrievalResult retrieveScopedKnowledgeChannels(String query,
+                                                                    RetrievalBudget budget,
+                                                                    List<String> allowedCollections,
+                                                                    List<String> allowedDocumentIds) {
         Objects.requireNonNull(allowedCollections, "必须指定知识库范围");
+        Objects.requireNonNull(allowedDocumentIds, "必须指定文档范围");
+        if (allowedDocumentIds.stream().anyMatch(id -> id == null || id.isBlank())) {
+            throw new IllegalArgumentException("文档范围不能包含空标识");
+        }
         if (allowedCollections.stream().anyMatch(name -> name == null || name.isBlank())) {
             throw new IllegalArgumentException("知识库范围不能包含空名称");
         }
@@ -109,6 +120,7 @@ public class MultiChannelRetrievalEngine {
         SearchContext context = SearchContext.builder()
                 .originalQuestion(query).rewrittenQuestion(query).intents(List.of(subIntent))
                 .budget(budget)
+                .documentIds(allowedDocumentIds.stream().distinct().toList())
                 .retrievalScope(RetrievalScope.global(0, allowedCollections.stream().distinct().toList()))
                 .build();
         return retrieve(subIntent, context, null, true);
@@ -119,7 +131,8 @@ public class MultiChannelRetrievalEngine {
 
         List<SearchChannelResult> channelResults = executeSearchChannels(context, sourceBound);
         if (sourceBound && channelResults.stream().flatMap(result -> result.getChunks().stream())
-                .anyMatch(chunk -> !context.getRetrievalScope().targetCollections().contains(chunk.getCollectionName()))) {
+                .anyMatch(chunk -> !context.getRetrievalScope().targetCollections().contains(chunk.getCollectionName())
+                        || (!context.getDocumentIds().isEmpty() && !context.getDocumentIds().contains(chunk.getDocId())))) {
             throw new IllegalStateException("检索通道返回了研究范围外的来源");
         }
         if (capture != null) {

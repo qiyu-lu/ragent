@@ -67,6 +67,12 @@ public class SearchContext {
     private RetrievalScope retrievalScope;
 
     /**
+     * 由服务端确认的文档范围，各通道在召回前执行。
+     */
+    @Builder.Default
+    private List<String> documentIds = List.of();
+
+    /**
      * 扩展元数据
      */
     @Builder.Default

@@ -4,7 +4,7 @@
 
 ## 当前接续点
 
-P0、P1 已完成；P2 进行中，首批已完成数据契约、知识库作用域、块级证据快照和研究表 SQL；P3—P8 未开始。接下来继续 P2 的文档筛选、可靠邻接读取、QASPER/MuSiQue 转换与幂等导入。首批提供 Java 服务，尚未接入 SDK 工具、研究运行器或聊天入口，不能把单元测试和隔离 SQL 通过写成研究 Agent 已完成。
+P0、P1 已完成；P2 进行中，已完成数据契约、知识库/文档作用域、块级与受限邻接证据快照、研究表 SQL，并通过 Java 存储与来源读取的隔离 PostgreSQL 联调；P3—P8 未开始。接下来继续 P2 的 QASPER/MuSiQue 转换与幂等导入。当前提供 Java 服务，尚未接入 SDK 工具、研究运行器或聊天入口，不能把测试通过写成研究 Agent 已完成。
 
 ## P0：基线、分支与接入准备（2026-09-17，已完成）
 
@@ -104,12 +104,34 @@ app 严格类型检查仍有 24 个既有诊断，与 P0 的诊断逐条一致�
 - 首次 SQL 验证发现新建 schema 中残留的补丁前缀字符，修正后复跑通过，首次失败与清理日志保留。原始日志、JUnit 结果和 checks.json 位于本地忽略目录 `local-data/agentic-research/runs/20260917T072920_P2A/`，详细命令见验证报告。
 - 本批没有修改前端、接入 SDK、调用真实 embedding/rerank/研究模型、转换/导入数据或执行模型评测；不生成效果或费用成绩。前端检查沿用 P0/P1 的历史记录，本批未重跑。
 
-本批起始提交：`a1b61d7`。提交标题：`feat: add scoped research evidence snapshots`；从 Git log 按唯一标题查询 SHA，下一批补记。
+本批起始提交：`a1b61d7`。阶段提交：`4b8a328`，标题 `feat: add scoped research evidence snapshots`。
+
+## P2 第二批：文档筛选与可靠邻接快照（2026-09-17，已完成；P2 仍进行中）
+
+### 范围与实现
+
+- 从 `feat/agentic-research@4b8a328` 的干净工作区继续。本批未接入 SDK、运行器、前端或模型调用。
+- ResearchBrief 新增 `allowedDocIds`；旧四参构造与已有 JSON 兼容。空列表表示在允许知识库内不另限文档；工具的 null/空文档参数继承服务端保存的限制，不能清空它。显式文档必须属于当前选定知识库、未删除且启用；隐式限制取当前有效交集，交集为空时报错，不退回不限文档。
+- [KnowledgeSearchService](../../bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/KnowledgeSearchService.java) 增加 narrowedDocIds 参数，经 RetrieveRequest/SearchContext 传入召回。PGVector 在 ORDER/LIMIT 前使用绑定参数过滤 doc_id；Milvus 使用 JSON doc_id 过滤表达式；ES 在 bool filter 中加入 doc_id terms。三个后端返回真实 docId，原始越界结果在重排前拒绝，随后仍回查关系表的文档范围。Milvus 语法参照[官方 JSON 文档](https://milvus.io/docs/json-field-overview.md)核对；本批仅实际联调 PostgreSQL，Milvus/ES 以请求构造测试验证。
+- ChunkMetadata 将实际解析的 outlinePath 写入权威 `section_path`，避免章节只存在于内存、未进入来源 metadata。旧块不回填未知结构。
+- [ResearchSourceCatalog](../../bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/ResearchSourceCatalog.java) 通过只读 REPEATABLE READ 事务读取原块及每侧最多一个相邻序号，最多返回三个块。同文档、版本、章节/工作表与资料类型边界成立才展开；AVAILABLE_EXCERPT 必须属于同一个 sourceParagraphId。缺少可靠分组、邻块序号重复或边界不符时只返回原块并说明原因；不以 chunkIndex 相邻推断章节，metadata 若声明了错误文档版本则拒绝读取。
+- [SourceReader](../../bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/SourceReader.java) 支持 CHUNK/NEIGHBORS 模式。原候选已变化时保留旧块并返回 CHANGED/BLOCK_ONLY，避免拼入新版本邻块。合法展开由 [EvidenceSnapshotFactory](../../bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/EvidenceSnapshotFactory.java) 保存真实块顺序、正文和每块位置，得到新的 evidenceId；requestedEvidenceId 保留原候选身份。后续引用须使用返回的已读 evidenceId，不能认为未读取的原候选已经 read=true。
+- 新增 [260917_03_research_neighbors.sql](../../resources/database/upgrades/v1.1.0/260917_03_research_neighbors.sql)，在 schema 增加 origin_evidence_id 自引用 FK 和运行内原候选的部分唯一索引，旧升级 SQL 保持字节不变。Java INSERT 检查原候选属于同一运行，并发展开冲突时返回首次保存的快照。重复读取复用它；来源正文/位置变化时返回旧快照与 CHANGED，来源停用/删除时仍拒绝。
+
+### 实际验证与边界
+
+- 后端 clean package 通过；18 个定向回归类共 123 个用例全部通过，0 失败/错误/跳过。本批新增 22 个普通回归用例，覆盖文档限制传递、越界拒绝、章节/工作表/原始段落边界、首次邻接快照复用及来源变更/停用。
+- 实际 PostgreSQL 16 隔离库通过 schema/init、首批与第二批 SQL 各执行两次，以及新建/升级的列、默认值、约束和索引一致检查；历史草稿哨兵保留，测试库已清理。
+- [ResearchEvidencePostgresIT](../../bootstrap/src/test/java/com/nageoffer/ai/ragent/research/service/ResearchEvidencePostgresIT.java) 7/7 通过：真实 Java INSERT/SELECT/UPDATE、归属及运行边界、并发首次展开唯一性、PGVector 文档过滤先于 Top1、MyBatis 搜索/邻接读取、来源变更快照复用和停用拒绝。拦截实际来源查询连接，验证 neighbors/loadAll 的只读 REPEATABLE READ；范围列表查询不被计入此断言。
+- 初次测试源码编译暴露辅助方法参数和 checked exception 声明错误；ES 测试需以真实 SDK response 和非 final 的请求方法配合当前 Mockito mock-maker-subclass。首次 PostgreSQL 测试还发现事务探针统计了范围列表查询，调整为仅统计来源读取后复跑通过。失败日志及首次 PG JUnit 保留，不改写为一次通过。
+- 原始日志、独立的普通/PG JUnit、源码 hash 和 checks.json 保存于本地忽略目录 `local-data/agentic-research/runs/20260917T075350_P2B/`。没有导入公开语料、启动完整应用或运行浏览器 E2E，没有调用真实 embedding/rerank/研究模型，没有效果或费用指标。Java 与 PG 联调使用合成正文/向量；不代表 SDK 原生工具调用或 Milvus/ES 服务已经联调。
+
+本批起始提交：`4b8a328`。提交标题：`feat: scope research documents and read neighboring evidence`；从 Git log 按唯一标题查询 SHA，下一批补记。
 
 ## P2 剩余工作的直接接续顺序
 
 1. 核对分支、Git 状态及本记录，继续主计划第 4.2/4.3/6/7 节；不要重新接入送检工具或直接跳到 P3。
-2. 为工具加入允许范围内的文档筛选，并在向量与关键词召回前生效。当前 Brief/工具只限制知识库，不能将事后过滤当作文档作用域。依据可靠 sectionPath/sourceParagraphId/sheet 等 metadata 支持受限邻接读取；旧元数据仍回退到块级，不跨章节、工作表或版本。
-3. 在 `eval/agentic-research/` 实现 QASPER/MuSiQue 转换、固定 ID/抽样种子、清单与 corpus/questions 分离，保留原文身份；答案、支持标签和 gold decomposition 不进入检索库或规划器。当前只有已下载的原始文件清单，本批未生成转换产物。
-4. 实现真实摄取链的幂等批次、分批重试、进度与 usage 记录；先导入小样例，再处理真实批量。补充 Java evidence store 与来源读取的 PostgreSQL 集成验证，记录当前库/语料快照及错误，不把隔离 SQL 或 mock 当作真实入库。
+2. 在 `eval/agentic-research/` 实现 QASPER/MuSiQue 转换、固定 ID/抽样种子、清单与 corpus/questions 分离，保留原文身份及 section_path/sourceParagraphId 等定位。答案、支持标签和 gold decomposition 不进入检索库或规划器。当前只有已下载的原始文件清单，本批未生成转换产物。
+3. 实现真实摄取链的幂等批次、分批重试、进度与 usage 记录；先导入小样例，再处理真实批量。记录当前库/语料快照及错误；本批的 Java/PG 合成夹具联调不能代替真实语料入库验证。
+4. 用导入后的实际文档复核 search/read 范围与邻接定位；旧 metadata 不足仍回退块级。继续保留独立的数据库联调和模型/效果证据。
 5. 满足 P2 完成证据后再接入 P3 的 AgentScope 原生工具、首期研究模型、任务调度与调用记录器。本批的证据存储仍需结合 P3 的状态/epoch 写入条件处理取消和迟到结果；同用户唯一键不等于请求幂等执行已经实现。

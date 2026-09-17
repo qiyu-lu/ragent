@@ -50,8 +50,7 @@ public class PgVectorRetrieverService implements VectorRetrieverService {
             return List.of();
         }
         // 单个或多个逻辑库都通过一条 SQL 过滤，LIMIT 是整个范围的总 TopK
-        Object documentId = request.getMetadataFilters() == null ? null : request.getMetadataFilters().get("doc_id");
-        return queryByCollections(vector, collectionNames, request.getTopK(), documentId);
+        return queryByCollections(vector, collectionNames, request.getTopK(), request.getEffectiveDocumentIds());
     }
 
     @Override
@@ -69,7 +68,7 @@ public class PgVectorRetrieverService implements VectorRetrieverService {
      * <p>
      * 单库与全局共用此方法：单库传单元素列表，全局传多元素列表
      */
-    private List<RetrievedChunk> queryByCollections(float[] vector, List<String> collectionNames, int limit, Object documentId) {
+    private List<RetrievedChunk> queryByCollections(float[] vector, List<String> collectionNames, int limit, List<String> documentIds) {
         // 提升召回率；迭代扫描保证过滤后仍能填满 LIMIT，消除过滤向量检索的召回悬崖（pgvector >= 0.8）
         // noinspection SqlDialectInspection,SqlNoDataSourceInspection
         jdbcTemplate.execute("SET hnsw.ef_search = 200");
@@ -83,19 +82,24 @@ public class PgVectorRetrieverService implements VectorRetrieverService {
         args.add(vectorLiteral);
         args.addAll(collectionNames);
         String documentFilter = "";
-        if (documentId != null) {
+        if (documentIds.size() == 1) {
             documentFilter = " AND metadata->>'doc_id' = ?";
-            args.add(documentId.toString());
+            args.add(documentIds.get(0));
+        } else if (!documentIds.isEmpty()) {
+            documentFilter = " AND metadata->>'doc_id' IN ("
+                    + documentIds.stream().map(id -> "?").collect(java.util.stream.Collectors.joining(", ")) + ")";
+            args.addAll(documentIds);
         }
         args.add(vectorLiteral);
         args.add(limit);
 
         // noinspection SqlDialectInspection,SqlNoDataSourceInspection
-        return jdbcTemplate.query("SELECT id, content, collection_name, 1 - (embedding <=> ?::vector) AS score FROM t_knowledge_vector WHERE collection_name IN (" + placeholders + ")" + documentFilter + " ORDER BY embedding <=> ?::vector LIMIT ?",
+        return jdbcTemplate.query("SELECT id, content, collection_name, metadata->>'doc_id' AS doc_id, 1 - (embedding <=> ?::vector) AS score FROM t_knowledge_vector WHERE collection_name IN (" + placeholders + ")" + documentFilter + " ORDER BY embedding <=> ?::vector LIMIT ?",
                 (rs, rowNum) -> RetrievedChunk.builder()
                         .id(rs.getString("id"))
                         .text(rs.getString("content"))
                         .collectionName(rs.getString("collection_name"))
+                        .docId(rs.getString("doc_id"))
                         .score(rs.getFloat("score"))
                         .build(),
                 args.toArray()

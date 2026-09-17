@@ -23,8 +23,13 @@ import java.util.List;
  * 服务端确认后的目标与知识库范围。allowedKbIds 不是模型可修改的工具参数。
  */
 public record ResearchBrief(String goal, OutputType outputType,
-                            List<String> constraints, List<String> allowedKbIds) {
+                            List<String> constraints, List<String> allowedKbIds,
+                            List<String> allowedDocIds) {
     public enum OutputType { REPORT, PLAN }
+
+    public ResearchBrief(String goal, OutputType outputType, List<String> constraints, List<String> allowedKbIds) {
+        this(goal, outputType, constraints, allowedKbIds, List.of());
+    }
 
     public ResearchBrief {
         if (goal == null || goal.isBlank() || outputType == null) {
@@ -36,5 +41,11 @@ public record ResearchBrief(String goal, OutputType outputType,
             throw new IllegalArgumentException("必须保存明确的知识库范围");
         }
         allowedKbIds = allowedKbIds.stream().distinct().toList();
+        // 空列表表示允许知识库内的文档；工具参数为空时不能清除已保存的文档限制。
+        allowedDocIds = allowedDocIds == null ? List.of() : List.copyOf(allowedDocIds);
+        if (allowedDocIds.stream().anyMatch(id -> id.isBlank())) {
+            throw new IllegalArgumentException("文档范围不能包含空标识");
+        }
+        allowedDocIds = allowedDocIds.stream().distinct().toList();
     }
 }

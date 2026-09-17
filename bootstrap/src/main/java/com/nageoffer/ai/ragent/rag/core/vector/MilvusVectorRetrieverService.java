@@ -58,6 +58,13 @@ public class MilvusVectorRetrieverService implements VectorRetrieverService {
     public List<RetrievedChunk> retrieveByVector(float[] vector, RetrieveRequest retrieveParam) {
         // 单个或多个逻辑库都在共享物理 Collection 中一次过滤，topK 是整个过滤范围的总预算
         String filter = buildCollectionFilter(retrieveParam.getEffectiveCollectionNames());
+        List<String> documents = retrieveParam.getEffectiveDocumentIds();
+        if (!documents.isEmpty()) {
+            String inList = documents.stream().map(this::escapeFilterValue)
+                    .map(value -> "\"" + value + "\"").collect(Collectors.joining(", "));
+            String documentFilter = "metadata[\"doc_id\"] in [" + inList + "]";
+            filter = StrUtil.isBlank(filter) ? documentFilter : "(" + filter + ") && (" + documentFilter + ")";
+        }
         return searchShared(vector, filter, retrieveParam.getTopK());
     }
 
@@ -86,7 +93,8 @@ public class MilvusVectorRetrieverService implements VectorRetrieverService {
     }
 
     private String escapeFilterValue(String value) {
-        return value.replace("\\", "\\\\").replace("\"", "\\\"");
+        return value.replace("\\", "\\\\").replace("\"", "\\\"")
+                .replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t");
     }
 
     /**
@@ -124,9 +132,21 @@ public class MilvusVectorRetrieverService implements VectorRetrieverService {
                         .id(Objects.toString(r.getEntity().get("id"), ""))
                         .text(Objects.toString(r.getEntity().get("content"), ""))
                         .collectionName(Objects.toString(r.getEntity().get("collection_name"), null))
+                        .docId(documentId(r.getEntity().get("metadata")))
                         .score(r.getScore())
                         .build())
                 .collect(Collectors.toList());
+    }
+
+    private String documentId(Object metadata) {
+        if (metadata instanceof Map<?, ?> values) {
+            return Objects.toString(values.get("doc_id"), null);
+        }
+        if (metadata instanceof com.google.gson.JsonObject values && values.has("doc_id")
+                && !values.get("doc_id").isJsonNull()) {
+            return values.get("doc_id").getAsString();
+        }
+        return null;
     }
 
     private static float[] toArray(List<Float> list) {

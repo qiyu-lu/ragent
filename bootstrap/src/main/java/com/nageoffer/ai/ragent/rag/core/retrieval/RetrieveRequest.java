@@ -63,6 +63,11 @@ public class RetrieveRequest {
     private List<String> collectionNames;
 
     /**
+     * 召回前限定文档。空列表表示不增加文档限制，不能用于覆盖服务端已保存的范围。
+     */
+    private List<String> documentIds;
+
+    /**
      * 元数据等值过滤条件（扩展项）：
      * - key 为 metadata 字段名
      * - value 为匹配值
@@ -89,5 +94,22 @@ public class RetrieveRequest {
             normalized.add(collectionName.trim());
         }
         return List.copyOf(normalized);
+    }
+
+    public List<String> getEffectiveDocumentIds() {
+        if (documentIds != null && !documentIds.isEmpty()) {
+            if (documentIds.stream().anyMatch(id -> id == null || id.isBlank())) {
+                throw new IllegalArgumentException("文档标识不能为空");
+            }
+            return documentIds.stream().distinct().toList();
+        }
+        Object legacy = metadataFilters == null ? null : metadataFilters.get("doc_id");
+        if (legacy == null) {
+            return List.of();
+        }
+        if (legacy.toString().isBlank()) {
+            throw new IllegalArgumentException("文档标识不能为空");
+        }
+        return List.of(legacy.toString());
     }
 }

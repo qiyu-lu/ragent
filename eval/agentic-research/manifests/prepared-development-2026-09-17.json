@@ -1,0 +1,433 @@
+{
+  "base_commit": "365d3e4d62337e91112246b4e781385183f011c7",
+  "boundaries": {
+    "corpus_imported": false,
+    "model_api_calls": 0,
+    "musique_full_rows_are_independent_question_groups": false,
+    "qasper_source_unit_is_embedding_chunk": false,
+    "quality_evaluation_executed": false,
+    "real_test_splits_converted": false
+  },
+  "datasets": [
+    {
+      "boundaries": {
+        "corpus_imported": false,
+        "model_api_calls": 0,
+        "musique_answerability_scope": "original per-question candidates; pooled context may restore omitted support",
+        "musique_fullwiki": false,
+        "qasper_figure_table_images_and_captions_imported": false,
+        "quality_evaluation_executed": false
+      },
+      "converter": {
+        "source_hashes": {
+          "cs_evalkit.py": "b44ef4c7d08ee52ea84fa708040c7af30c2856d8b82c566d383a60352304618f",
+          "datasetkit.py": "4a6dd9e336f4e73e3c17393f9ceab07fafa1373cc8e32271f19b311ed7594d47",
+          "prepare_dataset.py": "c9a49619defb41ae8a28240c9705f597fbd85d02c8543ead6012b83c1d3ce391"
+        },
+        "version": "1.0.0"
+      },
+      "counts": {
+        "corpus_units": 47770,
+        "deduplicated_occurrences": 0,
+        "distinct_source_question_ids": 2593,
+        "documents": 888,
+        "profiles": {
+          "regression": {
+            "question_ids_hash": "04a40d06ab165db14aa9a9402903666083777c3719df21888e1d77e7b3249914",
+            "questions": 200,
+            "requested": 200
+          },
+          "smoke": {
+            "question_ids_hash": "88b6cb9c88b15013a1434d8dbabd36e14c3884434fd21aff5a1f2479992fda8b",
+            "questions": 20,
+            "requested": 20
+          }
+        },
+        "questions": 2593,
+        "source_occurrences": 47770
+      },
+      "dataset": "qasper",
+      "inputs": [
+        {
+          "path": "qasper/train/0000.parquet",
+          "sha256": "9af08092ee26c4f700202c1f90d1592b662926f23f3a308a10ff0a53345e37fe",
+          "size_bytes": 14374550
+        }
+      ],
+      "manifest_sha256": "f627156a8276cc3277201a8d4f36ea66711df336f353112eb2d3ba2d8d7b90ec",
+      "outputs": {
+        "corpus.jsonl": {
+          "sha256": "1a0d702156f11b76f34ec91f043747e8c085193516ab8ae086d059d3183dc8ae",
+          "size_bytes": 57718413
+        },
+        "queries.jsonl": {
+          "sha256": "6ca3f56afe9a963ab68462e40aedc5eaea7033582630b37a3dab1c83039fe578",
+          "size_bytes": 723960
+        },
+        "queries.regression.jsonl": {
+          "sha256": "052682d7b41aa58c423484e14b1f9fb2648c7c8fd4fec93c23446c79571d7345",
+          "size_bytes": 55750
+        },
+        "queries.smoke.jsonl": {
+          "sha256": "83bdbe24ecf545084ae7f517e564b37a59a2ce5b2e89cca8ed63d67a70eeb550",
+          "size_bytes": 5604
+        },
+        "questions.jsonl": {
+          "sha256": "ff4b1c3a8fa2e23a85b9b2d17088d72441710952fdd6d21fc44995823bce4a37",
+          "size_bytes": 14187580
+        },
+        "questions.regression.jsonl": {
+          "sha256": "c21d9b29de05994dda93f7012e2abe2b4e0ab29b914c596a26f5a282784843b4",
+          "size_bytes": 1039749
+        },
+        "questions.smoke.jsonl": {
+          "sha256": "ea57d6aee5b9e29271183754e1099c0861876f0130ccadc39ff5faa1560c4784",
+          "size_bytes": 91948
+        }
+      },
+      "prepared_path": "local-data/agentic-research/prepared/research-data-v1/qasper-train",
+      "retrieval_mode": "paper",
+      "selected_profile_statistics": {
+        "regression": {
+          "distinct_source_question_ids": 200,
+          "question_records": 200
+        },
+        "smoke": {
+          "distinct_source_question_ids": 20,
+          "question_records": 20
+        }
+      },
+      "source": {
+        "attribution": "Dasigi, Lo, Beltagy, Cohan, Smith and Gardner (2021), QASPER",
+        "format_reference": "https://huggingface.co/datasets/allenai/qasper/blob/main/qasper.py",
+        "license": "CC-BY-4.0",
+        "url": "https://huggingface.co/datasets/allenai/qasper",
+        "version": "0.3"
+      },
+      "split": "train",
+      "statistics": {
+        "empty_paragraphs_skipped": 805,
+        "gold_evidence_resolved": 3676,
+        "gold_evidence_unresolved": 533,
+        "papers": 888,
+        "questions_answerable": 2315,
+        "questions_mixed": 7,
+        "questions_unanswerable": 271
+      },
+      "variant": null
+    },
+    {
+      "boundaries": {
+        "corpus_imported": false,
+        "model_api_calls": 0,
+        "musique_answerability_scope": "original per-question candidates; pooled context may restore omitted support",
+        "musique_fullwiki": false,
+        "qasper_figure_table_images_and_captions_imported": false,
+        "quality_evaluation_executed": false
+      },
+      "converter": {
+        "source_hashes": {
+          "cs_evalkit.py": "b44ef4c7d08ee52ea84fa708040c7af30c2856d8b82c566d383a60352304618f",
+          "datasetkit.py": "4a6dd9e336f4e73e3c17393f9ceab07fafa1373cc8e32271f19b311ed7594d47",
+          "prepare_dataset.py": "c9a49619defb41ae8a28240c9705f597fbd85d02c8543ead6012b83c1d3ce391"
+        },
+        "version": "1.0.0"
+      },
+      "counts": {
+        "corpus_units": 13547,
+        "deduplicated_occurrences": 0,
+        "distinct_source_question_ids": 1005,
+        "documents": 281,
+        "profiles": {
+          "regression": {
+            "question_ids_hash": "268a718c8edd760cd46775a6bcee2cda91a3da2ce736418984510423891239ad",
+            "questions": 200,
+            "requested": 200
+          },
+          "smoke": {
+            "question_ids_hash": "7a130794df3317441d4acf446f5efd7ee6847e09a913641204a14501611b222a",
+            "questions": 20,
+            "requested": 20
+          }
+        },
+        "questions": 1005,
+        "source_occurrences": 13547
+      },
+      "dataset": "qasper",
+      "inputs": [
+        {
+          "path": "qasper/validation/0000.parquet",
+          "sha256": "089781b91c337d348dd9e8b57cc8adc100ed2d9cab84a6127402bcccf1559222",
+          "size_bytes": 4749127
+        }
+      ],
+      "manifest_sha256": "82b86ee788b4f8c502f5f7e97b512824b492bff58031326b521e710301b1d52c",
+      "outputs": {
+        "corpus.jsonl": {
+          "sha256": "82af571c892428e18f154e09eee488568c71379bee7013dd2e902fd57038b66c",
+          "size_bytes": 16771803
+        },
+        "queries.jsonl": {
+          "sha256": "2676b7102e64d66abde03b81f751245535d232e07b2d4cb5db2748c32476998b",
+          "size_bytes": 282490
+        },
+        "queries.regression.jsonl": {
+          "sha256": "27cd0d5227b43024a8a4dc0b3f0a3bec69c6d8b3c95d15331e7548775cf70ed8",
+          "size_bytes": 56190
+        },
+        "queries.smoke.jsonl": {
+          "sha256": "af2a225d7933f2464974aa1ccb96b551d21e8eb642eb5ea0765e35a151c68817",
+          "size_bytes": 5611
+        },
+        "questions.jsonl": {
+          "sha256": "0d9ae29200de8b95087efd134959d72115b40b6fe0420624993ea09be96555c2",
+          "size_bytes": 5906607
+        },
+        "questions.regression.jsonl": {
+          "sha256": "30559ff3c9c1188a3f96f2a556558313e9fb0d97bfef8dc1ab956bc06f351c95",
+          "size_bytes": 1181749
+        },
+        "questions.smoke.jsonl": {
+          "sha256": "d625bd36dfe1bb5faa7a633b0b0812aa9c0d0f8fe0c4ba9cf2ad04c786c6c367",
+          "size_bytes": 107835
+        }
+      },
+      "prepared_path": "local-data/agentic-research/prepared/research-data-v1/qasper-validation",
+      "retrieval_mode": "paper",
+      "selected_profile_statistics": {
+        "regression": {
+          "distinct_source_question_ids": 200,
+          "question_records": 200
+        },
+        "smoke": {
+          "distinct_source_question_ids": 20,
+          "question_records": 20
+        }
+      },
+      "source": {
+        "attribution": "Dasigi, Lo, Beltagy, Cohan, Smith and Gardner (2021), QASPER",
+        "format_reference": "https://huggingface.co/datasets/allenai/qasper/blob/main/qasper.py",
+        "license": "CC-BY-4.0",
+        "url": "https://huggingface.co/datasets/allenai/qasper",
+        "version": "0.3"
+      },
+      "split": "validation",
+      "statistics": {
+        "empty_paragraphs_skipped": 328,
+        "gold_evidence_resolved": 2426,
+        "gold_evidence_unresolved": 382,
+        "papers": 281,
+        "questions_answerable": 870,
+        "questions_mixed": 75,
+        "questions_unanswerable": 60
+      },
+      "variant": null
+    },
+    {
+      "boundaries": {
+        "corpus_imported": false,
+        "model_api_calls": 0,
+        "musique_answerability_scope": "original per-question candidates; pooled context may restore omitted support",
+        "musique_fullwiki": false,
+        "qasper_figure_table_images_and_captions_imported": false,
+        "quality_evaluation_executed": false
+      },
+      "converter": {
+        "source_hashes": {
+          "cs_evalkit.py": "b44ef4c7d08ee52ea84fa708040c7af30c2856d8b82c566d383a60352304618f",
+          "datasetkit.py": "4a6dd9e336f4e73e3c17393f9ceab07fafa1373cc8e32271f19b311ed7594d47",
+          "prepare_dataset.py": "c9a49619defb41ae8a28240c9705f597fbd85d02c8543ead6012b83c1d3ce391"
+        },
+        "version": "1.0.0"
+      },
+      "counts": {
+        "corpus_units": 95125,
+        "deduplicated_occurrences": 702288,
+        "distinct_source_question_ids": 19938,
+        "documents": 95125,
+        "profiles": {
+          "regression": {
+            "question_ids_hash": "9bc40d577cb4b70ece01a22bb9cb46efc1865838d0932ce2ffe1612602845777",
+            "questions": 200,
+            "requested": 200
+          },
+          "smoke": {
+            "question_ids_hash": "9d010a9a9cf80f16110ef98fa01dc930b2582bd427dcca3f75d2eca440b8a48c",
+            "questions": 20,
+            "requested": 20
+          }
+        },
+        "questions": 39876,
+        "source_occurrences": 797413
+      },
+      "dataset": "musique",
+      "inputs": [
+        {
+          "path": "musique/data/musique_full_v1.0_train.jsonl",
+          "sha256": "b1cd998f7e0e2838d6fda024e4ad1eb0e7fc3edefdadb0bd9b5b10b0907f2034",
+          "size_bytes": 476696984
+        }
+      ],
+      "manifest_sha256": "0b5ac48081c27e7465f005e9e62f9661535bdc9bd17b63f9efc26261a8453f08",
+      "outputs": {
+        "corpus.jsonl": {
+          "sha256": "5e5e8d2f61fd25ef17bde45f39187fb678b19f2ea210c84e01f1b37d963c2d47",
+          "size_bytes": 104563228
+        },
+        "queries.jsonl": {
+          "sha256": "58eaf0cafa62fb047d36ae348d0ccb42a36a6a2016020d4ce827446b37fadc8f",
+          "size_bytes": 67902656
+        },
+        "queries.regression.jsonl": {
+          "sha256": "18efeef02312825eb7afe923e8535223f3be99b054780895f709a0e653505961",
+          "size_bytes": 340598
+        },
+        "queries.smoke.jsonl": {
+          "sha256": "069df5f501d94ba357d11fadc4ac65a02c4407dbf3df6c71bcf9885c263bbc05",
+          "size_bytes": 33894
+        },
+        "questions.jsonl": {
+          "sha256": "fe9ba8a7e0c308142110b15a1f174451859420190910bd6c9d677d971d9d4e10",
+          "size_bytes": 173497936
+        },
+        "questions.regression.jsonl": {
+          "sha256": "179fdf23f47ca2cfbaa848826961dac15a6da86eb85987168f31564eac73f044",
+          "size_bytes": 870999
+        },
+        "questions.smoke.jsonl": {
+          "sha256": "372fb69a47df00fda6c448fab795f2a335d9a3a01cbbd2135ec7b574e6e8a64e",
+          "size_bytes": 86588
+        }
+      },
+      "prepared_path": "local-data/agentic-research/prepared/research-data-v1/musique-train",
+      "retrieval_mode": "distractor",
+      "selected_profile_statistics": {
+        "regression": {
+          "distinct_source_question_ids": 199,
+          "question_records": 200
+        },
+        "smoke": {
+          "distinct_source_question_ids": 20,
+          "question_records": 20
+        }
+      },
+      "source": {
+        "attribution": "Trivedi, Balasubramanian, Khot and Sabharwal (2022), MuSiQue",
+        "format_reference": "https://github.com/StonyBrookNLP/musique/blob/main/raw_data_to_official_format.py",
+        "license": "CC-BY-4.0",
+        "url": "https://github.com/StonyBrookNLP/musique",
+        "version": "1.0"
+      },
+      "split": "train",
+      "statistics": {
+        "questions_answerable": 19938,
+        "questions_unanswerable": 19938
+      },
+      "variant": "full"
+    },
+    {
+      "boundaries": {
+        "corpus_imported": false,
+        "model_api_calls": 0,
+        "musique_answerability_scope": "original per-question candidates; pooled context may restore omitted support",
+        "musique_fullwiki": false,
+        "qasper_figure_table_images_and_captions_imported": false,
+        "quality_evaluation_executed": false
+      },
+      "converter": {
+        "source_hashes": {
+          "cs_evalkit.py": "b44ef4c7d08ee52ea84fa708040c7af30c2856d8b82c566d383a60352304618f",
+          "datasetkit.py": "4a6dd9e336f4e73e3c17393f9ceab07fafa1373cc8e32271f19b311ed7594d47",
+          "prepare_dataset.py": "c9a49619defb41ae8a28240c9705f597fbd85d02c8543ead6012b83c1d3ce391"
+        },
+        "version": "1.0.0"
+      },
+      "counts": {
+        "corpus_units": 26326,
+        "deduplicated_occurrences": 70300,
+        "distinct_source_question_ids": 2417,
+        "documents": 26326,
+        "profiles": {
+          "regression": {
+            "question_ids_hash": "a73129edac0fa2135c7caa44a120453e11fcbad1f7615a34ee52c3f27186d29a",
+            "questions": 200,
+            "requested": 200
+          },
+          "smoke": {
+            "question_ids_hash": "68898c1224a7146ce7e63d42151818c9714b1dbd3625076988ae73c5ed0557db",
+            "questions": 20,
+            "requested": 20
+          }
+        },
+        "questions": 4834,
+        "source_occurrences": 96626
+      },
+      "dataset": "musique",
+      "inputs": [
+        {
+          "path": "musique/data/musique_full_v1.0_dev.jsonl",
+          "sha256": "8cab31d56a3a1c4ef491b205a8dab3f1ac9c66e472098c6cf1de4e20294f7a4a",
+          "size_bytes": 59422562
+        }
+      ],
+      "manifest_sha256": "e9eb90cc5c252a0adb314a3d9d7a0b00314d3d87eb4697cfe1b94e9dd622d624",
+      "outputs": {
+        "corpus.jsonl": {
+          "sha256": "7851e8e47b873bf68059e613ce280d8cfadfb49f83b8c4f426a53c331f884e42",
+          "size_bytes": 29692145
+        },
+        "queries.jsonl": {
+          "sha256": "08452d4b8badff2abfe64cf2f1cda0150639aa4ef95e1e81a56afb5159719a67",
+          "size_bytes": 8274886
+        },
+        "queries.regression.jsonl": {
+          "sha256": "3b8ee2d25095347b1c6b546abf068e121427ab36d0f0bf55d63038f28cffeb48",
+          "size_bytes": 342693
+        },
+        "queries.smoke.jsonl": {
+          "sha256": "63e72769e942adce67760062535997020f6acca6132e8012f10197d92c91cc38",
+          "size_bytes": 33951
+        },
+        "questions.jsonl": {
+          "sha256": "bf96a62d9e1a524c2f1ebdfc3297e3f952fe45f59269c3a895b99531092de821",
+          "size_bytes": 21391260
+        },
+        "questions.regression.jsonl": {
+          "sha256": "6173f05601e57ab8524210f22b658a01b52e6259ab9d8b63d8141b875f7298af",
+          "size_bytes": 886544
+        },
+        "questions.smoke.jsonl": {
+          "sha256": "373f7852253da8bd277a095f341004cf19cb5cf58e51ae664736cc89656cbfa1",
+          "size_bytes": 86937
+        }
+      },
+      "prepared_path": "local-data/agentic-research/prepared/research-data-v1/musique-dev",
+      "retrieval_mode": "distractor",
+      "selected_profile_statistics": {
+        "regression": {
+          "distinct_source_question_ids": 196,
+          "question_records": 200
+        },
+        "smoke": {
+          "distinct_source_question_ids": 20,
+          "question_records": 20
+        }
+      },
+      "source": {
+        "attribution": "Trivedi, Balasubramanian, Khot and Sabharwal (2022), MuSiQue",
+        "format_reference": "https://github.com/StonyBrookNLP/musique/blob/main/raw_data_to_official_format.py",
+        "license": "CC-BY-4.0",
+        "url": "https://github.com/StonyBrookNLP/musique",
+        "version": "1.0"
+      },
+      "split": "dev",
+      "statistics": {
+        "questions_answerable": 2417,
+        "questions_unanswerable": 2417
+      },
+      "variant": "full"
+    }
+  ],
+  "purpose": "offline-conversion-and-validation-only",
+  "schema_version": "research-prepared-inventory-v1"
+}

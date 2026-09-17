@@ -27,7 +27,7 @@ RAG 只提供证据和候选结果，文档版本、来源与状态由后端持�
 | Java 后端 | 复用上游 Spring Boot 3.5.7、MyBatis-Plus 和 SSE；新增计划草稿持久化、确定性版本差异与可审计 API | [工业知识闭环历史记录](docs/iron-ore-rag/changes/2026-08-12-industrial-knowledge-demo.md) |
 | 后端可靠性 | 修复用户取消生成时 Redis 标记、进程内任务、SSE 连接与数据库 trace 并发收尾的竞态；通过多入口补偿和 `RUNNING → 终态` 条件更新，避免根 run 永久悬挂 | [取消后 trace 收尾](docs/iron-ore-rag/changes/2026-08-12-cancel-trace-run-hang.md) |
 | AI / RAG | 复用可替换模型客户端；新增请求级 TopK、`should_split` 执行、结构化重排和来源约束 | [检索纯度改进](docs/iron-ore-rag/changes/2026-08-13-request-level-retrieval-purity.md) |
-| 研究改造 | P0/P1 完成；P2 已实现知识库/文档范围与块级/邻接证据快照，数据转换和导入待续；新研究运行器尚未接入 | [执行进度与接续点](docs/iron-ore-rag/agentic-research-execution-log.md) |
+| 研究改造 | P0/P1 完成；P2 已实现证据工具、训练/开发数据转换与固定抽样，真实幂等导入待续；新研究运行器尚未接入 | [执行进度与接续点](docs/iron-ore-rag/agentic-research-execution-log.md) |
 | 文档工程 | 复用 POI 与 PDF/MinerU 接入；新增 XLSX 精确单元格来源、结构感知分块、稳定文档键和显式版本 | [XLSX 分块](docs/iron-ore-rag/changes/2026-08-13-xlsx-structure-aware-chunking.md) |
 | 数据环境 | 为 PostgreSQL/PGVector、Redis、RustFS、RocketMQ 建立项目独立 Compose 开发栈 | [本地开发栈](docs/iron-ore-rag/changes/2026-08-12-reproducible-local-development-stack.md) |
 | 评测回归 | 新增固定 3 类文档、24 题、15 个解析锚点，支持盲评、快照及固定改写和哈希校验的配对回放 | [评测工具](docs/iron-ore-rag/changes/2026-08-13-system-evaluation-harness.md) |

@@ -4,7 +4,7 @@
 
 ## 当前接续点
 
-P0、P1 已完成；P2 进行中，已完成数据契约、知识库/文档作用域、块级与受限邻接证据快照、研究表 SQL，并通过 Java 存储与来源读取的隔离 PostgreSQL 联调；P3—P8 未开始。接下来继续 P2 的 QASPER/MuSiQue 转换与幂等导入。当前提供 Java 服务，尚未接入 SDK 工具、研究运行器或聊天入口，不能把测试通过写成研究 Agent 已完成。
+P0、P1 已完成；P2 进行中，已完成证据工具、Java/PG 联调、QASPER/MuSiQue 训练/开发转换、固定抽样和字段隔离/来源校验；P3—P8 未开始。接下来补齐真实来源 metadata 摄取、离线身份到实际 docId/chunkId 的映射与幂等导入。当前没有公开语料入库或模型调用，Java 服务尚未接入 SDK 工具、运行器或聊天入口，不能把离线转换通过写成研究 Agent 已完成。
 
 ## P0：基线、分支与接入准备（2026-09-17，已完成）
 
@@ -126,12 +126,35 @@ app 严格类型检查仍有 24 个既有诊断，与 P0 的诊断逐条一致�
 - 初次测试源码编译暴露辅助方法参数和 checked exception 声明错误；ES 测试需以真实 SDK response 和非 final 的请求方法配合当前 Mockito mock-maker-subclass。首次 PostgreSQL 测试还发现事务探针统计了范围列表查询，调整为仅统计来源读取后复跑通过。失败日志及首次 PG JUnit 保留，不改写为一次通过。
 - 原始日志、独立的普通/PG JUnit、源码 hash 和 checks.json 保存于本地忽略目录 `local-data/agentic-research/runs/20260917T075350_P2B/`。没有导入公开语料、启动完整应用或运行浏览器 E2E，没有调用真实 embedding/rerank/研究模型，没有效果或费用指标。Java 与 PG 联调使用合成正文/向量；不代表 SDK 原生工具调用或 Milvus/ES 服务已经联调。
 
-本批起始提交：`4b8a328`。提交标题：`feat: scope research documents and read neighboring evidence`；从 Git log 按唯一标题查询 SHA，下一批补记。
+本批起始提交：`4b8a328`。阶段提交：`365d3e4`，标题 `feat: scope research documents and read neighboring evidence`。
+
+## P2 第三批：数据转换与固定样本（2026-09-17，已完成；P2 仍进行中）
+
+### 范围与实现
+
+- 从 `feat/agentic-research@365d3e4` 的干净工作区继续；新增 [离线数据工具](../../eval/agentic-research/README.md)，不修改 Java、数据库、前端、模型配置或历史评测工具，不 push/合并。
+- [prepare_dataset.py](../../eval/agentic-research/prepare_dataset.py) 分批读取 QASPER Parquet，逐行读取 MuSiQue JSONL，以临时 SQLite 去重/排序。输出不存在时才执行，成功后发布完整目录；失败仅清理自身临时目录。源文件前后核对大小与 SHA-256，保存数据版本/署名/许可、源码指纹及精确条数。
+- corpus 只保留真实正文与来源；questions 保存 scorer-only gold，queries 使用白名单投影供未来运行器准备请求，不能把整行 questions 送入模型。Gold 变化不影响语料/queries/固定样本身份，额外标签字段即使重写文件指纹仍被校验拒绝。
+- QASPER 保留 paper、section/paragraph 原始下标及名称、全部答案标注者、yes/no 和不可回答分歧。空段落跳过但不重排原下标；只有 caption/图片路径的表格不编造正文。Evidence 按空白归一后的完整段落匹配，未匹配原文保留 unresolved；train/validation 分别有 533/382 个未解析 evidence 标注，不把它们改配到近似段落。
+- MuSiQue 标题+精确正文去重，同标题不同内容不拼接；来源均标 AVAILABLE_EXCERPT。Full 两行共用原问题 ID，转换身份加入其候选上下文，不依赖答案/answerable。每题 idx → 真实来源身份映射保存在评测文件。支持 pooled-context 和 distractor；本批完整转换使用 distractor 的原候选文档范围，pool 不称 fullwiki，且不能直接沿用原负例的不可回答标签报告成绩。
+- 种子 `20260917`，全部问题按 SHA256(seed, question ID) 排序，生成 20 条 smoke 与 200 条 regression 及对应 gold-free queries；smoke 是 regression 前缀。Full regression 各 200 条分别对应 train 199 / dev 196 个原始问题 ID，清单保留这个口径。真实 test 不转换；隐藏标签的合成测试保留 gold=null。
+- [verify_prepared.py](../../eval/agentic-research/verify_prepared.py) 校验文件及原始数据指纹、严格字段、来源 hash/身份、候选/gold 引用、queries 投影和固定样本。完整四个训练/开发 split 通过；[紧凑清单](../../eval/agentic-research/manifests/prepared-development-2026-09-17.json) 纳入 Git，真实语料和生成大文件留在 local-data。
+
+### 实际验证与边界
+
+- 16 个 Python 用例全部通过：HF 并行列表与原生 sequence、标注者分歧/yes-no、unresolved evidence、Full 成对行/去重、两种作用域、gold 修改不影响请求/语料、输入行序无关、输出保留、错误/损坏数据拒绝，以及合成隐藏标签/test 防误用。
+- 实际 QASPER train：888 篇、47,770 个来源段落、2,593 条问题；validation：281 篇、13,547 个来源段落、1,005 条问题。
+- 实际 MuSiQue Full train：95,125 个去重可用段落、39,876 条记录 / 19,938 个原问题 ID；dev：26,326 个去重段落、4,834 条记录 / 2,417 个原问题 ID。原始 Full 的正/负版本均保留，没有把 Ans 额外相加。
+- 实际 QASPER validation 和 MuSiQue dev 再转换一次，7 个数据文件及 manifest 都逐字节一致。全量校验包含原始 SHA-256、全部记录/引用和固定样本，不能把 20/200 抽样误写成已运行模型的规模。
+- 首轮 MuSiQue 因共用原问题 ID 失败，修正为上下文身份后完整复跑；首轮测试发现复用目录的同名 validate_dataset 模块遮蔽，改为 verify_prepared 且调整导入路径后 16/16 通过。成功/失败日志、原始 manifests、重跑结果和源码指纹位于本地忽略目录 `local-data/agentic-research/runs/20260917T082228_P2C/`。
+- 本批没有导入公开语料、产生向量、调用 embedding/rerank/研究模型、启动应用或浏览器 E2E；模型调用为 0，无 token/cost/效果成绩。未修改 Java/SQL/前端，不重复运行上一批的后端或 PostgreSQL 检查；它们的 123/7 结果仍是第二批证据。
+
+本批起始提交：`365d3e4`。提交标题：`feat: prepare reproducible research datasets`；从 Git log 按唯一标题查询 SHA，下一批补记。
 
 ## P2 剩余工作的直接接续顺序
 
 1. 核对分支、Git 状态及本记录，继续主计划第 4.2/4.3/6/7 节；不要重新接入送检工具或直接跳到 P3。
-2. 在 `eval/agentic-research/` 实现 QASPER/MuSiQue 转换、固定 ID/抽样种子、清单与 corpus/questions 分离，保留原文身份及 section_path/sourceParagraphId 等定位。答案、支持标签和 gold decomposition 不进入检索库或规划器。当前只有已下载的原始文件清单，本批未生成转换产物。
-3. 实现真实摄取链的幂等批次、分批重试、进度与 usage 记录；先导入小样例，再处理真实批量。记录当前库/语料快照及错误；本批的 Java/PG 合成夹具联调不能代替真实语料入库验证。
-4. 用导入后的实际文档复核 search/read 范围与邻接定位；旧 metadata 不足仍回退块级。继续保留独立的数据库联调和模型/效果证据。
+2. 读取 research-data-v1 各 manifest 并用 verify_prepared 复核。真实摄取只消费 corpus，不上传 questions/queries 的 gold；QASPER 按 paper 和原章节/段落下标还原顺序，MuSiQue 每个去重段落单独保存为可用片段。真实 test 留到最终配置确定后。
+3. 补齐来源 metadata 接线与离线 source/document ID → 实际 docId/chunkId 的映射。KnowledgeDocumentUploadRequest 当前不接受任意 metadata，直接上传 Markdown 不能证明原始身份进入每个 chunk；重复章节名称的邻接还需结合 section_index，旧 metadata 缺失时仍回退块级。离线 SHA-256 ID 不能直接填入数据库 20 字符主键。
+4. 实现真实摄取链的幂等批次、分批重试、进度与 usage 记录；先小样例再真实批量，用入库来源复核 search/read 与引用映射。明确 corpus 段落数和实际生成 chunk 数、原始分组数与模型运行记录数；Java/PG 合成测试和离线转换不能替代此验证。
 5. 满足 P2 完成证据后再接入 P3 的 AgentScope 原生工具、首期研究模型、任务调度与调用记录器。本批的证据存储仍需结合 P3 的状态/epoch 写入条件处理取消和迟到结果；同用户唯一键不等于请求幂等执行已经实现。

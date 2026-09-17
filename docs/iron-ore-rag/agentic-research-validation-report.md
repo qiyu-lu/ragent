@@ -1,6 +1,6 @@
 # 统一研究工作流验证报告
 
-日期：2026-09-17。P0/P1 已完成；P2 已完成契约、知识库/文档作用域、块级/邻接证据快照及 Java/PG 联调，P2 仍进行中。研究接口、原生模型工具调用、公开数据入库与 A/B/C 评测尚未运行。下方按批次保留历史结果，以最新批次说明当前验证边界。
+日期：2026-09-17。P0/P1 已完成；P2 已完成证据工具、Java/PG 联调、训练/开发数据转换和固定抽样，P2 仍进行中。研究接口、原生模型工具调用、公开数据入库与 A/B/C 评测尚未运行。下方按批次保留历史结果，以最新批次说明当前验证边界。
 
 ## P0 基线
 
@@ -122,12 +122,58 @@ git diff --check
 
 真实 PostgreSQL 测试由脚本随机创建本机隔离库并最终删除，只接受该类测试 URL，凭证只通过临时子进程环境传递，日志不包含密钥。Java/PG 通过补足首批的存储与来源回查验证，但不能代替真实语料摄取、运行器取消/epoch 保护、事件并发分配、SDK 工具协议或最终引用语义测试。旧业务库未应用本批升级。
 
+## P2 第三批实际验证
+
+范围为离线数据转换、字段隔离与固定样本，没有模型或摄取调用。起始提交为 `365d3e4`；[工具说明](../../eval/agentic-research/README.md)、[紧凑清单](../../eval/agentic-research/manifests/prepared-development-2026-09-17.json)纳入 Git。原始成功/失败日志、完整 manifests、重跑证明及源码 hash 位于本地忽略目录 `local-data/agentic-research/runs/20260917T082228_P2C/`，真实产物在 `local-data/agentic-research/prepared/research-data-v1/`。
+
+```bash
+python3 -m unittest discover -s eval/agentic-research/tests -v
+python3 eval/agentic-research/prepare_dataset.py --dataset qasper --split train --output local-data/agentic-research/prepared/research-data-v1/qasper-train
+python3 eval/agentic-research/prepare_dataset.py --dataset qasper --split validation --output local-data/agentic-research/prepared/research-data-v1/qasper-validation
+python3 eval/agentic-research/prepare_dataset.py --dataset musique --split train --variant full --retrieval-mode distractor --output local-data/agentic-research/prepared/research-data-v1/musique-train
+python3 eval/agentic-research/prepare_dataset.py --dataset musique --split dev --variant full --retrieval-mode distractor --output local-data/agentic-research/prepared/research-data-v1/musique-dev
+python3 eval/agentic-research/verify_prepared.py --prepared local-data/agentic-research/prepared/research-data-v1/qasper-train --data-root local-data/agentic-research
+python3 eval/agentic-research/verify_prepared.py --prepared local-data/agentic-research/prepared/research-data-v1/qasper-validation --data-root local-data/agentic-research
+python3 eval/agentic-research/verify_prepared.py --prepared local-data/agentic-research/prepared/research-data-v1/musique-train --data-root local-data/agentic-research
+python3 eval/agentic-research/verify_prepared.py --prepared local-data/agentic-research/prepared/research-data-v1/musique-dev --data-root local-data/agentic-research
+git diff --check
+```
+
+上述目录已生成，复跑应指定新目录，工具拒绝覆盖。真实重跑命令为：
+
+```bash
+python3 eval/agentic-research/prepare_dataset.py --dataset qasper --split validation --output local-data/agentic-research/prepared/p2c-reproduced/qasper-validation
+python3 eval/agentic-research/prepare_dataset.py --dataset musique --split dev --retrieval-mode distractor --output local-data/agentic-research/prepared/p2c-reproduced/musique-dev
+```
+
+| 数据及范围 | 原资料规模 | corpus 来源段落 | 问题记录 | 原始问题 ID |
+| --- | --- | --- | --- | --- |
+| QASPER train / paper | 888 篇 | 47,770 | 2,593 | 2,593 |
+| QASPER validation / paper | 281 篇 | 13,547 | 1,005 | 1,005 |
+| MuSiQue Full train / distractor | 可用段落候选 | 95,125（去重） | 39,876 | 19,938 |
+| MuSiQue Full dev / distractor | 可用段落候选 | 26,326（去重） | 4,834 | 2,417 |
+
+| 检查 | 实际结果与边界 |
+| --- | --- |
+| Python 环境 | Python 3.8.10 / PyArrow 17.0.0；复用已安装依赖，未新增在线服务 |
+| 单元回归 | 16/16 通过；真实 Parquet 合成夹具及 JSONL，不调用 API。涵盖 HF/native 形状、成对行、去重、gold 不影响语料/请求/样本、作用域、隐藏标签、坏数据/引用/样本/指纹和覆盖拒绝 |
+| 真实完整校验 | 四个 split 全部通过，遍历完整 corpus/questions/queries，验证来源 ID/hash、引用、gold-free 投影、20/200 样本与原始文件指纹；没有只用 smoke 代替全量文件校验 |
+| 固定样本 | seed=20260917，每个 split 20 条 smoke / 200 条 regression，smoke 为其前缀；MuSiQue 两个 regression 各 200 行分别对应 train 199 / dev 196 个原问题 ID，不称 200 个独立问题组；不保证完整成对样本，不能直接冒用 Full 成对指标 |
+| 实际重跑 | QASPER validation 与 MuSiQue dev 另存新目录，7 个数据文件及 manifest 均逐字节相同；reproducibility.json 保留证明 |
+| QASPER gold 边界 | 1,133 个空段落跳过且保留原下标；train/validation 分别有 533/382 个未解析 evidence 标注，原文保留 unresolved。保留各标注者分歧，不补造 caption 对应的表格正文 |
+| MuSiQue gold 边界 | Full 正/负版本共享原始问题 ID，转换用候选上下文区分。distractor 仅使用原候选范围；pooled-context 可能补回负例支持，不直接沿用原不可回答标签声称效果 |
+| 首次失败 | MuSiQue duplicate question ID 失败保留，修正后完整转换/校验通过；测试模块同名导入遮蔽失败保留，改名及路径调整后 16/16 通过 |
+| 静态与来源 | 新 Python 语法、入口文档链接/围栏、whitespace、紧凑清单与当前转换源码/原始 manifests 一致检查通过；历史 SQL/Java/前端及旧评测源码保持不变 |
+| 在线业务、模型与成绩 | 无知识库入库、向量生成、供应商调用或浏览器 E2E；真实 test 未转换，模型调用 0，不生成 token/cost/EM/F1 指标。未改 Java/SQL/前端，其 123 个回归与 7 个 PG 用例沿用第二批历史证据，本批不重复声称复跑 |
+
+当前输出是来源段落，不是实际分块/向量数；离线完整 SHA-256 ID 也不是数据库 20 字符主键。下一步须补实际 metadata 摄取与 source/document → docId/chunkId 映射。直接调用现有上传接口不证明 paper/paragraph 身份已进入 chunk；重复章节名须结合 section_index，QASPER 正文还原须按原始下标，不能按 hash 行序。转换通过不代替真实入库或 SDK 工具/引用验证。
+
 ## 尚未验证的业务和评测
 
 - 未启动全套服务或浏览器进行登录、普通问答、入库、版本比较、草稿生成 E2E。
 - 已做 PostgreSQL 隔离库的新建/退役 SQL 检查；未升级既有业务库或清除其意图缓存，不自动 DROP 既有数据。
-- 未导入 QASPER/MuSiQue、生成固定回归题目、调用研究模型或产生模型费用/效果指标。
-- P2 的 QASPER/MuSiQue 转换与幂等导入仍未完成；文档筛选和邻接读取尚需实际导入语料复核。Milvus/ES 未做实际服务联调。
+- 已生成训练/开发的固定样本，未导入 QASPER/MuSiQue、调用研究模型或产生模型费用/效果指标；真实 test 转换留到最终配置确定后。
+- P2 的真实 metadata 摄取、来源映射、幂等导入与 usage 仍未完成；文档筛选和邻接读取尚需实际入库语料复核。Milvus/ES 未做实际服务联调。
 - REPORT / PLAN 原生工具、新运行器、并发 worker、研究 SSE 与调用记录器仍属于后续阶段。
 
 后续每阶段追加实际结果，保留失败和未运行边界，不以单元测试替代真实模型或页面效果。

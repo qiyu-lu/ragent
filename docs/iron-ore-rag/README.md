@@ -11,7 +11,7 @@
 | 冻结状态 | D2 固定回放已结束；公平回填质量 gate fail，代码保留但默认关闭 |
 | 历史评测配置 | `intent=off`、`ocr=off`、`rag.search.request-level-refill-enabled=false` |
 
-当前 P0/P1 已完成，P2 已实现数据契约、知识库/文档作用域、块级与受限邻接证据快照，并完成 Java 证据读写的隔离 PostgreSQL 联调；数据转换和导入继续在 P2 推进。[统一研究工作流计划](agentic-research-implementation-plan-2026-09-17.md)、[执行记录](agentic-research-execution-log.md)保存进度、提交和接续点；测试与真实模型边界见[验证报告](agentic-research-validation-report.md)。
+当前 P0/P1 已完成，P2 已实现证据工具与 Java/PG 联调，以及 QASPER/MuSiQue 完整训练/开发转换、固定抽样和字段隔离校验；实际 metadata 摄取接线与幂等导入待续。[数据准备工具](../../eval/agentic-research/README.md)、[统一研究工作流计划](agentic-research-implementation-plan-2026-09-17.md)、[执行记录](agentic-research-execution-log.md)保存进度和接续点；测试与真实模型边界见[验证报告](agentic-research-validation-report.md)。
 
 阶段 2、ROS1 和 2026-09-15 送检 Agent 的实现、迁移及定向验证属于历史版本记录，均未完成登录页面业务 E2E。P1 已退役送检和执行演示；旧评测及其负结果保留。对应历史提交统一见[改动索引](changes/README.md)。
 

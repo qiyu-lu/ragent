@@ -2,7 +2,7 @@
 
 日期：2026-09-17。配合[实施计划](agentic-research-implementation-plan-2026-09-17.md)使用。
 
-本文件记录已核实的数据与配置、模型建议、费用假设及后续评测要求。P2 已完成四个训练/开发 split 的转换、完整真实 embedding 摄取与 search/read 验收；尚未切换研究生成模型或执行问答评分，下文生成费用仍为预算估算。
+本文件记录已核实的数据与配置、模型建议、费用假设及后续评测要求。P2 已完成四个训练/开发 split 的转换、完整真实 embedding 摄取与 search/read 验收；P3 已接入独立 research-flash 配置并完成小规模真实原生工具联调，未执行问答质量评分或 A/B/C。下文生成费用仍为预算场景，P3 实际 usage 与失败请求见[联调清单](../../eval/agentic-research/manifests/research-p3-smoke-2026-09-17.json)，不是结算账单。
 
 ## 1. 模型与 API key
 
@@ -10,13 +10,13 @@
 
 | 用途 | 当前配置 | 本轮建议 |
 | --- | --- | --- |
-| 研究主 Agent、worker、最终回答/计划生成 | 新研究链尚未实现；现有 STANDARD 首选 qwen3-max | 首期统一使用 qwen3.7-flash-2026-07-15，复用 BAILIAN_API_KEY |
+| 研究主 Agent、worker、最终回答/计划生成 | P3 主 Agent 使用 research-flash / qwen3.7-flash-2026-07-15；worker 与最终产物生成在 P4/P5 接续 | 首期统一使用 qwen3.7-flash-2026-07-15，复用 BAILIAN_API_KEY |
 | A/B/C 架构对照 | 现有普通问答和 FAST 路由使用不同模型候选 | 用独立评测配置固定相同生成模型，记录实际调用；保留生产默认行为的历史成绩为单独一组 |
 | 少量难题的模型对照 | 已有 qwen3-max 候选 | 按需要增加小规模、单独标记的模型对照，不混入 Flash 主实验成绩 |
 | 向量化 | SiliconFlow 的 Qwen/Qwen3-Embedding-8B，1536 维 | 沿用 SILICONFLOW_API_KEY；相同语料与配置复用向量 |
 | 重排 | 百炼 qwen3-rerank | 沿用 BAILIAN_API_KEY，记录实际输入 usage |
 
-配置依据为 `bootstrap/src/main/resources/application.yaml`。当前 `qwen-flash` 不等于 `qwen3.7-flash`，仅选择旧 FAST 路由不会自动换成推荐模型；当前没有 DeepSeek 提供方配置。使用上述方案无需新增 DeepSeek 账户充值。P2 已通过 SiliconFlow 的真实 embedding 验证凭证有效性；百炼研究模型与 rerank 尚未调用，余额未核对。
+配置依据为 `bootstrap/src/main/resources/application.yaml`。当前 `qwen-flash` 不等于 `qwen3.7-flash`，仅选择旧 FAST 路由不会自动换成研究模型；当前没有 DeepSeek 提供方配置。使用上述方案无需新增 DeepSeek 账户充值。P2 已验证 SiliconFlow embedding，P3 已调用百炼研究模型并记录供应商 usage；本批未调用 rerank，余额和金额未核对。
 
 评测固定模型 ID、区域、thinking 设置、采样参数及各角色提示词版本。首次比较可统一关闭 thinking；如开启，单独记录并计入输出费用。架构之间允许职责对应的提示词不同，但每个模板必须版本化。评测配置不应静默回退到 Max 或其他高价模型；失败、重试和实际使用的模型都应进入结果记录。
 
@@ -41,7 +41,7 @@
 | B：单研究 Agent | 40,000 | 6,000 | 0.0128 元 |
 | C：主 Agent 按需委派 | 80,000 | 10,000 | 0.0240 元 |
 
-计算方式为逐次请求的 `输入 token × 对应单价 / 1,000,000 + 输出 token × 对应单价 / 1,000,000`，再汇总到题目和批次。本表没有实测研究生成 usage；这些 token 数只是预算场景，不能作为系统性能数据。P2 完整摄取的 embedding 留档为 5,884 个请求、19,958,704 个已知供应商 total_tokens，另有 28 个 usage unknown 请求；小批与连通性探测单独保留，金额尚未账单核对，见[导入清单](../../eval/agentic-research/manifests/imported-development-2026-09-17.json)。
+计算方式为逐次请求的 `输入 token × 对应单价 / 1,000,000 + 输出 token × 对应单价 / 1,000,000`，再汇总到题目和批次。本表的 token 数只是预算场景，不能作为系统性能数据。P3 五批开发联调实际累计 136 个研究模型请求，已知输入 1,058,680 / 输出 25,248 token，4 次取消请求 usage unknown；未用这组反复调试样例校准正式质量评测的每题成本。P2 完整摄取的 embedding 留档为 5,884 个请求、19,958,704 个已知供应商 total_tokens，另有 28 个 usage unknown 请求；小批与连通性探测单独保留，金额尚未账单核对，见[导入清单](../../eval/agentic-research/manifests/imported-development-2026-09-17.json)。
 
 - 固定 400 题各跑 A/B/C，共 1,200 次完整任务：Flash 生成费约 **15.68 元**；同样 token 假设下 Max 约 **196 元**。一次任务可能调用模型多次。
 - QASPER validation 1,005 题加 MuSiQue Full dev 4,834 题全部跑 A/B/C，共 17,517 次完整任务：Flash 生成费约 **228.89 元**。
@@ -82,6 +82,6 @@ MuSiQue Full 包含 Ans 的可回答样本，两个版本不能累计成独立�
 
 供应商未返回 usage 时标为 unknown，不能填 0 来冒充免费；失败请求是否计费按账单核对。估算费用与供应商账单分别标识。不保存 API key、Authorization 头或用户凭证；记录可审计的工具行为和业务输出即可。
 
-原始 trace 和大体积结果保留在本地忽略目录；每阶段提交脚本、配置模板、固定样本 ID、清单摘要和精简结果报告，报告标明原始结果位置及 hash。完整上下文通过版本化模板、语料/观察结果引用和配置还原，不只留下终端截图。P2 建立数据清单和记录目录，P3 接入模型时补齐调用记录器，再开展真实批量调用。
+原始 trace 和大体积结果保留在本地忽略目录；每阶段提交脚本、配置模板、固定样本 ID、清单摘要和精简结果报告，报告标明原始结果位置及 hash。完整上下文通过版本化模板、语料/观察结果引用和配置还原，不只留下终端截图。P2 建立数据清单和记录目录，P3 已补齐原生工具与逐请求 usage 记录器并开展小规模真实联调；正式批量质量评分在 P7 接续。
 
 每次调整保留前后两批记录，区分单元测试、故障模拟、真实 API 联调和数据集评测。若效果下降，保留负结果并修复相关环节；不得只发布成功题，或覆盖历史结果后声称持续提升。实现和评测阶段继续遵循主计划的分支与阶段提交约定。

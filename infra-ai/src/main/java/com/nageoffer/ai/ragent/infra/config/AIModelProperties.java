@@ -173,6 +173,9 @@ public class AIModelProperties {
          * 是否支持思考链功能
          */
         private Boolean supportsThinking = false;
+
+        /** 原生工具调用能力；研究链必须显式启用，不能根据模型名称猜测。 */
+        private Boolean supportsToolCalling = false;
     }
 
     /**

@@ -1,6 +1,6 @@
 # 统一研究工作流的数据准备
 
-这里实现 P2 的离线转换、校验与真实幂等摄取。转换不调用模型；`import_corpus.py --execute` 复用项目已有分块、向量化和索引落点，再用知识搜索/原文读取服务回查。研究运行器在 P3 接续，进度见[执行记录](../../docs/iron-ore-rag/agentic-research-execution-log.md)。
+这里实现 P2 的离线转换、校验与真实幂等摄取，以及 P3 的原生工具单研究运行联调。转换不调用模型；`import_corpus.py --execute` 复用项目已有分块、向量化和索引落点，再用知识搜索/原文读取服务回查。`smoke_research.py --execute` 调用真实研究模型，进度与失败记录见[执行记录](../../docs/iron-ore-rag/agentic-research-execution-log.md)。
 
 ## 来源与环境
 
@@ -27,6 +27,29 @@ python3 -m unittest discover -s eval/agentic-research/tests -v
 校验需对每个输出目录分别执行。包含 `--data-root` 时同时验证原始文件的大小和 SHA-256；转换开始和结束也会检查源文件是否变化。转换使用临时目录，成功后才发布完整输出；失败清理自己创建的临时内容，保留原始文件和已有快照。校验错误以非零状态退出，不能把不完整转换当作通过。
 
 默认种子为 `20260917`；smoke 为 20 题，regression 为 200 题，可通过 `--seed`、`--smoke`、`--regression` 调整。对全部问题按 SHA256(seed, question ID) 排序抽样，与源文件行序无关；smoke 是 regression 的前缀，不是独立数据集。小型夹具不足指定题数时取全部并记录实际数。QASPER test 和 MuSiQue test 需要显式 `--allow-test`，仅在最终配置确定后转换；MuSiQue 无答案字段的行保留 `gold=null`，不伪造不可回答标签。本批没有转换真实 test。
+
+## P3 单研究运行联调
+
+研究运行器接入 AgentScope Java 2.0.1，使用原生 `search_knowledge`、`read_source`、`ask_user` 和 `finish_research`。创建、查询、补充输入、取消接口位于 `/rag/research/runs`；事件接口目前返回 `after`/`limit` 分页 JSON，SSE 在 P6 接续。创建时必须提供当前用户的 `conversationId`、唯一 `clientRequestId`、目标、REPORT/PLAN 以及可用知识库范围。知识库仍采用项目现有全局共享规则，运行和会话按用户归属隔离。
+
+本阶段返回 `state.researchResult` 中的发现、已读证据 ID、缺口和冲突；`artifact` 仍为空。COMPLETED 在 P3 只表示研究阶段形成经过引用身份检查的摘要，完整报告、计划 JSON 和卡片属于 P5/P6。资料没有提供的要求不能补造。等待输入通过 `state.question` 展示，回复携带当前 `revision` 与 `answer`；原研究范围保持不变，需要更换范围时使用新的请求。
+
+运行器默认最多 16 次模型调用、24 次工具调用、300 秒累计活动时长，预留 2 次最终生成额度；最后两次研究调用限定为原生 finish_research。人工等待不计入活动时长，恢复保留已消耗额度。预算/超时退出时，有已读证据则保留为 PARTIAL，无证据则 FAILED。取消关闭本地 SDK/HTTP 订阅并阻止迟到写回，供应商是否停止远端计算保持 unknown。运行与模型并发分别限制为 2；本阶段采用单 JVM 执行，重启将失去执行者的 QUEUED/RUNNING 标为 INTERRUPTED，不恢复中间 token。
+
+```bash
+# 随机 PostgreSQL 隔离库与本地 HTTP 桩，无付费模型调用
+bash scripts/validate-agentic-research-p3.sh
+
+# 只生成 5 个请求与调用清单，不访问数据库或 API；run-dir 必须不存在
+python3 eval/agentic-research/smoke_research.py --run-dir local-data/agentic-research/runs/<new-id>
+
+# 真实供应商小规模联调，会消耗模型与 query embedding 额度
+python3 eval/agentic-research/smoke_research.py --run-dir local-data/agentic-research/runs/<new-id> --execute
+```
+
+真实联调复用已导入的 `research_corpus_v1`，仅查询语料，将运行、证据和事件写入随机 `research_p3_*` 库并在结束时清理。参数可覆盖 prepared 路径、容器名和语料库名；使用 `--case waiting-and-resume` 等可只复测一条路径。凭证优先来自环境变量，也可复用既有 IDEA 配置，在子进程环境中传递，日志不输出其值。Java 命令复用现有向量检索；本阶段 smoke 不启用 rerank，不运行 A/B/C 或 EM/F1。
+
+每批保留 `run.json`、`job.json`、`predictions.jsonl`、`traces.jsonl`、`usage.jsonl`、`embedding-usage.jsonl`、`java.log` 和 `summary.json`。请求只读取 gold-free `queries.jsonl`；不读取评分用 questions。源码/配置/模板 hash、实际 model ID、请求类型、工具参数/结果及未知 usage 分开记录。退出码 0 表示命令完成；每个样例是否形成闭环必须检查 predictions 的状态，不能把失败样例从报告中删除。
 
 ## 产物与标注隔离
 

@@ -182,6 +182,20 @@ rag:
       5. 最后另起一行，用一句话自然引出图片（例如"下方为该内容对应的原始图片："），以便在这段文字后紧接着展示图片。
     max-output-tokens: 4096
 
+research:
+  model-id: research-flash
+  max-concurrent-runs: 2
+  queue-capacity: 32
+  max-concurrent-model-calls: 2
+  max-model-calls: 16
+  max-tool-calls: 24
+  max-duration-seconds: 300
+  model-call-timeout-seconds: 60
+  tool-timeout-seconds: 30
+  reserved-finalization-model-calls: 2
+  max-input-tokens: 28000
+  max-output-tokens: 4096
+
 ai:
   providers:
     ollama:
@@ -223,6 +237,10 @@ ai:
       - id: qwen-flash
         provider: bailian
         model: qwen-flash
+      - id: research-flash
+        provider: bailian
+        model: qwen3.7-flash-2026-07-15
+        supports-tool-calling: true
       - id: qwen3-local
         provider: ollama
         model: qwen3:8b-fp16

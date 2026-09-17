@@ -4,7 +4,7 @@
 
 ## 当前接续点
 
-P0、P1、P2 已完成；P3—P8 未开始。P2 已完成证据工具、Java/PG 联调、QASPER/MuSiQue 训练/开发转换与固定抽样、字段隔离，以及四个完整 split 的真实 embedding 摄取、稳定主键映射、幂等续入和 search/read 验收。Java 服务尚未接入 SDK 工具、运行器或聊天入口；下一步从 P3 的模型工厂、原生工具注册与单任务运行闭环接续。
+P0—P3 已完成；P4—P8 未开始。P2 完成四个训练/开发 split 的真实摄取和 search/read 验收；P3 完成 AgentScope 2.0.1 原生工具、带归属/幂等/epoch 的单任务运行服务、预算、追问恢复、取消与接口，并保留真实模型联调和 149 个回归测试记录。本轮按用户允许的任务量先完成 P3。当前结果是结构化研究摘要，完整报告/计划产物、SSE 和聊天页面尚未接入；下一步从 P4 的 conduct_research、独立 worker 上下文与受限并发接续。
 
 ## P0：基线、分支与接入准备（2026-09-17，已完成）
 
@@ -193,3 +193,41 @@ app 严格类型检查仍有 24 个既有诊断，与 P0 的诊断逐条一致�
 最终静态检查通过：58 个本地链接及锚点、Markdown 围栏、whitespace 和全部导入清单产物 hash；15 个历史增量 SQL 与起始提交逐字节一致。本批检查及日志指纹汇总保存在完整批次的 `validation/checks.json`。
 
 本批只证明真实数据摄取及检索阅读链路，不运行答案生成、A/B/C 或 EM/F1；真实 test 仍不转换/入库。Milvus/ES 服务、SDK 原生工具、研究取消/epoch 和页面 E2E 尚未验证，属于后续阶段。
+
+## P3：原生工具与单研究任务运行（2026-09-17，已完成）
+
+起始提交 `0c2ae30`，仍在 `feat/agentic-research`。本轮按用户允许的范围只实现 P3；原生协议、运行器、持久化竞争和真实联调的工作量已较大，P4 的委派与并发研究者留到下一阶段。
+
+### 实现范围
+
+- bootstrap 实际加入 `agentscope-core` 和 `agentscope-extensions-model-openai` 2.0.1。API 核对以正式 tag `v2.0.1`、commit `51d10ecfddadc45fb2173ff161e40e7bcf48d0be` 的源码及 Maven JAR 为准，使用 v2 的 ReActAgent、Middleware、Toolkit 和 RuntimeContext；未引入 Harness、通用 MCP 或文本 JSON 决策协议。
+- [ResearchModelFactory](../../bootstrap/src/main/java/com/nageoffer/ai/ragent/research/runtime/ResearchModelFactory.java) 从现有 AI 注册表读取提供方、端点和凭证，新增独立 `research-flash` 项指向 `qwen3.7-flash-2026-07-15`，显式要求 `supports-tool-calling`。普通问答各档位候选未调整；研究链没有静默回退模型。模型请求关闭 thinking，工具存在时使用 `tool_choice=required`，最后两次研究调用限定为原生 `finish_research`，可在同一额度内修复一次引用错误。
+- [ResearchAgentFactory](../../bootstrap/src/main/java/com/nageoffer/ai/ragent/research/runtime/ResearchAgentFactory.java) 每次领取创建独立 Agent/会话，只注册 search/read/ask/finish 四个工具，复用 P2 知识服务。模型可以观察后补查、等待用户输入或结束。finish 的每条发现必须绑定本次实际 read_source 提供的 ID；非法参数、越界/虚构来源和未读引用以原生 tool result 回传，修复调用照常计入额度。
+- [ResearchRunStore](../../bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/ResearchRunStore.java) 使用 PostgreSQL 唯一请求键与最初请求指纹处理幂等；重复 ID 配不同请求明确拒绝。领取以 owner + 行锁分配 epoch/随机租约，活动租约不重复执行；事件序号按 run 原子 UPDATE 分配。写事件、保存结束与取消各自短事务，模型/工具不在事务中。运行视图不暴露 leaseToken。
+- [ResearchRunService](../../bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/ResearchRunService.java) 用有界任务池自行推进，不需要 advance。取消先写终态、撤销租约，再传播到 SDK interrupt 和 Reactor/HTTP 订阅；旧 epoch、取消后返回及完成/取消竞争不会覆盖终态。独立记录 CANCEL_REQUESTED 与 LOCAL_EXECUTION_ENDED；远端计算是否停止保持 unknown。排队拒绝落库为 FAILED；单 JVM 重启将失去执行者的 QUEUED/RUNNING 标记 INTERRUPTED，保留证据/调用记录，重新发起需新 clientRequestId。
+- ResearchBudget 同步分配模型/工具额度，并通过共享 semaphore 限制研究模型并发；默认 16/24 次、300 秒累计活动时长、模型 60 秒/工具 30 秒，预留 2 次最终生成额度。人工等待不计活动时长，恢复保留之前的消耗。上下文按 token 估算裁剪最早完整 assistant/tool 往返，保留系统指令、目标和最新观察；供应商实际 usage 与估算分开，未返回 usage 不填 0。
+- [ResearchRunController](../../bootstrap/src/main/java/com/nageoffer/ai/ragent/research/controller/ResearchRunController.java) 提供创建、查询、事件分页、带 revision 的输入及幂等取消。校验当前会话归属、可用知识库与文档范围；知识库仍为现有全局共享规则。P3 输入只补充条件，不修改服务器保存的知识库/文档范围。明确记录 latestUserInput 的问题/回答与 user_input 来源，恢复时不受原始目标中旧的“未提供”措辞影响。
+- 当前产物是 `state.researchResult` 的结构化研究发现、缺口和冲突以及 readEvidenceIds，`artifact` 为空；COMPLETED 在此阶段表示研究摘要闭环。P5 再接统一 REPORT/PLAN 生成、结构检查和展示用引用映射；P6 再接 SSE/聊天页面。事件 GET 当前为 after/limit 分页 JSON，查询与刷新不调度执行。
+- 新增 [P3 验证脚本](../../scripts/validate-agentic-research-p3.sh)和[真实 smoke 工具](../../eval/agentic-research/smoke_research.py)。真实命令仅查询已导入公开语料，运行/证据/事件写入随机研究库并清理，保存实际模型/模板、源码指纹、工具参数和结果、usage 与失败样例，不保留隐藏推理。SDK 模型请求流取消传播到 JDK HTTP future/socket；这不等于供应商已确认停止计费。
+
+### 验证与问题修复
+
+最新后端回归 149/149（0 失败、错误、跳过），其中新增 P3 26 个：PostgreSQL 9 个、真实 SDK/本地 HTTP 11 个、预算 3 个、接口 3 个。PostgreSQL 覆盖重复请求并发、活动/过期租约、旧 epoch、事件并发编号、revision/owner、真实完成/取消竞争及重启。HTTP 桩覆盖匹配的 tool_call_id、依赖补查、错误回传、未读引用修复、等待输入、拒绝文本仿冒、取消、超时后配额释放、强制原生结束和额度保留。它们证明程序机制，真实模型结果单列。
+
+首次接入修正了 SDK `maxRetries` 实际含义为含首次调用的尝试次数（应为 1），以及原生工具结果消息的 TOOL role。Maven 首次因缓存目录只读无法下载，经沙箱授权解析后成功；一次并行构建造成测试发现时目标类缺失，随后改为顺序构建/测试并 clean 重跑。失败日志保留，不作为验证通过的依据。
+
+真实联调分批留档，未覆盖或改写旧批次：
+
+- A：查找、多跳答案和资料不足正常结束，取消生效；多跳从初次候选直接读到两层信息，没有依赖补查；输入后重复追问。发现候选未读引用时，程序拒绝、模型补读后成功。这批不作为追问恢复和依赖补查通过。
+- B：补查确实依赖前次阅读，已记录 user_input 回复，但 auto 协议仍会直接输出文本，四个普通探测落为 FAILED；取消保留 CANCELLED。未将文本包装为原生工具成功。
+- C：加入 required 工具选择后，多跳、资料不足、输入恢复和取消通过；查找仍提前结束失败。继续调整额度提示的注入位置。
+- D：额度提示合并到开头的系统指令后，查找、依赖补查、资料不足和取消通过；输入恢复读过资料后继续搜索，耗尽 14 次研究额度。当时联调命令将异常统一记为 FAILED，未保存部分状态；这份原始失败保持不变。
+- E：只复测受影响的等待/恢复路径，最后两次研究调用限定 finish_research，同时将联调命令的预算/超时退出对齐服务实现：有已读证据时落 PARTIAL 并保留来源及缺口。复测经过 WAITING_INPUT、INPUT_RECEIVED 与原生 finish，最终 COMPLETED，共 14 次模型/工具调用，3 个已读证据、8 项缺口，2 次最终生成额度仍保留。
+
+当前提示词为 `research-main-v2`。模型记录响应是否包含原生调用、是否含文本及 finishReason，不保存推理内容。五批合计 136 个研究模型请求，供应商已知输入 1,058,680 / 输出 25,248 token；四次取消请求的 usage 保持 unknown。这是开发调试累计量，不是每题平均成本或结算账单。D 的四条正常/取消路径与 E 的恢复路径分别留证，未在最终源码下重新运行整批五题，不能合并声称最终全量回归。原始结果在 `local-data/agentic-research/runs/*_P3_real_A` 至 `*_P3_real_E`，构建/程序回归及失败日志在 `local-data/agentic-research/runs/20260917T112600_P3_validation/`；[P3 清单](../../eval/agentic-research/manifests/research-p3-smoke-2026-09-17.json)记录逐批状态、源码/产物 hash 和验证边界。
+
+本批不新增表或字段，沿用 P2 schema；未对既有业务库执行升级。真实 smoke 的检索通道为现有 PGVector + query embedding，不启用 rerank；没有 A/B/C、EM/F1 或语义支持评分，也没有全套服务/浏览器 E2E。阶段提交通过标题 `feat: implement bounded research runs with native tool calls` 在 Git log 定位，不自动 push 或合并。
+
+最终静态验收通过：69 个入口本地链接/锚点、Markdown 围栏、全部 P3 文件 whitespace、44 份源码/配置/模板及全部原始结果/检查记录指纹一致；E 批研究源码与当前交付内容一致。P3 起始提交的 16 份升级 SQL 不变，其中最初基线 `a7ef618` 的 12 份历史文件也不变。shell/Python 语法与 5/1 请求的全批/单路径 dry-run 通过，未重复调用付费模型。
+
+下一步从 P4 接续 conduct_research：在现有 run/epoch、证据身份、预算和模型配额上增加独立 worker 上下文与专用线程池，最多 2 个并行研究者、总数 4，仅一层委派；不得分别复制全局额度，也不将子 Agent 完整历史拼回主 Agent。

@@ -48,7 +48,7 @@
 
     <dependencyManagement>
         <dependencies>
-            <!-- Activated by the research implementation in P3. -->
+            <!-- Native tool calling for the bounded research runner (P3). -->
             <dependency>
                 <groupId>io.agentscope</groupId>
                 <artifactId>agentscope-core</artifactId>

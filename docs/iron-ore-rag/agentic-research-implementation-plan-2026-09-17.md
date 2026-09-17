@@ -1,6 +1,6 @@
 # 统一研究 Agent 与计划草稿改造实施计划
 
-> 制定日期：2026-09-17。实施状态：P0、P1、P2 已完成。P2 已完成证据契约、知识库/文档作用域、块级及受限邻接快照、数据转换与固定抽样，以及四个训练/开发 split 的真实幂等导入和 search/read 验收；P3—P8 未开始。当前进度与验证边界见[执行记录](agentic-research-execution-log.md)和[验证报告](agentic-research-validation-report.md)。
+> 制定日期：2026-09-17。实施状态：P0—P3 已完成。P2 完成四个训练/开发 split 的真实幂等导入和 search/read 验收；P3 完成 AgentScope 2.0.1 原生工具、单研究任务服务与接口、预算/取消/epoch 保护及真实模型联调。当前返回结构化研究摘要，完整报告/计划产物与页面在 P5/P6 接续；P4—P8 未开始。本轮按用户允许的任务量先完成 P3。当前进度与验证边界见[执行记录](agentic-research-execution-log.md)和[验证报告](agentic-research-validation-report.md)。
 >
 > 本文件是后续实施的主要交接入口。它记录本轮已经确定的产品方向、技术选择、删除范围、数据准备、阶段提交和验证方式。后续无需重新阅读完整聊天，也不要重新把方向改回送检助手。
 >
@@ -386,6 +386,8 @@ P2 第三批已新增 [eval/agentic-research/](../../eval/agentic-research/READM
 
 ### P3：接入 AgentScope 与单研究任务运行闭环
 
+**当前状态（2026-09-17）：已完成。** 轻量 SDK 与独立 research-flash 配置已启用，实际模型为 `qwen3.7-flash-2026-07-15`；四个原生 search/read/ask/finish 工具复用 P2 证据服务。创建后自行执行，GET 查询不重复调度；用户回复通过 revision 校验恢复，累计调用额度保持不变。PostgreSQL 幂等、短事务、租约/epoch、取消和重启保护完成，最新后端回归 149/149。真实联调保留各批失败及修复记录，覆盖查找、依赖阅读的补查、资料不足、追问恢复与取消，见[联调清单](../../eval/agentic-research/manifests/research-p3-smoke-2026-09-17.json)。P3 的 COMPLETED 仅表示 `state.researchResult` 中有通过已读引用身份检查的研究摘要，`artifact` 为空；不是 P5 最终报告/计划已生成。事件接口暂为分页 JSON，SSE 在 P6 接续；本阶段无多 Agent、质量评分或全套 Web E2E。
+
 **工作：**
 
 - 增加 ResearchModelFactory、ResearchAgentFactory，使用锁定版本的原生工具调用。
@@ -597,7 +599,7 @@ npm --prefix frontend run build
 | P0 基线与分支 | 已完成 | 8a9c79d；见执行记录 |
 | P1 退役旧业务 | 已完成 | a1b61d7；见执行记录与验证报告 |
 | P2 数据与工具 | 已完成：证据工具、转换抽样、完整训练/开发摄取及真实联调 | 4b8a328、365d3e4、943c11a、4b06f21；验收见执行记录 |
-| P3 单研究运行 | 未开始 | — |
+| P3 单研究运行 | 已完成：原生工具、持久化运行闭环与真实联调 | `feat: implement bounded research runs with native tool calls`；见执行记录与验证报告 |
 | P4 多 Agent | 未开始 | — |
 | P5 报告与计划 | 未开始 | — |
 | P6 前端整合 | 未开始 | — |

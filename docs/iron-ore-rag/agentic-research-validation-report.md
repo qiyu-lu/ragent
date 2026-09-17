@@ -1,6 +1,6 @@
 # 统一研究工作流验证报告
 
-日期：2026-09-17。P0/P1/P2 已完成。P2 已完成证据工具、Java/PG 联调、训练/开发数据转换和固定抽样，以及四个完整 split 的真实摄取、来源审计与 search/read 验收。研究接口、原生模型工具调用与 A/B/C 评测尚未运行。下方按批次保留历史结果，以最新批次说明当前验证边界。
+日期：2026-09-17。P0—P3 已完成。P2 完成四个完整训练/开发 split 的真实摄取和 search/read 验收；P3 完成原生工具单研究运行、接口、实际 PostgreSQL 竞争验证和真实供应商联调，最新后端回归 149/149。P4 多 Agent、P5 最终报告/计划、P6 页面与 SSE、P7 A/B/C 质量评测尚未完成。本轮按用户允许的任务量先完成 P3。下方按批次保留历史结果，以最新批次说明当前验证边界。
 
 ## P0 基线
 
@@ -193,12 +193,62 @@ python3 eval/agentic-research/prepare_dataset.py --dataset musique --split dev -
 
 原始路径：`local-data/agentic-research/runs/20260917T084500_P2D_smoke/` 和 `local-data/agentic-research/runs/20260917T085000_P2D_full/`。每份 split 保留 input/job、documents、mapping、progress/complete、corpus-audit、source-probes、usage、traces 和 Java 日志；完整批次输入的源清单/代码 SHA 在 run/invocations 中保存。[导入清单](../../eval/agentic-research/manifests/imported-development-2026-09-17.json)保留数量、KB ID、逐产物 SHA 和执行源码与最终配置编码的差异处理。逐请求日志按 call_id 合并，STARTED 没有 COMPLETED 的记录保留未知状态，不重复累加 token。金额以实际账单核对，不能把 token 记录当结算账单。
 
+## P3：原生工具与单研究运行验证
+
+起始提交 `0c2ae30`，分支 `feat/agentic-research`。SDK 正式版本为 2.0.1，API 核对源码 tag `v2.0.1` 的 commit `51d10ecfddadc45fb2173ff161e40e7bcf48d0be`。[联调清单](../../eval/agentic-research/manifests/research-p3-smoke-2026-09-17.json)纳入 Git；长日志、JUnit XML、逐请求记录与失败样例保存在本地忽略目录。阶段提交通过标题 `feat: implement bounded research runs with native tool calls` 定位。
+
+```bash
+./mvnw -o -pl bootstrap -am -DskipTests clean package
+./mvnw -o -pl bootstrap dependency:tree -Dverbose -Dincludes=io.agentscope:*,io.projectreactor:*,com.fasterxml.jackson.core:*,org.slf4j:*,org.xerial:*
+P3_TESTS=ResearchRunPostgresIT,ResearchBudgetTest,ResearchNativeToolsTest,ResearchRunControllerTest,ResearchEvidenceToolsTest,ResearchEvidenceStoreTest,MultiChannelRetrievalEngineTest,RetrievalScopeResolverTest,VectorSearchChannelTest,KeywordSearchChannelTest,PgVectorRetrieverServiceTest,MilvusVectorRetrieverServiceTest,EsKeywordRetrieverServiceTest,RetrievalEngineTest,StreamChatPipelineTest,IngestionTaskServiceImplTest,TableChunkerTest,WorkbookDiffServiceTest,TaskTemplateGeneratorTest,IronOreTaskTemplateServiceTest,TaskTemplateValidatorTest,StreamTaskManagerCancelTraceTest bash scripts/validate-agentic-research-p3.sh
+python3 eval/agentic-research/smoke_research.py --run-dir local-data/agentic-research/runs/<new-id> --execute
+python3 eval/agentic-research/smoke_research.py --run-dir local-data/agentic-research/runs/<new-id> --case waiting-and-resume --execute
+git diff --check
+```
+
+实际供应商调用仅由后两条 Python 命令触发；程序回归使用 PostgreSQL 隔离库与本地 HTTP 桩。Maven 构建和测试顺序执行，不共享并行 clean 目标。最终构建/回归与历次失败日志位于 `local-data/agentic-research/runs/20260917T112600_P3_validation/`，文件 hash、源码 hash 和最终静态检查见其 checks.json。
+
+| 验证 | 实际结果与边界 |
+| --- | --- |
+| 后端 clean package | 通过，Java 17；实际依赖 core/openai-extension 均为 2.0.1 |
+| SDK 依赖兼容 | Boot 管理 Reactor 3.7.12、Jackson 2.19.2、SLF4J 2.0.17；SDK 声明的 Reactor 3.8.2 / Jackson 2.21.1 被现有管理版本覆盖。编译、实际 SDK/HTTP 工具测试及本批供应商请求通过，没有整体替换普通问答依赖 |
+| 最新定向回归 | 22 个类，149/149，0 失败/错误/跳过；原有检索、摄取、草稿、版本比较与取消检查仍通过 |
+| 新增 P3 用例 | 26 个：PostgreSQL 9、实际 SDK/HTTP 11、预算 3、接口 3 |
+| PostgreSQL 16 / Java 短事务 | 随机研究库，JdbcTemplate 实际 INSERT/行锁/JSONB/UPDATE；20 次并发重复请求只建一条 run，活动租约不重复领取，过期租约旧 epoch 拒绝，事件并发编号连续；10 轮真实完成/取消竞争、跨用户、revision、重启状态与异步服务调度通过。模型/工具执行时无数据库事务 |
+| SDK 原生协议 / 本地 HTTP | 四个 schema、tool_call_id 与 TOOL result 匹配；依赖补查、坏参数原生错误及修复、未读引用拒绝及补读、ask_user、拒绝纯文本 JSON 仿冒、整组上下文裁剪、最后两次原生结束、取消订阅与超时后模型并发额度释放通过。它们证明程序机制，不计为模型效果 |
+| REST 接口 | standalone MockMvc 校验创建参数、只读查询/事件、revision 输入与幂等取消；未启动全套 Spring 应用或浏览器 |
+| 预算 / 恢复 | 16 次模型 / 24 次工具、300 秒累计活动时间，模型 60 秒 / 工具 30 秒，预留 2 次最终生成；输入恢复保留调用历史/usage，人工等待不计活动时间；耗尽时有已读证据则 PARTIAL，无证据则 FAILED |
+| 取消边界 | 数据库 CANCELLED 先落，epoch 撤销后再取消 SDK/HTTP；迟到事件/结果不能覆盖终态。CANCEL_REQUESTED 与 LOCAL_EXECUTION_ENDED 分开，远端计算/计费停止未获供应商确认，保持 unknown |
+| schema / 前端 | P3 未改表或 SQL、未升级既有业务库；无前端改动，本批未重跑其历史构建/类型检查 |
+
+真实联调使用 `qwen3.7-flash-2026-07-15`，thinking 关闭，无静默模型回退。语料仅查 P2 独立 `research_corpus_v1`；运行/证据/事件写入随机 `research_p3_*` 库，结束后均已清理。请求来自 gold-free queries 与明确的缺失条件探测，没有读评分答案、证据标签或 gold decomposition。检索使用现有 query embedding + PGVector，不启用 rerank。
+
+以下 A—E 是开发修复批次名，不是计划中的 A/B/C 架构对照。前四批每批 5 个探测，最后一批只重跑受影响的输入恢复；不是 21 个独立问题。
+
+| 开发批次 | 查找 | 依赖多跳 | 资料不足 | 等待/恢复 | 取消 | 模型请求 / 已知输入 / 输出 token / unknown |
+| --- | --- | --- | --- | --- | --- | --- |
+| A `20260917T111000_P3_real_A` | COMPLETED | COMPLETED，但无阅读后补查 | COMPLETED | 回复后仍 WAITING_INPUT | CANCELLED | 29 / 210,254 / 5,245 / 1 |
+| B `20260917T111500_P3_real_B` | FAILED | FAILED，补查已发生 | FAILED | FAILED | CANCELLED | 24 / 127,377 / 4,474 / 1 |
+| C `20260917T111900_P3_real_C` | FAILED | COMPLETED | COMPLETED | COMPLETED | CANCELLED | 34 / 276,369 / 7,702 / 1 |
+| D `20260917T112200_P3_real_D` | COMPLETED | COMPLETED，依赖补查 | COMPLETED | FAILED，研究额度耗尽 | CANCELLED | 35 / 261,347 / 4,738 / 1 |
+| E `20260917T112600_P3_real_E` | 未重跑 | 未重跑 | 未重跑 | COMPLETED | 未重跑 | 14 / 183,333 / 3,089 / 0 |
+
+原始结果逐批保留：A 候选未读引用被拒绝后模型补读，输入恢复却再次追问；B 将用户回复单独标记为 user_input，但 auto 模式仍输出纯文本，被程序判为失败；C 加入原生 required，D 将额度提示合并到开头的系统消息，查找与依赖补查结束正常。D 的输入恢复读过来源后继续搜索，研究额度耗尽；当时联调命令的统一异常处理未保留部分状态，原始 FAILED 不改写。
+
+最终实现限制最后两次研究调用为原生 finish_research，给同一额度内的引用修复留一次机会；联调命令的预算/超时退出也对齐在线服务的 PARTIAL 与来源保存。E 在最终研究源码下经过 WAITING_INPUT → INPUT_RECEIVED → 原生 finish，形成 3 个已读证据支撑的研究摘要，保留 8 项缺口，共 14 次模型/工具调用，2 次最终生成额度未动用。D 的其余四条路径未在最终源码下重跑，分别记录修复前的实际证据，不声称最终版本整批五题通过。
+
+五批累计 136 个研究模型请求，已知输入 1,058,680 / 输出 25,248 token，4 次取消请求 usage unknown。供应商实际 usage 与输入 token 估算分开，unknown 不当作 0；金额未核对账单。完整 run/job/traces/usage/predictions/embedding-usage/summary/Java 日志与 SHA-256 由联调清单引用，可回放实际工具参数、观察与状态；未保存隐藏推理。
+
+P3 的 COMPLETED 表示 `state.researchResult` 研究摘要经过已读引用身份检查，`artifact` 仍为空；不证明引用语义充分、最终 REPORT/PLAN 生成或业务计划可执行。事件 GET 当前分页 JSON；SSE、聊天页面和多 Agent 仍留后续阶段。
+
+最终静态检查通过：5 份入口 Markdown 的 69 个本地链接/锚点、围栏与全部 P3 文件 whitespace；44 份源码/配置/模板指纹与清单一致，最终 E 批的研究 Java、配置和提示词 hash 与交付源码相同。P3 起始提交的 16 份现有升级 SQL 逐字节不变；其中原始 `a7ef618` 基线的 12 份历史 SQL 也未变。脚本语法与 dry-run 通过，全批/单路径分别只生成 5/1 个请求，不访问 API/数据库。长日志、JUnit 和五批模型产物逐文件 SHA-256 检查通过。
+
 ## 尚未验证的业务和评测
 
 - 未启动全套服务或浏览器进行登录、普通问答、文档管理、版本比较、草稿生成 E2E。
 - 已做 PostgreSQL 隔离库的新建/增量检查和真实公开语料摄取；未升级既有业务库或清除其意图缓存，不自动 DROP 既有数据。
-- 已生成训练/开发固定样本，未调用研究/生成模型或执行 A/B/C、EM/F1；真实 test 转换留到最终配置确定后。完整导入不等于完整问答评分。
+- 已生成训练/开发固定样本并完成小规模真实研究模型联调，未执行 A/B/C、EM/F1 或语义支持评分；真实 test 转换留到最终配置确定后。完整导入不等于完整问答评分。
 - Milvus/ES 未做实际服务联调；本次真实索引落点为 PostgreSQL。
-- REPORT / PLAN 原生工具、新运行器、并发 worker、研究 SSE 与取消/epoch 控制属于 P3—P8。
+- P3 原生工具、单研究运行器及取消/epoch 已验证；P4 并发 worker、P5 最终 REPORT/PLAN 生成与引用映射、P6 研究 SSE/聊天整合尚未完成。
 
 后续每阶段追加实际结果，保留失败和未运行边界，不以单元测试替代真实模型或页面效果。

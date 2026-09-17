@@ -1,6 +1,6 @@
 # 统一研究工作流验证报告
 
-日期：2026-09-18。P0—P7 已完成实现与约定验证，P8 最终演示与交接收尾。固定 regression 1200 任务全部记录，24 个应用/85 条引用快照及两例复测保留负结果。当前后端 173/173、Python 28/28、新库/重复升级、前端 build、node 类型与 9 项受控浏览器检查通过；app 24 项既有诊断保留。质量见[固定对照](agentic-research-evaluation-report.md)与[原文核对](agentic-research-application-review.md)，下方历史批次不改写。
+日期：2026-09-18。P0—P8 已完成实现与本轮约定验证。固定 regression 1200 任务全部记录，24 个应用/85 条引用及两例复测保留负结果；P8 真实演示 4 请求/10 引用已核对。当前后端 173/173、Python 28/28、新库/重复升级、前端 build、node 类型与 9 项受控浏览器检查通过；app 24 项既有诊断保留。质量见[固定对照](agentic-research-evaluation-report.md)与[原文核对](agentic-research-application-review.md)，启动及失败边界见[交接](agentic-research-handoff.md)，下方历史批次不改写。
 
 ## P0 基线
 
@@ -344,6 +344,9 @@ P5 提交 `3507d9e` 后接入聊天三模式、ResearchProgress / PlanDraftCard�
 | 应用原文 | 固定 12 比较/12 计划：5/15/4；20 个产物/85 引用由 Codex 检查，错误推断保留，没有独立人工盲评或裁判 API |
 | 针对性 v4 复测 | comparison-03 合法完成但仍过度解释碎片；plan-02 缺必填数组失败，未发布计划；原批次不覆盖 |
 | full | 5839 问题/17517 任务 dry-run 准备，模型 0；本轮未付费执行 |
+| 四请求真实演示 | 2 COMPLETED/2 PARTIAL，4 合法产物/10 引用由 Codex 核对；实际 CLI/检索/供应商/隔离 PG，两个运行库删除；一次检索缺后续、比较未完成、PLAN 没生成 null 参数条目，均保留 |
+| 演示资源 | 33 SDK 模型调用记录，已知输入 444152/输出 11886、unknown 0；估算生成费 0.1457 元。Embedding 17/271 tokens/unknown 0，金额及账单未知 |
+| 最终文档/源码 | 当前入口链接/锚点、围栏、whitespace、shell/JSON、72 项运行源码/配置与固定回归一致、16 历史 SQL 与原 XLSX 主体保留，详见 P8 清单 |
 
 ### 10 项必须行为的检查入口
 
@@ -361,3 +364,5 @@ P5 提交 `3507d9e` 后接入聊天三模式、ResearchProgress / PlanDraftCard�
 | 清洁库与既有结构升级不删历史 | validate-agentic-research-p2-database.sh 在随机库重建历史结构、保存真实哨兵、对比研究表 catalog 并重复增量 |
 
 这些是程序机制、隔离存储或受控页面证据，不能包装成生产故障注入。真实模型结果包含失败/超时，远端是否停止计算或计费保持 unknown。
+
+最终交付清单见[P8 manifest](../../eval/agentic-research/manifests/research-p8-handoff-2026-09-18.json)。四例演示是完整 24 项核对之后选取的说明样例，仍有负结果，不能替代基准或包装为语义通过率。所有 PLAN 为待核对草稿，未审批/执行/下发。已有业务库、Redis 缓存清理、生产登录、来源下载预览和完整 Web/业务栈 E2E 未执行。

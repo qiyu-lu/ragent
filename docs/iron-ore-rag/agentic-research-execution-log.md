@@ -4,11 +4,11 @@
 
 ## 当前接续点
 
-P0—P7 已完成实现与约定验证，P8 正在做最终演示和交接验收。固定 regression 的 QASPER 200 问题与 MuSiQue Full dev 200 行，A/B/C 共 1200 个任务全部记录（932 COMPLETED / 93 PARTIAL / 175 FAILED），没有未执行任务。QASPER Answer F1：A 0.3365/B 0.2338/C 0.2442；MuSiQue Answer F1：A 0.3325/B 0.3269/C 0.3918；MuSiQue 答案/支持只评分 105 行 answerable，非 200 行答案分母。C 实际 2 个运行委派、创建 4 个 worker。结果和费用见[固定对照报告](agentic-research-evaluation-report.md)。
+P0—P8 已完成实现与本轮约定验证（2026-09-18）。P7 提交 `3381fa9`；P8 通过唯一标题 `docs: finalize research workflow and implementation handoff` 定位。固定 regression 的 QASPER 200 问题与 MuSiQue Full dev 200 行，A/B/C 共 1200 个任务全部记录（932 COMPLETED / 93 PARTIAL / 175 FAILED），没有未执行任务。QASPER Answer F1：A 0.3365/B 0.2338/C 0.2442；MuSiQue Answer F1：A 0.3325/B 0.3269/C 0.3918；MuSiQue 答案/支持只评分 105 行 answerable，非 200 行答案分母。C 实际 2 个运行委派、创建 4 个 worker。结果和费用见[固定对照报告](agentic-research-evaluation-report.md)。
 
 当前后端 24 类 173/173、Python 28/28、新库/重复增量保留历史、前端 build、node 类型与 9 项受控浏览器检查通过；app 仍有与 P6 相同的 24 项诊断。24 个应用由 Codex 核对 85 条引用快照，两例 v4 复测的错误推断和失败保留；不是独立人工盲评。最终生成 v4 隔离 evidence 输入中的托管元数据，服务端引用快照保持，输入检查不等于语义可靠。
 
-P8 已整理三个入口、当前流程、启动/手工迁移/失败边界和具体四请求演示脚本，真实演示待执行。full 5839 问题/17517 任务仅 dry-run 准备；已有业务库升级、生产登录和真实文档预览下载未执行。P7/P8 阶段提交按各自唯一标题定位，P7 SHA 在 P8 记录中补记。
+P8 已交付三个入口、当前流程、启动/手工迁移/失败边界、最终验证和具体四请求演示：2 COMPLETED/2 PARTIAL，10 条引用由 Codex 原文核对；未完成比较、一次检索缺失后续命名线索和未生成 null 参数条目均保留。full 5839 问题/17517 任务仅 dry-run 准备；已有业务库升级、生产登录和真实文档预览下载未执行。新会话从[交接](agentic-research-handoff.md)和[P8 清单](../../eval/agentic-research/manifests/research-p8-handoff-2026-09-18.json)恢复；先处理实际失败，暂不宣称整体或多 Agent 收益。
 
 ## P0：基线、分支与接入准备（2026-09-17，已完成）
 
@@ -397,10 +397,20 @@ A/B/C 原始目录分别为 `20260917T132700_P5_real_A/`、`20260917T133500_P5_r
 - 本批 SDK 模型调用记录 7778，已知输入 84043881/输出 1456411 token、unknown 1；已知生成费估算 21.4981 元。Embedding 3989 请求、unknown 127，金额和账单未核对。错误与已读支持覆盖提示均在 diagnostics.json；分类不构成因果或语义证明。
 - full 当前仅准备 5839/17517，未付费执行；默认 30 元生成估算上限也作用于 full，未执行不计完成。所有固定任务、负结果、调用资源、日志和配置 SHA 见[P7 清单](../../eval/agentic-research/manifests/research-p7-evaluation-2026-09-17.json)。
 
-## P8：清理与交接（进行中）
+## P8：清理与交接（2026-09-18，已完成）
 
 运行源码/配置/前端入口引用检查未发现退役 TaskAgent、TaskTemplate、Simulation 或 Robot 依赖。保留普通摄取的任务接口、MCP、Milvus/ES 等现用能力。更新首页、文档索引、08 当前研究流程、面试口径、数据库说明与交接文档；旧工业检索数字、历史阶段日志、历史负结果和 16 份升级 SQL 保持。
 
-新增 `scripts/demo-agentic-research.sh`，冻结两道 A 问题以及双资料比较 REPORT / AMR 摘要 PLAN（缺失 batch/window 保留 null），默认只准备四个请求。初版 comparison-01/plan-01 dry-run 在 `20260917T142200_P8_demo_dryrun/` 通过；最终脚本依据完整应用核对选用 comparison-05/plan-06，独立记录演示，不替换负结果。真实模式需已有公开语料和供应商凭证，逐任务状态、来源与 unknown usage 保留，不能把命令 exit 0 当作正确率。
+新增 `scripts/demo-agentic-research.sh`，冻结两道 A 问题以及双资料比较 REPORT / AMR 摘要 PLAN（要求缺失 batch/window 保持 null/待确认），默认只准备四个请求。初版 comparison-01/plan-01 dry-run 在 `20260917T142200_P8_demo_dryrun/` 通过；最终脚本依据完整应用核对选用 comparison-05/plan-06，独立记录演示，不替换负结果。真实模式需已有公开语料和供应商凭证，逐任务状态、来源与 unknown usage 保留，不能把命令 exit 0 当作正确率。
 
 当前前端 build、node 类型检查通过；app 24 项既有诊断按 cwd 前缀/行号归一化与 P6 相同。`20260917T142343_P8_browser/` 与 v4 变更后 `20260917T150225_P8_browser_v4/` 受控浏览器各 9 项检查通过，49 个本地 fixture 模型调用，零付费调用；受控组件和生产 E2E 边界保留。修复旧 P2 数据库脚本对已退役 fresh 表的假设，仅在随机库执行历史建表脚本；fresh、两轮增量、owner、快照与历史哨兵均通过，库已清理。
+
+### P8 四请求真实演示与最终交付
+
+P7 阶段提交为 `3381fa9d0a8bab051873b5ec415cc8f642da933f`。随后运行 `bash scripts/demo-agentic-research.sh --execute <new-run-directory>`，批次为 `20260917T192824_P8_demo_v4`。四个请求都在模型调用前冻结：两道 A 问题 COMPLETED，comparison-05 / plan-06 均为 PARTIAL / MODEL_CALL_BUDGET；原程序、原 24 项应用和两例复测不覆盖。两个随机运行库均删除，语料只读。
+
+两道 A 题分别是“Do they evaluate only on English datasets?”及“After what is the body of water Partridge Lake is part of named?”。前者方向有数据段落支持，但未遵守 Yes/No 极短格式；后者只回答 Bering Sea 中间实体，未回答命名来源。comparison-05 只有 Organization/event 短句、没有读到 Paper B，不能形成方法比较。plan-06 的 JAMR/子树/Neural AMR/基线步骤有对应原文；298/33 与均值须保持 AMR Bank/训练限定，ROGUE 基线证据不能单独证明全流程评价。batch/window 仅在待确认项，step.parameters 全空，未生成请求要求的 null 条目。
+
+四个产物的 10 条引用快照由 Codex 核对，身份、段落 ID 和正文 SHA 在 semantic-review.json / P8 清单；不是独立人工盲评，无裁判 API。SDK 模型调用记录 33、已知输入 444152/输出 11886 token，usage unknown 0；已知生成费估算 0.1457 元。Embedding 17 请求、已知 total_tokens 271、unknown 0，金额/账单未核对。这是实际公开语料—检索/模型—隔离 PostgreSQL—产物的 CLI 路径，没有生产登录或来源预览下载。
+
+最终检查覆盖 15 份当前入口文档的链接/锚点、围栏、whitespace、三份 shell 语法、JSON 清单、72 项运行源码/配置与固定回归一致、16 份历史 SQL 字节不变及既有 XLSX 事实比较主体。后端/前端代码在最终 173/28 程序检查、clean package 和 v4 浏览器检查后未改动，不重复声称新的付费/生产服务测试。目录 docs/current-code-notes-2026-09-18/ 是工作期间新增的独立未跟踪文档，保留在阶段提交范围外。

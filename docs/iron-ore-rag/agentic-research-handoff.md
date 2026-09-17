@@ -2,7 +2,7 @@
 
 当前用户入口是聊天页的“普通问答 / 深入分析 / 生成计划”。普通问答继续使用现有 RAG；后两者共享研究运行器、证据服务和最终生成，以 REPORT/PLAN 区分产物。送检、工位预约、草稿批准、执行模拟和 ROS 运行代码已退役。
 
-实际实现、逐阶段验证和公开数据结果分别见[实施计划](agentic-research-implementation-plan-2026-09-17.md)、[执行日志](agentic-research-execution-log.md)、[验证报告](agentic-research-validation-report.md)。程序用例、受控浏览器和真实供应商评测是不同证据，最终质量以固定评测及原文核对为准。
+P0—P8 已完成实现与本轮约定验证。实际实现、逐阶段验证和公开数据结果分别见[实施计划](agentic-research-implementation-plan-2026-09-17.md)、[执行日志](agentic-research-execution-log.md)、[验证报告](agentic-research-validation-report.md)、[固定对照](agentic-research-evaluation-report.md)与[应用原文核对](agentic-research-application-review.md)。[最终交接清单](../../eval/agentic-research/manifests/research-p8-handoff-2026-09-18.json)保存配置、源码、日志和演示引用 SHA。程序用例、受控浏览器和真实供应商评测是不同证据。
 
 ## 1. 环境与启动
 
@@ -73,7 +73,7 @@ python3 eval/agentic-research/evaluate_research.py --profile full --run-dir loca
 # 固定 12 比较 / 12 计划；产物引用原文供独立核对
 python3 eval/agentic-research/evaluate_applications.py --run-dir local-data/agentic-research/runs/<new-applications> --execute
 
-# 两道一次检索问题 + 一个双资料比较 REPORT + AMR 摘要 PLAN（未披露 batch/window 保留 null），默认仅生成请求
+# 两道一次检索问题 + 一个双资料比较 REPORT + AMR 摘要 PLAN（要求未披露 batch/window 保持 null/待确认），默认仅生成请求
 bash scripts/demo-agentic-research.sh
 # 指定真实执行，会消耗供应商额度
 bash scripts/demo-agentic-research.sh --execute
@@ -86,3 +86,7 @@ A 对照复用项目的一次知识检索和固定命中块，统一生成模型
 生产登录、真实来源下载预览、完整 Web 栈和现场业务效果的验证边界以验证报告为准；受控浏览器通过不能替代这些结论。
 
 演示 REPORT 使用冻结 comparison-05（Agatha 链接数据与 multilingual Bayesian SRI）；PLAN 使用 plan-06（AMR Bank/CNN-Dailymail 摘要复现）。这些资料来自完整 24 项应用核对，演示本身不代替固定回归。真实运行可能 PARTIAL/FAILED，应查看每项状态及引用正文。当前 v4 生成证据输入隔离语料元数据，但合法引用仍可能对应错误推断；残缺公式、字段缺失与运行预算/资料缺口混淆均有实际负例。
+
+本轮实际演示 `20260917T192824_P8_demo_v4` 记录四个合法产物：两道 A 题 COMPLETED，比较/计划均 PARTIAL，因模型调用预算退出。10 条引用快照由 Codex 对照原文检查；不是独立人工盲评。一次检索的 Partridge Lake 题只回答了 Bering Sea 中间实体；English datasets 题没有遵守 Yes/No 极短格式。比较只读到一个 Organization/event 短句，没有完成两论文比较。计划主要步骤有引用，但训练集/AMR Bank 限定及全流程评价仍需核对；batch/window 仅列待确认，未生成请求要求的 null 参数条目。演示不是语义正确率或完整复现执行证明。
+
+后续先处理原生 finish 稳定性、有效正文阅读、字段修复定位、运行问题与资料缺口区分，再以新批次复测。固定评测中 C 的两个实际委派请求均为不可回答行，不能将其可回答题 F1 写成多 Agent 收益。full 17517 任务、生产登录、真实来源下载预览和已有业务库迁移仍未执行。

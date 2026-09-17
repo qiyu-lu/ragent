@@ -2,6 +2,8 @@
 
 这里实现离线转换、真实幂等摄取、原生研究与统一产物，以及 P7 固定 A/B/C 对照和应用原文核对。转换不调用模型；`import_corpus.py --execute` 复用项目分块、向量化和索引落点。真实评测的配置、逐题输出、trace、usage 和失败保存在独立批次，见[执行记录](../../docs/iron-ore-rag/agentic-research-execution-log.md)与[交接说明](../../docs/iron-ore-rag/agentic-research-handoff.md)。
 
+P7 固定 regression 已全部记录 400 问题/1200 任务，MuSiQue 答案/支持的分母为 105 行可回答；完整质量和限制见[对照报告](../../docs/iron-ore-rag/agentic-research-evaluation-report.md)。[P7 机器清单](manifests/research-p7-evaluation-2026-09-17.json)冻结配置、原始产物 SHA、调用资源、作者公式对齐、173/28 程序检查和实际委派案例；full 5839/17517 只准备，未付费执行。
+
 ## 来源与环境
 
 - QASPER v0.3：使用已下载的 HF Parquet train/validation 分片；[数据卡](https://huggingface.co/datasets/allenai/qasper)与[官方加载脚本](https://huggingface.co/datasets/allenai/qasper/blob/main/qasper.py)。署名 Dasigi 等（2021），CC BY 4.0。
@@ -194,6 +196,8 @@ bash scripts/validate-agentic-research-p7.sh
 bash scripts/validate-agentic-research-p2-database.sh
 ```
 
-应用输出的 `source-review.md` 保存完整产物和每条实际引用正文，供逐项独立核对；自动汇总只统计状态、引用文档、缺口与追问，不自动宣告语义通过。演示脚本冻结两道一次检索问题、comparison-05 的 Agatha/Bayesian SRI 比较 REPORT 和 plan-06 的 AMR 摘要复现 PLAN（缺失 batch/window 参数保持 null），默认不调用 API。执行模式贯通实际语料、研究 SDK、供应商 HTTP、隔离 PostgreSQL 状态和产物，尚不包含生产账号登录与真实页面验收；浏览器夹具的受控组件见 `browser_research.py`。
+应用输出的 `source-review.md` 保存完整产物和每条实际引用正文，供逐项独立核对；自动汇总只统计状态、引用文档、缺口与追问，不自动宣告语义通过。演示脚本冻结两道一次检索问题、comparison-05 的 Agatha/Bayesian SRI 比较 REPORT 和 plan-06 的 AMR 摘要复现 PLAN（要求缺失 batch/window 参数保持 null/待确认），默认不调用 API。执行模式贯通实际语料、研究 SDK、供应商 HTTP、隔离 PostgreSQL 状态和产物，尚不包含生产账号登录与真实页面验收；浏览器夹具的受控组件见 `browser_research.py`。
 
 当前最终生成只传已读正文、引用身份、extent/截断及原文章节/表格上下文；语料版本、数据集托管名和 split 不进入此证据投影，服务端引用快照仍完整保留。v4 输入隔离通过程序检查，但真实两例复测仍出现残缺公式过度解释和 PLAN 必填数组缺失；这不是语义可靠性的保证。24 项源文核对记录见 [P7 应用核对清单](manifests/p7-application-source-review.json)，核对者为 Codex 原文检查，没有独立盲评或裁判模型 API。
+
+P8 四请求演示已真实记录 2 COMPLETED/2 PARTIAL，10 条引用原文核对见[P8 清单](manifests/research-p8-handoff-2026-09-18.json)。一次检索未完成多跳命名问题，比较没有读到第二篇，PLAN 的 batch/window 只有待确认项而无请求要求的 null 条目；这些负结果保留，没有替换完整回归。原始输出、runtime、trace/usage、semantic-review.json 和执行库清理位于 `local-data/agentic-research/runs/20260917T192824_P8_demo_v4/`。

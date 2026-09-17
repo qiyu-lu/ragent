@@ -12,7 +12,7 @@
 
 **追问②：** 原型的使用范围、交付状态和你能证明的效果分别是什么？
 
-**追问②回答：**它目前是可复现的工程原型：文档摄取、基于证据的问答、证据草案和模拟链路已有实现。固定数据与配置下的分块和检索记录能说明局部行为；登录页面的完整业务验收、对象级访问权限和真实设备控制没有得到相同级别的证明，所以不能把这些局部结果说成生产收益或整体答案准确率。
+**追问②回答：**它目前是可复现的工程原型：文档摄取、基于证据的普通问答、深度研究和计划草稿已有实现；送检与审批模拟已经退役。固定数据与配置下的分块和检索记录能说明局部行为；登录页面的完整业务验收、对象级访问权限和真实设备控制没有得到相同级别的证明，所以不能把这些局部结果说成生产收益或整体答案准确率。
 
 **反查：**[仓库项目定位](../../../README.md)、[项目能力边界](../README.md)、[浓度检测脱敏示例](../samples/concentration-process.md)
 
@@ -612,19 +612,19 @@ flowchart LR
 
 **反查：**[停止流程](../flow-notes/06-chat-stream-and-cancel.md#3-触发关系二用户另发停止请求)、[StreamTaskManager.java](../../../bootstrap/src/main/java/com/nageoffer/ai/ragent/rag/service/handler/StreamTaskManager.java)、[RAGChatController.java](../../../bootstrap/src/main/java/com/nageoffer/ai/ragent/rag/controller/RAGChatController.java)
 
-### Q039｜P1｜把回答整理成候选任务时，程序如何限制模型输出？
+### Q039｜P1｜生成计划草稿时，程序如何限制模型输出？
 
-**参考回答：**用户从已有回答创建候选任务时，服务不重新检索，而是读取这个用户拥有的助手消息，检查请求的文档确实出现在当时来源列表，再从随消息保存的证据快照里只取该文档的块，组成允许引用的证据 ID 集合。模型按固定 JSON 结构生成草案；程序解析并校验字段、步骤顺序和证据 ID，失败最多请求模型修复一次。通过后用数据库中的文档版本覆盖模型给出的版本，以草稿（`DRAFT`）保存；批准和模拟由之后独立请求执行，草稿生成本身不控制设备。
+**参考回答：**用户选择计划生成后，服务先保存目标、用户约束和允许的知识库或文档范围。研究 Agent 通过原生搜索与阅读工具取得依据，必要时补查、追问或委派独立维度；最终生成器使用同一份 brief、研究发现和实际证据形成结构化计划。Java 校验步骤顺序、参数和引用身份，失败最多修复一次；服务器回填实际来源，合法产物与终态原子保存。
 
-**追问①：** JSON 可读、证据 ID 在白名单、动作受原文支持分别属于哪层保证？
+**追问①：** JSON 可读、证据 ID 合法、内容受原文支持分别属于哪层保证？
 
-**追问①回答：**JSON 可解析只说明格式可读。Java 校验器还检查标题、规程名、步骤非空，步骤序号从一连续递增、动作非空，证据 ID 不重复且都在白名单中。至于某个合法 ID 对应的原文是否真的支持这一步动作，当前主要靠提示词约束和人工审核；把合法编号贴在无关动作上仍可能通过结构校验。
+**追问①回答：**JSON 可解析只说明格式可读。结构校验进一步检查必需字段、连续步骤、参数和引用是否属于当前运行且具有阅读证明。某个合法 ID 对应的原文是否真正支持这一步，仍需要语义核对；把已读编号贴到无关动作上可能通过身份检查。真实联调曾暴露这种问题，因此完成状态不能代替原文审核。
 
-**追问②：** 来源存在但没有对应证据快照时怎么处理，模拟是否控制真实设备？
+**追问②：** 资料没写参数、用户补充条件或最终生成失败时怎样处理？
 
-**追问②回答：**来源列表可能含目标文档，但最多八块的证据快照里没有它；此时程序会拒绝生成草案，不拿来源代表摘录代替，也不会临时重新检索。普通模拟只把已批准模板转成预设的本地“开始、步骤完成、模拟完成”事件并写模拟成功状态，不连接真实设备，更不代表实际动作已执行。
+**追问②回答：**未披露参数应保留 null 和缺口，不能用来源列表代替正文，也不能补造数值。用户回复保存为独立 `user_input` 条件，恢复时沿原范围继续并保留成功子任务；终态重新生成创建新运行。最终结构或引用修复仍失败则记录 FAILED，不保存伪造草稿。当前产物供人核对，未接业务办理或设备执行。
 
-**反查：**[证据任务流程](../flow-notes/08-evidence-task-and-version.md#1-从已保存回答创建证据约束的候选任务)、[TaskTemplateValidator.java](../../../bootstrap/src/main/java/com/nageoffer/ai/ragent/ironore/service/TaskTemplateValidator.java)、[IronOreTaskTemplateService.java](../../../bootstrap/src/main/java/com/nageoffer/ai/ragent/ironore/service/IronOreTaskTemplateService.java)
+**反查：**[统一产物流程](../flow-notes/08-evidence-task-and-version.md#4-报告和计划由同一个最终阶段生成)、[PlanDraftValidator.java](../../../bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/PlanDraftValidator.java)、[ResearchArtifactGenerator.java](../../../bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/ResearchArtifactGenerator.java)
 
 ### Q040｜P0｜如果面试官说“这些数字不能证明整体回答更准”，你怎样回应？
 

@@ -11,7 +11,7 @@
 | 冻结状态 | D2 固定回放已结束；公平回填质量 gate fail，代码保留但默认关闭 |
 | 历史评测配置 | `intent=off`、`ocr=off`、`rag.search.request-level-refill-enabled=false` |
 
-当前 P0/P1 已完成，P2 已实现证据工具与 Java/PG 联调，以及 QASPER/MuSiQue 完整训练/开发转换、固定抽样和字段隔离校验；实际 metadata 摄取接线与幂等导入待续。[数据准备工具](../../eval/agentic-research/README.md)、[统一研究工作流计划](agentic-research-implementation-plan-2026-09-17.md)、[执行记录](agentic-research-execution-log.md)保存进度和接续点；测试与真实模型边界见[验证报告](agentic-research-validation-report.md)。
+P0—P8 已完成实现与本轮约定验证：训练/开发资料已导入，原生工具、有限委派、统一 REPORT/PLAN、聊天与来源恢复已接通，固定公开集 400 问题/1200 任务全部记录。P8 四请求真实演示已记录 2 COMPLETED/2 PARTIAL，10 条引用已核对，负结果保留。最新状态以[执行记录](agentic-research-execution-log.md)为准。[运行与交接](agentic-research-handoff.md)提供启动、手工迁移、三个用户入口和故障边界；[评测工具](../../eval/agentic-research/README.md)提供固定样本及 full 配置。程序、受控浏览器和真实模型分别见[验证报告](agentic-research-validation-report.md)。
 
 阶段 2、ROS1 和 2026-09-15 送检 Agent 的实现、迁移及定向验证属于历史版本记录，均未完成登录页面业务 E2E。P1 已退役送检和执行演示；旧评测及其负结果保留。对应历史提交统一见[改动索引](changes/README.md)。
 
@@ -25,6 +25,8 @@
 | 重建本地环境 | [阶段 0：本地基线复现](stages/00-reproduction.md) → [开发栈改动说明](changes/2026-08-12-reproducible-local-development-stack.md) |
 | 了解 Java 后端 + AI 核心改造 | [工业知识闭环改动](changes/2026-08-12-industrial-knowledge-demo.md) → [部署与验收手册](stages/02-industrial-knowledge-demo.md) |
 | 接续统一研究 Agent 与计划改造 | [实施计划](agentic-research-implementation-plan-2026-09-17.md) → [执行记录](agentic-research-execution-log.md) |
+| 运行三个聊天入口、复现公开集对照 | [运行与交接](agentic-research-handoff.md) → [评测工具](../../eval/agentic-research/README.md) |
+| 查看固定公开集答案、证据、失败与成本 | [A/B/C 对照结果](agentic-research-evaluation-report.md) → [应用原文核对](agentic-research-application-review.md) |
 | 查阅已退役送检 Agent 的设计与验证 | [送检 Agent 历史记录](changes/2026-09-15-task-agent.md) |
 | 复现小型系统评测 | [评测工具与冻结结果](changes/2026-08-13-system-evaluation-harness.md) → [评测说明](../../eval/iron-ore/README.md) → [固定运行手册](../../eval/iron-ore/RUNBOOK.md) |
 | 查看证据驱动优化 | [XLSX 分块](changes/2026-08-13-xlsx-structure-aware-chunking.md) → [检索纯度](changes/2026-08-13-request-level-retrieval-purity.md) → [D2 负结果](changes/2026-08-14-request-level-fair-refill.md) |
@@ -34,12 +36,12 @@
 
 ## 文档职责
 
-- `project-study-guide.md` 按完整业务流程解释当前实现，单列上游 Ragent 原有特色及启用边界，并总结本分支重点改进的发现证据、根因、实现、取舍、效果与边界，是日常复习主入口。
+- `project-study-guide.md` 是旧基线学习资料导航；当前研究流程以 `flow-notes/08-evidence-task-and-version.md` 和交接说明为准。旧资料的审批/模拟行为只适用于其标注提交。
 - `stages/` 只保留仍有使用价值的复现或验收手册，不记录实验流水。
 - `changes/` 按问题保存发现证据、根因、方案取舍、实现、效果、限制和回滚；索引是唯一提交总表。
 - `eval/iron-ore/` 定义评测协议与运行命令；原始材料、响应、评分表和数据库 dump 位于 Git 忽略目录。
 
-## 阶段停止点
+## 旧工业评测停止点
 
 - 当前只验证 3 份文档、24 题和 15 个解析锚点；B0/C-final 的人工严格通过率均为 `79.2%`，不外推为行业基准或生成准确率提升。
 - D0 是冻结索引实验；D1 的 PDF 结果受在线 MinerU 漂移影响；D2 证明机制能补位但未通过质量门槛。

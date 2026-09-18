@@ -60,10 +60,12 @@ public class EsKeywordRetrieverService implements KeywordRetrieverService {
 
     @Override
     public List<RetrievedChunk> search(String query, List<String> collectionNames, int topK, List<String> documentIds) {
+        // 范围为空即无结果：空列表若当作「不限库」，上游作用域被权限裁空时会退化成全索引检索
+        if (CollUtil.isEmpty(collectionNames)) {
+            return List.of();
+        }
         String index = keywordProperties.sharedIndex();
-        List<FieldValue> collectionFilter = CollUtil.isEmpty(collectionNames)
-                ? List.of()
-                : collectionNames.stream().map(FieldValue::of).toList();
+        List<FieldValue> collectionFilter = collectionNames.stream().map(FieldValue::of).toList();
         List<FieldValue> documentFilter = documentIds.stream().map(FieldValue::of).toList();
 
         try {
@@ -74,12 +76,9 @@ public class EsKeywordRetrieverService implements KeywordRetrieverService {
                             .allowNoIndices(true)
                             .query(q -> q.bool(b -> {
                                 b.must(m -> m.match(mt -> mt.field("content").query(query)));
-                                // 空表示不限库（全局）；否则以 collection_name terms 限定目标知识库范围
-                                if (!collectionFilter.isEmpty()) {
-                                    b.filter(f -> f.terms(t -> t
-                                            .field("collection_name")
-                                            .terms(tv -> tv.value(collectionFilter))));
-                                }
+                                b.filter(f -> f.terms(t -> t
+                                        .field("collection_name")
+                                        .terms(tv -> tv.value(collectionFilter))));
                                 if (!documentFilter.isEmpty()) {
                                     b.filter(f -> f.terms(t -> t.field("doc_id")
                                             .terms(tv -> tv.value(documentFilter))));

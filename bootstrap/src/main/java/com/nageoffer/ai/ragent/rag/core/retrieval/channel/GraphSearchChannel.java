@@ -29,6 +29,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * 知识图谱检索通道
@@ -97,7 +98,11 @@ public class GraphSearchChannel implements SearchChannel {
             }
             ScopeQuota quota = ScopeQuota.split(scope, baseTopK, properties.getScope().getSupplementRatio());
             List<RetrievedChunk> primary = ScopeQuota.cap(evidence.matched(), quota.primary());
-            List<RetrievedChunk> supplement = ScopeQuota.cap(evidence.unmatched(), quota.supplement());
+            // 图谱只能在结果侧按库归属过滤：未命中份里可能有不可读库或无法归属的证据，补充路只收补充范围内的库
+            Set<String> supplementCollections = Set.copyOf(scope.supplementCollections());
+            List<RetrievedChunk> supplement = ScopeQuota.cap(evidence.unmatched().stream()
+                    .filter(chunk -> chunk.getCollectionName() != null && supplementCollections.contains(chunk.getCollectionName()))
+                    .toList(), quota.supplement());
 
             long latency = System.currentTimeMillis() - startTime;
             log.info("图谱检索完成，范围={}，命中 {} 条，补充 {} 条，耗时 {}ms",

@@ -18,6 +18,7 @@
 package com.nageoffer.ai.ragent.rag.core.retrieval.channel;
 
 import cn.hutool.core.collection.CollUtil;
+import com.nageoffer.ai.ragent.knowledge.service.KnowledgeAccessService;
 import com.nageoffer.ai.ragent.rag.config.SearchChannelProperties;
 import com.nageoffer.ai.ragent.rag.config.SearchChannelProperties.FallbackMode;
 import com.nageoffer.ai.ragent.rag.core.intent.NodeScore;
@@ -38,6 +39,9 @@ import java.util.stream.Collectors;
  * <p>
  * 由引擎按子问题各算一次放进 {@link SearchContext}，各通道只读不判，
  * 避免同一子问题里向量走全局、关键词走定向这类作用域打架
+ * <p>
+ * 访问控制在这里、召回之前生效：「有效库」先与当前用户可读的库求交，意图绑定、全局与补充范围都从交集里取，
+ * 通道拿到的库集合里没有不可读的库，也就不会在 TopK 里为它们留位置
  */
 @Slf4j
 @Component
@@ -46,6 +50,7 @@ public class RetrievalScopeResolver {
 
     private final SearchChannelProperties properties;
     private final KbCollectionProvider kbCollectionProvider;
+    private final KnowledgeAccessService accessService;
 
     /**
      * 解析本次请求的检索作用域
@@ -53,7 +58,10 @@ public class RetrievalScopeResolver {
      * 只看 KB 意图最高分：达到置信阈值才收窄，意图个数不参与判定——多一个低分意图不应让系统更准确
      */
     public RetrievalScope resolve(List<SubQuestionIntent> subIntents) {
-        List<String> activeCollections = kbCollectionProvider.listActiveCollections();
+        Set<String> readable = Set.copyOf(accessService.readableCollections(accessService.current()));
+        List<String> activeCollections = kbCollectionProvider.listActiveCollections().stream()
+                .filter(readable::contains)
+                .toList();
         List<NodeScore> kbIntents = extractKbIntents(subIntents);
         double topScore = kbIntents.stream().mapToDouble(NodeScore::getScore).max().orElse(0.0);
 
@@ -72,11 +80,11 @@ public class RetrievalScopeResolver {
         Set<String> targets = new LinkedHashSet<>(bound);
         targets.retainAll(activeCollections);
         if (targets.isEmpty()) {
-            return fallback(topScore, activeCollections, "KB 意图绑定的知识库均已失效（" + bound + "）");
+            return fallback(topScore, activeCollections, "KB 意图绑定的知识库均已失效或当前用户不可读（" + bound + "）");
         }
         if (targets.size() < bound.size()) {
             bound.removeAll(targets);
-            log.warn("KB 意图绑定中已失效的知识库（{}）不参与检索", bound);
+            log.warn("KB 意图绑定中已失效或不可读的知识库（{}）不参与检索", bound);
         }
         List<String> supplement = activeCollections.stream()
                 .filter(collection -> !targets.contains(collection))

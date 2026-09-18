@@ -143,6 +143,18 @@ class GraphSearchChannelTest {
         verifyNoInteractions(lightRagClient);
     }
 
+    @Test
+    @DisplayName("补充路只收补充范围内的库：不可读库与无法归属的图谱证据不入池")
+    void supplementDropsEvidenceOutsideSupplementCollections() {
+        // 图谱只能结果侧过滤，未命中份是「命中库之外的全图」，包括当前用户不可读的库
+        stub(List.of(evidence("m0", 0)),
+                List.of(evidence("s1", 1, "kb-secret"), evidence("n2", 2, null), evidence("u3", 3)));
+
+        List<RetrievedChunk> chunks = channel.search(directedContext()).getChunks();
+
+        assertEquals(List.of("m0", "u3"), chunks.stream().map(RetrievedChunk::getId).toList());
+    }
+
     private void stub(List<RetrievedChunk> matched, List<RetrievedChunk> unmatched) {
         when(lightRagClient.retrieveByScope(anyString(), any(), anyInt(), any(Collection.class)))
                 .thenReturn(new GraphEvidence(matched, unmatched));
@@ -173,9 +185,14 @@ class GraphSearchChannelTest {
      * 按全图名次构造一条图谱证据，分数与 {@code LightRagClient} 的中性分数口径一致
      */
     private static RetrievedChunk evidence(String id, int graphRank) {
+        return evidence(id, graphRank, id.startsWith("u") ? "kb-hr" : "kb-finance");
+    }
+
+    private static RetrievedChunk evidence(String id, int graphRank, String collection) {
         return RetrievedChunk.builder()
                 .id(id)
                 .text(id)
+                .collectionName(collection)
                 .score(1.0F / (graphRank + 1))
                 .build();
     }

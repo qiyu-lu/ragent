@@ -138,7 +138,7 @@ public final class ResearchExecutorCommand {
         searchProperties.getChannels().setTimeoutMs(properties.getToolTimeoutSeconds() * 1000L);
         var vector = new VectorSearchChannel(new PgVectorRetrieverService(corpusJdbc, embedding), searchProperties, retrieval);
         var engine = new MultiChannelRetrievalEngine(List.of(vector), List.of(),
-                new RetrievalScopeResolver(searchProperties, new KbCollectionProvider(bases)), retrieval, searchProperties);
+                new RetrievalScopeResolver(searchProperties, new KbCollectionProvider(bases), new com.nageoffer.ai.ragent.knowledge.service.KnowledgeAccessService(corpusJdbc)), retrieval, searchProperties);
         var search = new KnowledgeSearchService(engine, bases, docs, catalog, evidence, JSON);
         var reader = new SourceReader(evidence, catalog, new EvidenceSnapshotFactory(JSON));
         var modelFactory = new ResearchModelFactory(models, properties);

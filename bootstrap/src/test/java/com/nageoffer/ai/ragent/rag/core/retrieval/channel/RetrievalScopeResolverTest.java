@@ -17,6 +17,7 @@
 
 package com.nageoffer.ai.ragent.rag.core.retrieval.channel;
 
+import com.nageoffer.ai.ragent.knowledge.service.KnowledgeAccessService;
 import com.nageoffer.ai.ragent.rag.config.SearchChannelProperties;
 import com.nageoffer.ai.ragent.rag.config.SearchChannelProperties.FallbackMode;
 import com.nageoffer.ai.ragent.rag.core.intent.IntentNode;
@@ -94,7 +95,7 @@ class RetrievalScopeResolverTest {
         KbCollectionProvider provider = mock(KbCollectionProvider.class);
         when(provider.listActiveCollections()).thenReturn(ACTIVE);
 
-        RetrievalScope scope = new RetrievalScopeResolver(properties, provider).resolve(List.of());
+        RetrievalScope scope = new RetrievalScopeResolver(properties, provider, readable(ACTIVE)).resolve(List.of());
 
         assertFalse(scope.directed());
         assertTrue(scope.targetCollections().isEmpty());
@@ -174,13 +175,62 @@ class RetrievalScopeResolverTest {
         assertEquals(List.of("kb-hr", "kb-tech"), scope.supplementCollections());
     }
 
+    @Test
+    @DisplayName("全局作用域只含当前用户可读的库")
+    void globalScopeContainsOnlyReadableCollections() {
+        RetrievalScope scope = resolveAs(List.of("kb-hr"), intent("kb-finance", 0.5));
+
+        assertFalse(scope.directed());
+        assertEquals(List.of("kb-hr"), scope.targetCollections());
+    }
+
+    @Test
+    @DisplayName("意图命中不可读的库时不收窄到它，也不把它放进补充范围")
+    void intentOnUnreadableCollectionIsNotSearched() {
+        RetrievalScope scope = resolveAs(List.of("kb-hr", "kb-tech"), intent("kb-finance", 0.9));
+
+        assertFalse(scope.directed());
+        assertEquals(List.of("kb-hr", "kb-tech"), scope.targetCollections());
+        assertTrue(scope.supplementCollections().isEmpty());
+    }
+
+    @Test
+    @DisplayName("定向时补充范围同样只取可读的库")
+    void supplementContainsOnlyReadableCollections() {
+        RetrievalScope scope = resolveAs(List.of("kb-finance", "kb-tech"), intent("kb-finance", 0.9));
+
+        assertTrue(scope.directed());
+        assertEquals(List.of("kb-finance"), scope.targetCollections());
+        assertEquals(List.of("kb-tech"), scope.supplementCollections());
+    }
+
+    @Test
+    @DisplayName("没有任何可读库时作用域为空，不回退为全部库")
+    void noReadableCollectionYieldsEmptyScope() {
+        RetrievalScope scope = resolveAs(List.of(), intent("kb-finance", 0.9));
+
+        assertTrue(scope.targetCollections().isEmpty());
+        assertTrue(scope.supplementCollections().isEmpty());
+    }
+
+    private static KnowledgeAccessService readable(List<String> collections) {
+        KnowledgeAccessService access = mock(KnowledgeAccessService.class);
+        when(access.current()).thenReturn(KnowledgeAccessService.Subject.NOBODY);
+        when(access.readableCollections(KnowledgeAccessService.Subject.NOBODY)).thenReturn(collections);
+        return access;
+    }
+
     /**
      * 每条意图挂在各自的子问题下，还原「意图按子问题分别识别、再合并」的真实流程
      */
     private RetrievalScope resolve(NodeScore... nodeScores) {
+        return resolveAs(ACTIVE, nodeScores);
+    }
+
+    private RetrievalScope resolveAs(List<String> readable, NodeScore... nodeScores) {
         KbCollectionProvider provider = mock(KbCollectionProvider.class);
         when(provider.listActiveCollections()).thenReturn(ACTIVE);
-        RetrievalScopeResolver resolver = new RetrievalScopeResolver(new SearchChannelProperties(), provider);
+        RetrievalScopeResolver resolver = new RetrievalScopeResolver(new SearchChannelProperties(), provider, readable(readable));
         List<SubQuestionIntent> subIntents = IntStream.range(0, nodeScores.length)
                 .mapToObj(index -> new SubQuestionIntent("子问题" + index, List.of(nodeScores[index])))
                 .toList();

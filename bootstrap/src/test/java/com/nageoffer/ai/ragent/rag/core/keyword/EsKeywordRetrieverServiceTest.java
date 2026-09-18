@@ -52,6 +52,13 @@ class EsKeywordRetrieverServiceTest {
     }
 
     @Test
+    void emptyCollectionScopeNeverQueriesTheWholeIndex() throws Exception {
+        ElasticsearchClient client = mock(ElasticsearchClient.class);
+        assertTrue(new EsKeywordRetrieverService(client, new KeywordProperties()).search("query", List.of(), 3).isEmpty());
+        verifyNoInteractions(client);
+    }
+
+    @Test
     void unsupportedKeywordBackendCannotSilentlyIgnoreDocumentScope() {
         KeywordRetrieverService backend = (query, collections, count) -> List.of();
         assertThrows(UnsupportedOperationException.class,

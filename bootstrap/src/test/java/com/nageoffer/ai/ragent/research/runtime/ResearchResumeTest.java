@@ -214,6 +214,14 @@ class ResearchResumeTest {
     }
 
     @Test
+    void shutdownFailuresAreRecognisedWhereverTheyAreWrapped() {
+        assertTrue(ResearchControl.shuttingDown(new IllegalStateException(new RuntimeException(new ResearchControl.HandoverRequested()))));
+        assertTrue(ResearchControl.shuttingDown(new RuntimeException(new io.agentscope.core.shutdown.AgentShuttingDownException())));
+        assertFalse(ResearchControl.shuttingDown(new java.util.concurrent.CancellationException("RESEARCH_CANCELLED")),
+                "a user cancellation is not a shutdown");
+    }
+
+    @Test
     void historyKeepsCompletedCallsOfAPartlyFinishedTurnAndStartsAfterTheLatestUserInput() {
         List<ResearchEvent> events = new ArrayList<>();
         java.util.function.BiConsumer<String, Map<String, Object>> add = (type, payload) ->

@@ -213,7 +213,10 @@ public class ResearchRunService {
             var claim = entry.getValue().claim;
             if (claim == null) continue;
             try {
-                if (!store.renew(claim, lease)) entry.getValue().control.cancel();
+                if (!store.renew(claim, lease)) {
+                    log.info("Research lease lost for {} on {}; stopping the local execution", entry.getKey(), executorId);
+                    entry.getValue().control.cancel();
+                }
             } catch (RuntimeException e) {
                 // 数据库暂时不可用时不自杀；租约过期前恢复即可续上，否则写入会被拒绝。
                 log.warn("Research lease renewal failed for {}", entry.getKey(), e);
@@ -255,7 +258,9 @@ public class ResearchRunService {
 
     /** 停机途中在步边界停下的执行把任务交还队列，由其他实例从已持久化的历史续跑；其余失败照常落库。 */
     private void ended(ResearchSession session, Execution execution, RuntimeException failure) {
-        if (execution.control.handoverRequested() && !execution.control.cancelled()) store.release(session.claim, "SHUTDOWN");
+        if ((execution.control.handoverRequested() || ResearchControl.shuttingDown(failure)) && !execution.control.cancelled()) {
+            store.release(session.claim, "SHUTDOWN");
+        }
         else completion.researchFailed(session, failure);
     }
 

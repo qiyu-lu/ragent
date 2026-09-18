@@ -51,11 +51,24 @@ public class ResearchControl {
 
     public boolean cancelled() { return cancelled.get(); }
 
-    /** 停机交还：不打断正在进行的模型调用或工具，主 Agent 在下一步开始前停下，由服务把任务交还队列。 */
+    /** 停机交还：不打断正在进行的模型调用或工具，主 Agent 在下一次模型调用开始前停下，由服务把任务交还队列。 */
     public void requestHandover() { handover.set(true); }
     public boolean handoverRequested() { return handover.get(); }
     public static final class HandoverRequested extends CancellationException {
         public HandoverRequested() { super("RESEARCH_HANDOVER"); }
+    }
+
+    /**
+     * 失败是否来自进程停机：本服务的交还请求，或 AgentScope 自带的 JVM 关闭钩子（它在自己的步边界中断 Agent、
+     * 关闭模型 HTTP 传输，与我们的停机逻辑并发执行，谁先到不确定）。这类失败应交还任务，不能写成失败。
+     */
+    public static boolean shuttingDown(Throwable failure) {
+        if (io.agentscope.core.shutdown.GracefulShutdownManager.getInstance().getState()
+                != io.agentscope.core.shutdown.ShutdownState.RUNNING) return true;
+        for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+            if (cause instanceof HandoverRequested || cause instanceof io.agentscope.core.shutdown.AgentShuttingDownException) return true;
+        }
+        return false;
     }
     public Mono<Boolean> signal() { return signal.asMono(); }
     public void check() {

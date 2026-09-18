@@ -60,6 +60,8 @@ public class ResearchCompletionService {
             store.finish(session.claim, outcome.result().status() == SubtaskResult.Status.PARTIAL ? Status.PARTIAL : Status.COMPLETED,
                     state, json.convertValue(artifact, Map.class), session.budget.snapshot(), researchError);
         } catch (RuntimeException failure) {
+            // 停机打断的产物生成交给执行服务交还任务；结论已随 RESEARCH_CONCLUDED 落库，接管方直接重新生成产物。
+            if (ResearchControl.shuttingDown(failure)) throw failure;
             String reason = reason(failure);
             state.put("artifactError", reason);
             // 保留已研究的发现；非法/未完成产物不可发布。取消或旧 epoch 会被 store 拒绝写回。

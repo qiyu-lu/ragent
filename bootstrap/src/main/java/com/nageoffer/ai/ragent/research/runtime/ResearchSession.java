@@ -171,7 +171,7 @@ public class ResearchSession {
         if (!store.current(claim)) throw new CancellationException("RESEARCH_LEASE_SUPERSEDED");
     }
 
-    /** 步边界检查：主 Agent 每次模型调用或工具调用开始前调用；停机交还只在这里生效，进行中的一步不被打断。 */
+    /** 步边界检查：主 Agent 每次模型调用开始前调用；停机交还只在这里生效，进行中的模型调用与已决定的工具不被打断。 */
     public void checkStep() {
         check();
         if (main() && control.handoverRequested()) throw new ResearchControl.HandoverRequested();

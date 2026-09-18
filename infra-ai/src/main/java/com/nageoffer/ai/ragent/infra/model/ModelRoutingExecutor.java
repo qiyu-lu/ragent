@@ -20,11 +20,13 @@ package com.nageoffer.ai.ragent.infra.model;
 import com.nageoffer.ai.ragent.framework.errorcode.BaseErrorCode;
 import com.nageoffer.ai.ragent.framework.exception.RemoteException;
 import com.nageoffer.ai.ragent.infra.enums.ModelCapability;
+import com.nageoffer.ai.ragent.infra.operation.RequestOperation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.concurrent.CancellationException;
 import java.util.function.Function;
 
 /**
@@ -49,13 +51,16 @@ public class ModelRoutingExecutor {
         }
 
         Throwable last = null;
+        boolean open = false;
         for (ModelTarget target : targets) {
             C client = clientResolver.apply(target);
             if (client == null) {
                 log.warn("{} provider client missing: provider={}, modelId={}", label, target.candidate().getProvider(), target.id());
                 continue;
             }
-            if (healthStore.allowCall(target.id()) == null) {
+            var permit = healthStore.allowCall(target.id());
+            if (permit == null) {
+                open = true;
                 continue;
             }
 
@@ -64,14 +69,24 @@ public class ModelRoutingExecutor {
                 healthStore.markSuccess(target.id());
                 return response;
             } catch (Exception e) {
-                if (com.nageoffer.ai.ragent.infra.operation.RequestOperation.current() != null)
-                    throw com.nageoffer.ai.ragent.infra.operation.RequestOperation.failure("model.routing", e);
+                if (RequestOperation.current() != null) {
+                    // 有截止时间的请求不跨模型回退（向量不能跨模型），但失败照样计入熔断；
+                    // 取消不是上游故障，只归还可能持有的半开探测名额，否则该模型会一直被判为探测中。
+                    RuntimeException failure = RequestOperation.failure("model.routing", e);
+                    if (failure instanceof CancellationException) healthStore.releaseHalfOpenPermit(permit);
+                    else healthStore.markFailure(target.id());
+                    throw failure;
+                }
                 last = e;
                 healthStore.markFailure(target.id());
                 log.warn("{} model failed, fallback to next. modelId={}, provider={}", label, target.id(), target.candidate().getProvider(), e);
             }
         }
 
+        if (open && last == null && RequestOperation.current() != null) {
+            // 候选全被熔断跳过：快速失败且不可重试，而不是再等一次超时。
+            throw new RequestOperation.Failure("model.routing", "CIRCUIT_OPEN", false, null);
+        }
         throw new RemoteException(
                 "All " + label + " model candidates failed: " + (last == null ? "unknown" : last.getMessage()),
                 last,

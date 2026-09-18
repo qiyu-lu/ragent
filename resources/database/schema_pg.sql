@@ -256,13 +256,20 @@ CREATE TABLE t_research_run (
     completed_at        TIMESTAMPTZ,
     create_time         TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     update_time         TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    executor_id         VARCHAR(128),
+    takeover_count      INTEGER NOT NULL DEFAULT 0,
     CONSTRAINT ux_research_request UNIQUE (owner_user_id, client_request_id)
 );
 CREATE INDEX idx_research_run_owner ON t_research_run (owner_user_id, update_time);
+CREATE INDEX idx_research_run_pollable ON t_research_run (lease_until, update_time)
+    WHERE status IN ('QUEUED', 'RUNNING');
 COMMENT ON TABLE t_research_run IS '研究任务：归属、幂等请求与运行状态；P3 实现执行器';
 COMMENT ON COLUMN t_research_run.brief IS '服务端确认的目标、约束及 allowedKbIds；模型不可扩大范围';
 COMMENT ON COLUMN t_research_run.event_sequence IS 'P3 在短事务中原子分配事件序号，禁止 MAX(sequence_no)+1';
 COMMENT ON COLUMN t_research_run.usage IS '真实供应商 usage 或显式 unknown；不能以默认 0 冒充免费';
+COMMENT ON COLUMN t_research_run.lease_until IS '执行租约到期时间；持有者定时续租，过期后任一实例可接管';
+COMMENT ON COLUMN t_research_run.executor_id IS '当前或最后一次持有租约的执行实例，仅用于诊断，写保护依赖 epoch 与 lease_token';
+COMMENT ON COLUMN t_research_run.takeover_count IS '执行者失联后被接管的次数；超过上限判为毒任务 FAILED(EXECUTOR_LOST)';
 
 CREATE TABLE t_research_evidence (
     evidence_id             VARCHAR(67) PRIMARY KEY,

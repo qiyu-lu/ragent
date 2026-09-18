@@ -44,6 +44,7 @@ import java.util.UUID;
 /** 领取、状态变更、事件分配各自使用短事务；模型和工具在事务外执行。 */
 @Repository
 public class ResearchRunStore {
+    public static final int DEFAULT_MAX_TAKEOVERS = 3;
     public record Claim(ResearchRun run, String owner, String leaseToken) { }
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
@@ -103,23 +104,93 @@ public class ResearchRunStore {
                 (rs, row) -> read(rs), conversationId, owner);
     }
 
+    /** 单进程入口（离线评测）：不续租，租约需覆盖整次运行。 */
     public Optional<Claim> claim(String id, String owner, Duration leaseDuration) {
+        return claim(id, owner, "local", leaseDuration, DEFAULT_MAX_TAKEOVERS);
+    }
+
+    /**
+     * QUEUED 直接领取；RUNNING 只在租约过期（执行者失联）时接管，并计一次接管。租约时间取数据库时钟，
+     * 各实例本机时钟不参与判定。旧执行者的写入由 epoch 与 lease_token 拒绝。
+     */
+    public Optional<Claim> claim(String id, String owner, String executorId, Duration lease, int maxTakeovers) {
+        return transactions.execute(tx -> claimLocked(lock(id, owner), owner, executorId, lease, maxTakeovers));
+    }
+
+    /** 数据库即队列：领取排队中或租约已过期的任务，已被其他实例锁住的行直接跳过；数量由调用方的空闲槽位决定。 */
+    public List<Claim> claimAvailable(String executorId, Duration lease, int limit, int maxTakeovers) {
+        if (limit < 1) return List.of();
         return transactions.execute(tx -> {
-            ResearchRun run = lock(id, owner);
-            if (run.status() != Status.QUEUED && run.status() != Status.RUNNING) return Optional.empty();
-            if (run.status() == Status.RUNNING && Boolean.TRUE.equals(jdbc.queryForObject(
-                    "SELECT lease_until > CURRENT_TIMESTAMP FROM t_research_run WHERE id = ?", Boolean.class, id))) {
-                return Optional.empty();
+            List<Map<String, Object>> rows = jdbc.queryForList("""
+                    SELECT id, owner_user_id FROM t_research_run
+                    WHERE status = 'QUEUED' OR status = 'RUNNING' AND lease_until <= CURRENT_TIMESTAMP
+                    ORDER BY update_time, id LIMIT ? FOR UPDATE SKIP LOCKED
+                    """, limit);
+            List<Claim> claims = new ArrayList<>();
+            for (var row : rows) {
+                String owner = (String) row.get("owner_user_id");
+                claimLocked(get((String) row.get("id"), owner), owner, executorId, lease, maxTakeovers).ifPresent(claims::add);
             }
-            String token = UUID.randomUUID().toString();
-            jdbc.update("""
-                    UPDATE t_research_run SET status = 'RUNNING', epoch = epoch + 1, revision = revision + 1,
-                        lease_token = ?, lease_until = ?, started_at = COALESCE(started_at, CURRENT_TIMESTAMP),
-                        update_time = CURRENT_TIMESTAMP WHERE id = ? AND owner_user_id = ?
-                    """, token, Timestamp.from(Instant.now().plus(leaseDuration)), id, owner);
-            appendLocked(id, "main", "RUN_STARTED", "研究执行已开始", Map.of("epoch", run.epoch() + 1));
-            return Optional.of(new Claim(get(id, owner), owner, token));
+            return claims;
         });
+    }
+
+    private Optional<Claim> claimLocked(ResearchRun run, String owner, String executorId, Duration lease, int maxTakeovers) {
+        if (run.status() != Status.QUEUED && run.status() != Status.RUNNING) return Optional.empty();
+        var previous = jdbc.queryForMap("SELECT executor_id, takeover_count, lease_until > CURRENT_TIMESTAMP AS active FROM t_research_run WHERE id = ?", run.id());
+        boolean takeover = run.status() == Status.RUNNING;
+        if (takeover && Boolean.TRUE.equals(previous.get("active"))) return Optional.empty();
+        int takeovers = ((Number) previous.get("takeover_count")).intValue() + (takeover ? 1 : 0);
+        Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        payload.put("epoch", run.epoch() + 1);
+        payload.put("executorId", executorId);
+        if (takeover) {
+            payload.put("takeover", takeovers);
+            if (previous.get("executor_id") != null) payload.put("previousExecutorId", previous.get("executor_id"));
+        }
+        // 接管时在途的 worker 已随旧执行者消失，标为中断，由主 Agent 在预算内决定是否重派。
+        String subtasks = encode(takeover ? closeSubtasks(run, "INTERRUPTED") : Map.of());
+        if (takeovers > maxTakeovers) {
+            jdbc.update("""
+                    UPDATE t_research_run SET status = 'FAILED', epoch = epoch + 1, revision = revision + 1, lease_token = NULL,
+                        lease_until = NULL, error_summary = 'EXECUTOR_LOST', takeover_count = ?, completed_at = CURRENT_TIMESTAMP,
+                        state = state || ?::jsonb, update_time = CURRENT_TIMESTAMP WHERE id = ?
+                    """, takeovers, subtasks, run.id());
+            appendLocked(run.id(), "main", "FAILED", "执行实例多次在运行此任务时失联，停止接管", payload);
+            return Optional.empty();
+        }
+        String token = UUID.randomUUID().toString();
+        jdbc.update("""
+                UPDATE t_research_run SET status = 'RUNNING', epoch = epoch + 1, revision = revision + 1,
+                    lease_token = ?, lease_until = CURRENT_TIMESTAMP + ? * INTERVAL '1 millisecond', executor_id = ?, takeover_count = ?,
+                    state = state || ?::jsonb, started_at = COALESCE(started_at, CURRENT_TIMESTAMP),
+                    update_time = CURRENT_TIMESTAMP WHERE id = ? AND owner_user_id = ?
+                """, token, lease.toMillis(), executorId, takeovers, subtasks, run.id(), owner);
+        appendLocked(run.id(), "main", "RUN_STARTED", takeover ? "执行实例失联，研究已由其他实例接管" : "研究执行已开始", payload);
+        return Optional.of(new Claim(get(run.id(), owner), owner, token));
+    }
+
+    /** 续租只在自己仍是当前持有者且租约未过期时成功；失败说明已被接管或已结束，调用方应立即停止本地执行。 */
+    public boolean renew(Claim claim, Duration lease) {
+        return jdbc.update("""
+                UPDATE t_research_run SET lease_until = CURRENT_TIMESTAMP + ? * INTERVAL '1 millisecond'
+                WHERE id = ? AND owner_user_id = ? AND status = 'RUNNING' AND epoch = ? AND lease_token = ?
+                    AND lease_until > CURRENT_TIMESTAMP
+                """, lease.toMillis(), claim.run().id(), claim.owner(), claim.run().epoch(), claim.leaseToken()) == 1;
+    }
+
+    /** 停机交还：任务回到队列，其他实例无需等待租约过期即可领取；不计接管次数。 */
+    public boolean release(Claim claim, String reason) {
+        return Boolean.TRUE.equals(transactions.execute(tx -> {
+            ResearchRun run = lock(claim.run().id(), claim.owner());
+            if (!current(claim)) return false;
+            jdbc.update("""
+                    UPDATE t_research_run SET status = 'QUEUED', revision = revision + 1, lease_token = NULL, lease_until = NULL,
+                        state = state || ?::jsonb, update_time = CURRENT_TIMESTAMP WHERE id = ?
+                    """, encode(closeSubtasks(run, "INTERRUPTED")), run.id());
+            appendLocked(run.id(), "main", "RUN_RELEASED", "执行实例正在停止，研究已交还队列", Map.of("reason", reason));
+            return true;
+        }));
     }
 
     public boolean current(Claim claim) {
@@ -264,15 +335,6 @@ public class ResearchRunStore {
             closed.put(id.toString(), task);
         });
         return closed.isEmpty() ? Map.of() : Map.of("subtasks", closed);
-    }
-
-    public void rejectQueued(String id, String owner) {
-        transactions.executeWithoutResult(tx -> {
-            ResearchRun run = lock(id, owner);
-            if (run.status() != Status.QUEUED) return;
-            jdbc.update("UPDATE t_research_run SET status = 'FAILED', error_summary = 'RUN_QUEUE_FULL', revision = revision + 1, completed_at = CURRENT_TIMESTAMP WHERE id = ?", id);
-            appendLocked(id, "main", "FAILED", "研究队列已满，请稍后重新发起", Map.of());
-        });
     }
 
     private ResearchRun lock(String id, String owner) {

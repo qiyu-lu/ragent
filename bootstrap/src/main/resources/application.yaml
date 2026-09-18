@@ -203,6 +203,12 @@ research:
   max-input-tokens: 28000
   max-output-tokens: 4096
   explicit-prompt-cache: true
+  # 多实例持久化执行：短租约 + 心跳续租，过期由任一实例经数据库轮询接管（W2）。
+  lease-seconds: 30
+  heartbeat-seconds: 10
+  poll-seconds: 5
+  max-takeovers: 3
+  shutdown-grace-seconds: 20
 
 ai:
   providers:

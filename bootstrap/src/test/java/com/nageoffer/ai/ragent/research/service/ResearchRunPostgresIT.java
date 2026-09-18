@@ -389,6 +389,200 @@ class ResearchRunPostgresIT {
         } finally { executor.shutdownNow(); }
     }
 
+    private ResearchRunService service(ResearchRunner runner, ResearchProperties properties) {
+        return new ResearchRunService(store, runner, properties, jdbc, json, completion(), new ResearchEvidenceStore(jdbc, json));
+    }
+    private ResearchRunService.CreateRequest request(String id) {
+        return new ResearchRunService.CreateRequest(conversation, id, "compare", ResearchBrief.OutputType.REPORT, List.of(), List.of(kb), List.of());
+    }
+    private void expireLease(String id) {
+        jdbc.update("UPDATE t_research_run SET lease_until = CURRENT_TIMESTAMP - INTERVAL '1 second' WHERE id = ?", id);
+    }
+    private static ResearchSession.Outcome gapOnly() {
+        return new ResearchSession.Outcome(null, new SubtaskResult("main", List.of(), List.of("unavailable"), List.of(), SubtaskResult.Status.COMPLETED));
+    }
+    private List<Map<String, Object>> starts(String id) {
+        return store.events(id, owner, 0, 500).stream().filter(e -> e.type().equals("RUN_STARTED")).map(e -> e.payload()).toList();
+    }
+    private void contiguous(String id) {
+        var events = store.events(id, owner, 0, 500);
+        for (int i = 0; i < events.size(); i++) assertEquals(i + 1, events.get(i).sequence());
+    }
+
+    @Test
+    void expiredLeaseIsTakenOverByAnotherInstanceAndTheOldExecutorIsFencedOut() throws Exception {
+        var entered = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        var lateWrite = new java.util.concurrent.atomic.AtomicReference<Boolean>();
+        ResearchRunner stalled = session -> {
+            entered.countDown();
+            try { assertTrue(release.await(10, TimeUnit.SECONDS)); }
+            catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            lateWrite.set(store.event(session.claim, "LATE", "late", Map.of(), Map.of()));
+            return gapOnly();
+        };
+        // 同库里其他用例留下的排队任务也会被轮询领走，只按本用例的任务 ID 计数。
+        var survivorRuns = new java.util.concurrent.ConcurrentLinkedQueue<String>();
+        ResearchRunner survivor = session -> {
+            survivorRuns.add(session.claim.run().id());
+            if (session.claim.owner().equals(owner)) assertEquals(owner, UserContext.requireUser().getUserId());
+            return gapOnly();
+        };
+        var a = service(stalled, new ResearchProperties());
+        var b = service(survivor, new ResearchProperties());
+        try {
+            var run = a.create(request("takeover"));
+            assertTrue(entered.await(10, TimeUnit.SECONDS));
+            b.poll();
+            assertFalse(survivorRuns.contains(run.id()), "a live lease must not be taken over");
+            // 模拟实例 A 失联：它不再续租，租约过期。
+            expireLease(run.id());
+            b.poll();
+            await(() -> store.get(run.id(), owner).status().terminal());
+            assertEquals(1, survivorRuns.stream().filter(run.id()::equals).count());
+            release.countDown();
+            await(() -> lateWrite.get() != null);
+            assertFalse(lateWrite.get());
+            var started = starts(run.id());
+            assertEquals(2, started.size());
+            assertEquals(a.executorId(), started.get(0).get("executorId"));
+            assertEquals(b.executorId(), started.get(1).get("executorId"));
+            assertEquals(1, started.get(1).get("takeover"));
+            assertEquals(a.executorId(), started.get(1).get("previousExecutorId"));
+            assertTrue(store.events(run.id(), owner, 0, 500).stream().noneMatch(e -> e.type().equals("LATE")));
+            contiguous(run.id());
+        } finally { release.countDown(); a.close(); b.close(); }
+    }
+
+    @Test
+    void heartbeatKeepsALongRunOwnedAndLostLeaseStopsTheLocalExecution() throws Exception {
+        var limits = new ResearchProperties();
+        limits.setLeaseSeconds(2);
+        limits.setHeartbeatSeconds(1);
+        var release = new CountDownLatch(1);
+        var stopped = new CountDownLatch(1);
+        ResearchRunner longRun = session -> {
+            try {
+                while (!release.await(100, TimeUnit.MILLISECONDS)) session.check();
+            } catch (java.util.concurrent.CancellationException e) { stopped.countDown(); throw e; }
+            catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            return gapOnly();
+        };
+        var a = service(longRun, limits);
+        var polled = new java.util.concurrent.ConcurrentLinkedQueue<String>();
+        var b = service(session -> { polled.add(session.claim.run().id()); return gapOnly(); }, limits);
+        try {
+            var run = a.create(request("heartbeat"));
+            for (int i = 0; i < 4; i++) { Thread.sleep(1000); b.poll(); }
+            assertFalse(polled.contains(run.id()));
+            assertEquals(Status.RUNNING, store.get(run.id(), owner).status());
+            assertEquals(1, starts(run.id()).size(), "renewed lease must survive four seconds against a two-second lease");
+            store.cancel(run.id(), owner);
+            // 取消在别的实例上发生时，本地执行靠续租失败或写保护停下。
+            assertTrue(stopped.await(5, TimeUnit.SECONDS));
+        } finally { release.countDown(); a.close(); b.close(); }
+    }
+
+    @Test
+    void runsWhoseExecutorKeepsDyingAreFailedAsPoisonAfterTheTakeoverLimit() {
+        var run = run();
+        for (int attempt = 0; attempt <= ResearchRunStore.DEFAULT_MAX_TAKEOVERS; attempt++) {
+            assertTrue(store.claim(run.id(), owner, "executor-" + attempt, Duration.ofSeconds(30), ResearchRunStore.DEFAULT_MAX_TAKEOVERS).isPresent());
+            expireLease(run.id());
+        }
+        assertTrue(store.claimAvailable("executor-last", Duration.ofSeconds(30), 10, ResearchRunStore.DEFAULT_MAX_TAKEOVERS).stream()
+                .noneMatch(c -> c.run().id().equals(run.id())));
+        var failed = store.get(run.id(), owner);
+        assertEquals(Status.FAILED, failed.status());
+        assertEquals("EXECUTOR_LOST", failed.errorSummary());
+        assertEquals(4, jdbc.queryForObject("SELECT takeover_count FROM t_research_run WHERE id = ?", Integer.class, run.id()));
+        contiguous(run.id());
+    }
+
+    @Test
+    void takeoverInterruptsInFlightWorkersButKeepsCompletedCheckpoints() {
+        var run = run();
+        var old = claim(run);
+        assertTrue(store.subtask(old, "worker-1", Map.of("status", "COMPLETED", "readEvidenceIds", List.of("ev")), "SUBTASK_COMPLETED", Map.of("workersCreated", 2)));
+        assertTrue(store.subtask(old, "worker-2", Map.of("status", "RUNNING"), "SUBTASK_RUNNING", Map.of("workersCreated", 2)));
+        expireLease(run.id());
+        var fresh = store.claimAvailable("survivor", Duration.ofSeconds(30), 10, 3).stream().filter(c -> c.run().id().equals(run.id())).findFirst().orElseThrow();
+        var tasks = (Map<String, Map<String, Object>>) fresh.run().state().get("subtasks");
+        assertEquals("COMPLETED", tasks.get("worker-1").get("status"));
+        assertEquals("INTERRUPTED", tasks.get("worker-2").get("status"));
+        assertFalse(store.subtask(old, "worker-2", Map.of("status", "COMPLETED"), "SUBTASK_COMPLETED", Map.of()));
+        assertFalse(store.renew(old, Duration.ofSeconds(30)));
+        assertTrue(store.renew(fresh, Duration.ofSeconds(30)));
+    }
+
+    @Test
+    void fullLocalQueueLeavesRunsQueuedForAnyInstanceToPoll() throws Exception {
+        var limits = new ResearchProperties();
+        limits.setMaxConcurrentRuns(1);
+        limits.setQueueCapacity(1);
+        var release = new CountDownLatch(1);
+        ResearchRunner blocking = session -> {
+            try { assertTrue(release.await(10, TimeUnit.SECONDS)); }
+            catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            return gapOnly();
+        };
+        var a = service(blocking, limits);
+        var b = service(session -> gapOnly(), new ResearchProperties());
+        try {
+            var first = a.create(request("q1"));
+            await(() -> store.get(first.id(), owner).status() == Status.RUNNING);
+            a.create(request("q2"));
+            var third = a.create(request("q3"));
+            assertEquals(Status.QUEUED, store.get(third.id(), owner).status(), "a full local queue no longer fails the run");
+            b.poll();
+            await(() -> store.get(third.id(), owner).status().terminal());
+            assertNotEquals("RUN_QUEUE_FULL", store.get(third.id(), owner).errorSummary());
+        } finally { release.countDown(); a.close(); b.close(); }
+    }
+
+    @Test
+    void shutdownHandsRunningRunsBackWithoutCountingATakeoverOrFailingThem() throws Exception {
+        var entered = new CountDownLatch(1);
+        ResearchRunner blocking = session -> {
+            entered.countDown();
+            while (true) session.check();
+        };
+        var a = service(blocking, new ResearchProperties());
+        var b = service(session -> gapOnly(), new ResearchProperties());
+        try {
+            var run = a.create(request("handover"));
+            assertTrue(entered.await(10, TimeUnit.SECONDS));
+            a.close();
+            var queued = store.get(run.id(), owner);
+            assertEquals(Status.QUEUED, queued.status());
+            assertTrue(store.events(run.id(), owner, 0, 500).stream().anyMatch(e -> e.type().equals("RUN_RELEASED")));
+            b.poll();
+            await(() -> store.get(run.id(), owner).status().terminal());
+            assertNotEquals("EXECUTION_CANCELLED", store.get(run.id(), owner).errorSummary());
+            assertEquals(0, jdbc.queryForObject("SELECT takeover_count FROM t_research_run WHERE id = ?", Integer.class, run.id()));
+            assertFalse(starts(run.id()).get(1).containsKey("takeover"));
+            contiguous(run.id());
+        } finally { a.close(); b.close(); }
+    }
+
+    @Test
+    void polledRunsRebuildTheOwnerFromTheUserTable() throws Exception {
+        String userId = String.valueOf(Math.abs(UUID.randomUUID().getMostSignificantBits()) % 1_000_000_000_000L);
+        jdbc.update("INSERT INTO t_user (id, username, password, role) VALUES (?, ?, 'x', 'user')", userId, "u" + userId);
+        jdbc.update("INSERT INTO t_conversation (id, conversation_id, user_id, title) VALUES (?, ?, ?, 'fixture')", "c" + userId, "c" + userId, userId);
+        var seen = new java.util.concurrent.atomic.AtomicReference<com.nageoffer.ai.ragent.framework.context.LoginUser>();
+        var b = service(session -> { seen.set(UserContext.get()); return gapOnly(); }, new ResearchProperties());
+        try {
+            var run = store.create(userId, "c" + userId, "identity", brief());
+            b.poll();
+            await(() -> seen.get() != null);
+            assertEquals(userId, seen.get().getUserId());
+            assertEquals("u" + userId, seen.get().getUsername());
+            assertEquals("user", seen.get().getRole());
+            await(() -> store.get(run.id(), userId).status().terminal());
+        } finally { b.close(); }
+    }
+
     private void await(java.util.function.BooleanSupplier condition) throws Exception {
         long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         while (!condition.getAsBoolean()) {

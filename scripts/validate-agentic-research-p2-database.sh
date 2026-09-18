@@ -66,9 +66,11 @@ SQL
 psql_p2 < resources/database/upgrades/v1.1.0/260917_02_research_evidence.sql
 psql_p2 < resources/database/upgrades/v1.1.0/260917_03_research_neighbors.sql
 psql_p2 < resources/database/upgrades/v1.1.0/260917_04_research_corpus.sql
+psql_p2 < resources/database/upgrades/v1.1.0/260918_01_research_durable_execution.sql
 psql_p2 < resources/database/upgrades/v1.1.0/260917_02_research_evidence.sql
 psql_p2 < resources/database/upgrades/v1.1.0/260917_03_research_neighbors.sql
 psql_p2 < resources/database/upgrades/v1.1.0/260917_04_research_corpus.sql
+psql_p2 < resources/database/upgrades/v1.1.0/260918_01_research_durable_execution.sql
 psql_p2 -Atc "$p2_catalog_sql" > "$p2_scratch/upgraded-catalog.txt"
 diff -u "$p2_scratch/fresh-catalog.txt" "$p2_scratch/upgraded-catalog.txt"
 

@@ -45,6 +45,15 @@ public class ResearchProperties {
     private int toolTimeoutSeconds = 30;
     private int maxInputTokens = 28000;
     private int maxOutputTokens = 4096;
+    /** 执行租约：持有者每 heartbeat 秒续租一次，租约 lease 秒；失联超过租约后由任一实例接管。 */
+    private int leaseSeconds = 30;
+    private int heartbeatSeconds = 10;
+    /** 每个实例按空闲槽位轮询排队中与租约过期的任务。 */
+    private int pollSeconds = 5;
+    /** 同一任务的执行者失联超过此次数即判为毒任务，不再接管。 */
+    private int maxTakeovers = 3;
+    /** 停机时等在途任务走到步边界交还租约的最长时间；超时后直接交还并取消本地执行。 */
+    private int shutdownGraceSeconds = 20;
     /** 百炼显式上下文缓存：研究调用在稳定前缀末端打标记；关闭时只能依赖不保证命中的隐式缓存。 */
     private boolean explicitPromptCache;
 
@@ -65,7 +74,9 @@ public class ResearchProperties {
                 || workerTimeoutSeconds < 1 || maxModelCalls < 1 || maxToolCalls < 1
                 || reservedFinalizationModelCalls < 0 || reservedFinalizationModelCalls >= maxModelCalls
                 || maxDurationSeconds < 1 || modelCallTimeoutSeconds < 1 || toolTimeoutSeconds < 1
-                || maxInputTokens < 1024 || maxOutputTokens < 1) {
+                || maxInputTokens < 1024 || maxOutputTokens < 1
+                || heartbeatSeconds < 1 || leaseSeconds < heartbeatSeconds * 2 || pollSeconds < 1
+                || maxTakeovers < 0 || shutdownGraceSeconds < 0) {
             throw new IllegalArgumentException("研究模型、并发、预算或超时配置无效");
         }
     }

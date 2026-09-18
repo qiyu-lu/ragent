@@ -66,7 +66,8 @@ public class ResearchModelFactory {
         return OpenAIChatModel.builder().apiKey(provider.getApiKey()).modelName(candidate.getModel())
                 .baseUrl(url.getScheme() + "://" + url.getRawAuthority()).endpointPath(url.getRawPath())
                 // SDK 流取消会关闭 HTTP；关闭 thinking，usage 独立记录供应商返回值。
-                .stream(true).generateOptions(GenerateOptions.builder().temperature(0.0)
+                .stream(true).generateOptions(GenerateOptions.builder()
+                        .executionConfig(io.agentscope.core.model.ExecutionConfig.builder().maxAttempts(1).build()).temperature(0.0)
                         .maxTokens(research.getMaxOutputTokens()).parallelToolCalls(false)
                         .additionalBodyParams(Map.of("enable_thinking", thinking)).build()).build();
     }

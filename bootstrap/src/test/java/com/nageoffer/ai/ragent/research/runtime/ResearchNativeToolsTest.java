@@ -386,7 +386,7 @@ class ResearchNativeToolsTest {
     void truncatedToolStreamIsDiscardedAndRetriedFromCompletedHistory() throws Exception {
         String partial = json.writeValueAsString(Map.of("id", "broken", "choices", List.of(Map.of("index", 0,
                 "delta", Map.of("tool_calls", List.of(Map.of("index", 0, "id", "never-execute", "type", "function",
-                        "function", Map.of("name", "search_knowledge", "arguments", "{\"query\":\"X\"}"))))))));
+                        "function", Map.of("name", "search_knowledge", "arguments", "{\"query\":\"X"))))))));
         server.enqueue(new MockResponse().setHeader("Content-Type", "text/event-stream").setBody("data: " + partial + "\n\n"));
         tool("finish", "finish_research", Map.of("findings", List.of(), "gaps", List.of("Insufficient evidence"), "conflicts", List.of()));
         assertNotNull(factory().run(session).result());

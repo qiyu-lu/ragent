@@ -82,7 +82,8 @@ public class BoundedResearchModel implements Model {
     static boolean retryable(Throwable error) {
         for (Throwable cause = error; cause != null; cause = cause.getCause()) {
             if (cause instanceof java.util.concurrent.CancellationException || cause instanceof ResearchBudget.Exhausted) return false;
-            if (cause instanceof io.agentscope.core.model.ModelHttpException http) return http.isRetryableHttpStatus();
+            if (cause instanceof io.agentscope.core.model.ModelHttpException http && http.getStatusCode() != null)
+                return http.isRetryableHttpStatus();
             if (cause instanceof java.io.IOException || cause instanceof java.util.concurrent.TimeoutException
                     || cause instanceof IncompleteResponse) return true;
         }
@@ -149,8 +150,11 @@ public class BoundedResearchModel implements Model {
                         ? new ToolChoice.Specific("finish_research") : new ToolChoice.Required();
                 if (!session.finishingRepair() && session.remainingModelCalls(properties.getMaxWorkerModelCalls()) > 1
                         && session.requiresRead()) choice = new ToolChoice.Specific("read_source");
-                GenerateOptions effective = tools == null || tools.isEmpty() ? options
+                GenerateOptions requested = tools == null || tools.isEmpty() ? options
                         : GenerateOptions.mergeOptions(GenerateOptions.builder().toolChoice(choice).build(), options);
+                // No hidden SDK retries: each HTTP attempt gets its own budget/usage record here.
+                GenerateOptions effective = GenerateOptions.mergeOptions(GenerateOptions.builder()
+                        .executionConfig(io.agentscope.core.model.ExecutionConfig.builder().maxAttempts(1).build()).build(), requested);
                 session.event("MODEL_STARTED", "正在调用研究模型", Map.of("callId", id, "model", getModelName(),
                         "requestedToolChoice", tools == null || tools.isEmpty() ? "none"
                                 : choice instanceof ToolChoice.Specific specific

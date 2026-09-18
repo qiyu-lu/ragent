@@ -1,0 +1,52 @@
+{
+  "application": {
+    "evaluation": "per-output actual source review; structural validity is not semantic support",
+    "fixed_cases": 24,
+    "modes": [
+      "A",
+      "B",
+      "C"
+    ],
+    "tasks": 72
+  },
+  "boundaries": [
+    "fixed regression, not an unseen test or full 17517 task execution",
+    "R1 selected failures also appear in main 400; do not claim holdout independence",
+    "all recorded failures included in denominators; source support and delegation assessed separately",
+    "no monetary estimates; actual model/embedding/rerank usage and unknown retained"
+  ],
+  "main": {
+    "fixed_questions": 400,
+    "historical_run": "20260917T145853_P7_regression_v4",
+    "mode_order": "per-question ABC/BCA/CAB rotation",
+    "same_ordered_question_ids": true,
+    "tasks": 1200
+  },
+  "phase": "R5",
+  "primary_settings": {
+    "concurrency": 2,
+    "model": "qwen3.7-flash-2026-07-15",
+    "rerank": false,
+    "thinking": false
+  },
+  "repeat": {
+    "additional_runs": 2,
+    "additional_tasks": 72,
+    "ids": [
+      "qq-71b03a99bd9694de2e0c00720e821517373e3c0a9fa313da8a4e172b359b3afc",
+      "qq-3a3e54dc226cf8d13e66fb530ace783c1d3d95bb8a7d4a208a5b83d873f9df88",
+      "qq-d8a0eb70b0a66d50cbf3ece864115771579add72f1f0338d8d3611a3be8f9ac1",
+      "qq-16333aa8aef572c080529f9d789550656a33ae08c27c580902b7c0af74ea8860",
+      "qq-d4fc81496e769a87e42eab6b267d459f5903630e00ee9ee7a7a68355997e3181",
+      "qq-9a7495f0e8fbd424e5fd6895c70854f6bac7e096b4b1d90efa0c7c6c483f1ab7",
+      "mq-84b8db1651cdb60bfeab41ea08e5a7b85ae17610fc9bf86cb80edd0e42ca3211",
+      "mq-de48526690b050d06b690def3badca83af8a76edc3028f931a458a60ad1f888e",
+      "mq-7cacf59dbf25ebb7e4f167ce90b37c443324567ae05b16d7dcbbe20a2e4c366a",
+      "mq-e757134db02815ef393c7bd94a55f5bf1facdf9ad2a491f4f7e1ed27e9105091",
+      "mq-41ede31858f037d02cb95befc0231d3933edf5b890174f7f5643d46acf8fcee6",
+      "mq-84f6ce20f5fad212625ed486e76e6e4f8f8b72151f9f52328314d61fbf3f57c2"
+    ],
+    "selection": "seed 20260918; six per dataset; exclude R1 failure-selected IDs; no answers or gold metrics used"
+  },
+  "status": "prepared"
+}

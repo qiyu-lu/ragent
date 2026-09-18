@@ -82,6 +82,53 @@ class ResearchArtifactGeneratorTest {
     }
     @AfterEach void close() throws Exception { server.shutdown(); }
 
+    @Test void permanentAuthenticationFailureDoesNotStartAnotherGeneration() {
+        class AuthenticationFailure extends RuntimeException implements io.agentscope.core.model.ModelHttpException {
+            AuthenticationFailure() { super(new java.io.IOException("HTTP transport wrapper")); }
+            public Integer getStatusCode() { return 401; }
+        }
+        var finalizer = mock(ResearchArtifactGenerator.class);
+        new ResearchCompletionService(store, finalizer, json).researchFailed(session, new AuthenticationFailure());
+        verifyNoInteractions(finalizer);
+        verify(store).finish(any(), eq(ResearchRun.Status.FAILED), anyMap(), anyMap(), anyString());
+    }
+
+    @Test void exhaustedServiceFailurePreservesReadEvidenceInAPartialArtifact() throws Exception {
+        class ServiceFailure extends RuntimeException implements io.agentscope.core.model.ModelHttpException {
+            public Integer getStatusCode() { return 503; }
+        }
+        response(report("ev-a"));
+        new ResearchCompletionService(store, generator, json).researchFailed(session, new ServiceFailure());
+        verify(store).finish(any(), eq(ResearchRun.Status.PARTIAL), anyMap(), anyMap(), anyMap(), anyString());
+        assertEquals(1, server.getRequestCount());
+    }
+
+    @Test void disconnectedTextIsNeverConcatenatedWithTheRetriedArtifact() throws Exception {
+        String prefix = "data: " + json.writeValueAsString(Map.of("id", "broken-response", "choices", List.of(Map.of(
+                "index", 0, "delta", Map.of("content", "BROKEN_FRAGMENT"))))) + "\n\n";
+        server.enqueue(new MockResponse().setHeader("Content-Type", "text/event-stream")
+                .setBody(prefix + ": heartbeat\n\n".repeat(500)).setSocketPolicy(SocketPolicy.DISCONNECT_DURING_RESPONSE_BODY));
+        response(report("ev-a"));
+        var artifact = generator.generate(session, result());
+        assertFalse(artifact.markdown().contains("BROKEN_FRAGMENT"));
+        assertEquals(2, server.getRequestCount());
+        assertEquals(2, session.budget.snapshot().get("modelCalls"));
+        verify(store, never()).event(any(), eq("FINALIZATION_VALIDATION_FAILED"), anyString(), anyMap(), anyMap());
+    }
+
+    @Test void eachTransientHttpAttemptHasItsOwnLedgerEntry() throws Exception {
+        server.enqueue(new MockResponse().setResponseCode(503).setHeader("Content-Type", "application/json")
+                .setBody("{\"error\":{\"message\":\"temporarily unavailable\",\"type\":\"server_error\"}}"));
+        response(report("ev-a"));
+        assertNotNull(generator.generate(session, result()));
+        assertEquals(2, server.getRequestCount());
+        var calls = (List<Map<String, Object>>) session.budget.snapshot().get("calls");
+        assertEquals(2, calls.size(), "Every HTTP attempt must consume and record one model call");
+        assertEquals("FAILED", calls.get(0).get("status"));
+        assertEquals("unknown", calls.get(0).get("usageStatus"));
+        assertEquals("COMPLETED", calls.get(1).get("status"));
+    }
+
     @Test void missingPlanArrayReportsFieldPathThenAcceptsAnEmptyArray() throws Exception {
         session = session(ResearchBrief.OutputType.PLAN, Map.of()); session.delivered(item("ev-a"));
         var plan = new LinkedHashMap<String,Object>();

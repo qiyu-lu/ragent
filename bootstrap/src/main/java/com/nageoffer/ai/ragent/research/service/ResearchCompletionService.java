@@ -65,15 +65,22 @@ public class ResearchCompletionService {
     public void researchFailed(ResearchSession session, RuntimeException failure) {
         Throwable cause = root(failure);
         String reason = reason(failure);
-        boolean bounded = !(cause instanceof java.util.concurrent.CancellationException);
-        if ((bounded && !session.citableIds().isEmpty()) || !session.acceptedEvidenceIds().isEmpty()) {
+        boolean recoverable = cause instanceof ResearchBudget.Exhausted || cause instanceof java.util.concurrent.TimeoutException
+                || cause instanceof java.io.IOException || "MODEL_STREAM_INCOMPLETE".equals(cause.getMessage())
+                || cause instanceof io.agentscope.core.model.ModelHttpException http && http.isRetryableHttpStatus()
+                || cause instanceof com.nageoffer.ai.ragent.infra.operation.RequestOperation.Failure operation && operation.retryable;
+        boolean permanentHttp = cause instanceof io.agentscope.core.model.ModelHttpException http && http.getStatusCode() != null && !http.isRetryableHttpStatus();
+        if (!permanentHttp && !(cause instanceof java.util.concurrent.CancellationException)
+                && ((recoverable && !session.citableIds().isEmpty()) || !session.acceptedEvidenceIds().isEmpty())) {
             complete(session, new ResearchSession.Outcome(null, session.partial(reason)), reason);
         } else store.finish(session.claim, Status.FAILED, Map.of("executionIssues", session.partial(reason).executionIssues(), "researchResult", json.convertValue(session.partial(reason), Map.class),
                 "readEvidenceIds", session.delivered().keySet(), "acceptedWorkerEvidenceIds", session.acceptedEvidenceIds()), session.budget.snapshot(), reason);
     }
 
     private static Throwable root(Throwable error) {
-        while (error.getCause() != null && !(error instanceof ResearchBudget.Exhausted) && !(error instanceof com.nageoffer.ai.ragent.infra.operation.RequestOperation.Failure)) error = error.getCause();
+        while (error.getCause() != null && !(error instanceof ResearchBudget.Exhausted)
+                && !(error instanceof com.nageoffer.ai.ragent.infra.operation.RequestOperation.Failure)
+                && !(error instanceof io.agentscope.core.model.ModelHttpException http && http.getStatusCode() != null)) error = error.getCause();
         return error;
     }
     private static String reason(Throwable failure) {

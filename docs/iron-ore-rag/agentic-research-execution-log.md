@@ -493,3 +493,14 @@ R2 v2 续记：同两题 × ABC 的 6 个任务全部完成并生成回答。41 
 PLAN 的五类数组、步骤字段和参数字段显式 required，未知参数必须为 null value/null unit/空引用；步骤顺序、参数和数组错误反馈包含字段路径。JSON 反序列化错误返回缺失字段及路径，不再只有泛化的 JSON_INVALID。运行失败新增 executionIssues，与来源 gaps 独立保存并在产物 Markdown/前端以执行未完成显示；历史结果缺少该字段时按空列表读取。已读证据可用于生成带错误状态的部分产物，取消仍不发布。生成提示升级 artifact-v5，继续要求逐项核对原文，尤其是完整列表、相关工作与实验比较的区别；结构校验不声称语义正确。
 
 125 项相关后端检查通过（受影响的 45 项最终复跑），Python 30 项通过，前端构建及 9 项浏览器桩验证通过，既有 app 类型诊断仍为 24 项。第一次浏览器夹具在编译重建期间启动失败，稳定构建后 v2 通过，失败日志保留。24 应用×ABC 的 72 个唯一请求已离线验证。真实 thinking 对照使用同一模型、题目和时限，仅改变 enable_thinking；参数参考[百炼思考模式](https://help.aliyun.com/zh/model-studio/deep-thinking)与[流式协议](https://help.aliyun.com/zh/model-studio/stream)，不提前认定更慢或更强。对应真实批次和原文核对续记。
+
+R3 真实结果续记：36 个任务 35 完成/1 失败，未读引用工具错误 12→5，SOURCE_READ 63→124。相较 R1 同题，总输入 3,269,722→1,923,294 tokens，模型请求 273→298；减少输入未转化为稳定答案增益。QASPER 6 题的 A/B/C F1 为 0.3126/0.3173/0.3297；MuSiQue 3 个可回答题为 0.3711/0.6667/0.6667。C 的一例失败为最终生成反复返回无引用正文。单项重排 A 的 QASPER/MuSiQue F1 为 0.3452/0.6667，但 evidence F1 0.6790→0.5694、0.7857→0.6190；12 次重排均成功，实际 36,887 tokens。仅一个运行委派三个 worker，仍不能证明并行收益。完整结果见 [R3 清单](../../eval/agentic-research/manifests/research-r3-reading-2026-09-18.json)。主回归保留原 non-thinking、无重排设置，设置对照独立报告。
+
+
+R5 冻结前补强（仍属 R2 恢复边界）：进一步对照 pinned AgentScope 2.0.1 的 ModelUtils/ExecutionConfig，发现最终生成未经过 Agent 的 modelExecutionConfig 时会使用 SDK 默认三次尝试。本地 503→成功复现 HTTP 2 次但台账 1 条，已在模型工厂和逐次请求显式设置 maxAttempts=1，由外层统一重试和记账。真实中途断开的文本流另暴露 SDK 用无 HTTP 状态码的 OpenAIException 包装 IOException，分类现在继续检查底层原因，401/403 等明确永久状态仍不重试，也不转入新的最终生成。38 项模型/产物测试通过，含每次 attempt 独立台账、断流文字不拼接、工具 JSON 字符串中途截断、取消及鉴权检查。历史真实 Java 日志本次未发现 SDK 内部重试警告，但不以此推算未记录的 usage。R5 v1 仅离线准备、0 调用，已标记冻结前被替代；最终批次使用修正版本另建 v2。
+
+R5 预先固定主对照仍为原 400 题×ABC，逐题轮换 ABC/BCA/CAB；从两类数据各抽 6 题、排除 R1 故障选题，随机种子 20260918，额外重复两轮共 72 任务。原 24 应用另作 ABC 同题对照共 72 任务，逐项原文核对另记，不能将身份验证等同语义通过。见 [R5 预注册](../../eval/agentic-research/manifests/research-r5-validation-2026-09-18.json)。
+
+- R4 真实对照结束：关闭 thinking 的 B 模式 12/12 完成，开启后 10 完成/2 `ARTIFACT_VALIDATION_FAILED`；QASPER F1 0.4051→0.4430，MuSiQue 可回答 3 题 F1 0.8667→0.7500，p50 40.938→78.964 秒。两批分别记录 138/143 模型请求；开启批有 4 次 embedding unknown。样本来自 R1 失败选题，且运行冻结于最后 SDK 重试补丁前，不能作为普遍收益或纯网络因果判断。主回归保持 thinking=false。
+- R4 两项 C 应用均完成，但原文审阅不通过全面支持验收：`plan-06` 步骤 1/3 用目录支撑操作，`comparison-02` 方法段引用没有覆盖权重共享、判别器位置、BERT/copy 等全部细节。支持的数字、数据集与不支持的结论分别记录于 `research-r4-artifacts-2026-09-18.json`；不以结构校验掩盖负例。
+- 最后补齐 5xx/429 重试耗尽后的已读证据收尾，权限错误即使包裹 IOException 仍不重试生成；17 项产物测试通过。当前唯一相关检查合计 140 项（128 项主套件 + 11 项数据库 IT + 新增 1 项服务失败收尾测试）。主回归使用新目录 `20260918_R5_regression_v2`，所有 API attempt 由应用统一记账，旧 v1 仅准备未执行。

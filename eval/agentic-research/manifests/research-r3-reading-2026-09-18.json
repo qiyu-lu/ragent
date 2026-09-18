@@ -1,0 +1,285 @@
+{
+  "phase": "R3",
+  "checks": {
+    "related_backend_tests": 121,
+    "python_tests": 30
+  },
+  "replay": {
+    "boundaries": {
+      "A_path": "one scoped knowledge retrieval + pinned CHUNK context + shared artifact generation; no rewrite/intent/MCP/fallback",
+      "full_abc_executed": false,
+      "full_scope_selected": false,
+      "full_split_executed": false,
+      "judge_model_used": false,
+      "paired_musique_sufficiency": false,
+      "production_chat_pipeline": false,
+      "semantic_citation_support_proven": false
+    },
+    "execution": {
+      "A": {
+        "failed_and_timed_out_included": true,
+        "p50_ms": 8979,
+        "p95_ms": 12458,
+        "runs_with_delegation": 0,
+        "workers_created": 0
+      },
+      "B": {
+        "failed_and_timed_out_included": true,
+        "p50_ms": 39833,
+        "p95_ms": 50728,
+        "runs_with_delegation": 0,
+        "workers_created": 0
+      },
+      "C": {
+        "failed_and_timed_out_included": true,
+        "p50_ms": 37642,
+        "p95_ms": 65988,
+        "runs_with_delegation": 1,
+        "workers_created": 3
+      }
+    },
+    "expected_tasks": 36,
+    "fixed_questions": 12,
+    "profile": "regression",
+    "quality": {
+      "musique/A": {
+        "answer_em": 0.3333333333333333,
+        "answer_f1": 0.3710691823899371,
+        "answer_format_errors": 0,
+        "answer_scored_records": 3,
+        "answerability_accuracy": 0.8333333333333334,
+        "evidence_f1": 0.7857142857142857,
+        "evidence_recall": 0.6944444444444443,
+        "paired_sufficiency_metrics": null,
+        "read_evidence_recall": 1.0,
+        "records": 6,
+        "source_question_groups": 6,
+        "statuses": {
+          "COMPLETED": 6
+        }
+      },
+      "musique/B": {
+        "answer_em": 0.6666666666666666,
+        "answer_f1": 0.6666666666666666,
+        "answer_format_errors": 0,
+        "answer_scored_records": 3,
+        "answerability_accuracy": 0.5,
+        "evidence_f1": 0.5666666666666668,
+        "evidence_recall": 0.4166666666666667,
+        "paired_sufficiency_metrics": null,
+        "read_evidence_recall": 0.5833333333333334,
+        "records": 6,
+        "source_question_groups": 6,
+        "statuses": {
+          "COMPLETED": 6
+        }
+      },
+      "musique/C": {
+        "answer_em": 0.6666666666666666,
+        "answer_f1": 0.6666666666666666,
+        "answer_format_errors": 0,
+        "answer_scored_records": 3,
+        "answerability_accuracy": 0.6666666666666666,
+        "evidence_f1": 0.7857142857142857,
+        "evidence_recall": 0.6944444444444443,
+        "paired_sufficiency_metrics": null,
+        "read_evidence_recall": 0.8055555555555555,
+        "records": 6,
+        "source_question_groups": 6,
+        "statuses": {
+          "COMPLETED": 5,
+          "FAILED": 1
+        }
+      },
+      "qasper/A": {
+        "answer_em": 0.0,
+        "answer_f1": 0.3126344539029941,
+        "answer_format_errors": 0,
+        "answer_scored_records": 6,
+        "answerability_accuracy": 1.0,
+        "evidence_f1": 0.6789682539682541,
+        "evidence_recall": 0.8083333333333332,
+        "paired_sufficiency_metrics": null,
+        "read_evidence_recall": 0.8999999999999999,
+        "records": 6,
+        "source_question_groups": 6,
+        "statuses": {
+          "COMPLETED": 6
+        }
+      },
+      "qasper/B": {
+        "answer_em": 0.0,
+        "answer_f1": 0.3173340597373502,
+        "answer_format_errors": 0,
+        "answer_scored_records": 6,
+        "answerability_accuracy": 1.0,
+        "evidence_f1": 0.6425925925925926,
+        "evidence_recall": 0.8833333333333333,
+        "paired_sufficiency_metrics": null,
+        "read_evidence_recall": 0.9666666666666667,
+        "records": 6,
+        "source_question_groups": 6,
+        "statuses": {
+          "COMPLETED": 6
+        }
+      },
+      "qasper/C": {
+        "answer_em": 0.0,
+        "answer_f1": 0.3297431344006019,
+        "answer_format_errors": 0,
+        "answer_scored_records": 6,
+        "answerability_accuracy": 1.0,
+        "evidence_f1": 0.6102453102453101,
+        "evidence_recall": 0.8333333333333334,
+        "paired_sufficiency_metrics": null,
+        "read_evidence_recall": 0.8333333333333334,
+        "records": 6,
+        "source_question_groups": 6,
+        "statuses": {
+          "COMPLETED": 6
+        }
+      }
+    },
+    "recorded_tasks": 36,
+    "resources": {
+      "actual_models": [
+        "qwen3.7-flash-2026-07-15"
+      ],
+      "budget_reserve_cny": null,
+      "cost_estimation_enabled": false,
+      "embedding_currency_cost": null,
+      "embedding_known_total_tokens": 1259.0,
+      "embedding_requests": 106,
+      "embedding_usage_unknown": 0,
+      "invoice_verified": false,
+      "known_generation_cost_estimate_cny": null,
+      "known_input_tokens": 1923294,
+      "known_output_tokens": 60975,
+      "model_requests": 298,
+      "model_usage_unknown": 0,
+      "prices": null,
+      "rerank_known_total_tokens": 0,
+      "rerank_requests": 0,
+      "rerank_usage_unknown": 0
+    },
+    "unexecuted_tasks": 0
+  },
+  "rerank_only_A_ablation": {
+    "boundaries": {
+      "A_path": "one scoped knowledge retrieval + pinned CHUNK context + shared artifact generation; no rewrite/intent/MCP/fallback",
+      "full_abc_executed": false,
+      "full_scope_selected": false,
+      "full_split_executed": false,
+      "judge_model_used": false,
+      "paired_musique_sufficiency": false,
+      "production_chat_pipeline": false,
+      "semantic_citation_support_proven": false
+    },
+    "execution": {
+      "A": {
+        "failed_and_timed_out_included": true,
+        "p50_ms": 6559,
+        "p95_ms": 16528,
+        "runs_with_delegation": 0,
+        "workers_created": 0
+      }
+    },
+    "expected_tasks": 12,
+    "fixed_questions": 12,
+    "profile": "regression",
+    "quality": {
+      "musique/A": {
+        "answer_em": 0.6666666666666666,
+        "answer_f1": 0.6666666666666666,
+        "answer_format_errors": 0,
+        "answer_scored_records": 3,
+        "answerability_accuracy": 0.6666666666666666,
+        "evidence_f1": 0.6190476190476191,
+        "evidence_recall": 0.47222222222222215,
+        "paired_sufficiency_metrics": null,
+        "read_evidence_recall": 0.9166666666666666,
+        "records": 6,
+        "source_question_groups": 6,
+        "statuses": {
+          "COMPLETED": 6
+        }
+      },
+      "qasper/A": {
+        "answer_em": 0.0,
+        "answer_f1": 0.34521585018542417,
+        "answer_format_errors": 0,
+        "answer_scored_records": 6,
+        "answerability_accuracy": 1.0,
+        "evidence_f1": 0.5694444444444444,
+        "evidence_recall": 0.8166666666666668,
+        "paired_sufficiency_metrics": null,
+        "read_evidence_recall": 0.9,
+        "records": 6,
+        "source_question_groups": 6,
+        "statuses": {
+          "COMPLETED": 6
+        }
+      }
+    },
+    "recorded_tasks": 12,
+    "resources": {
+      "actual_models": [
+        "qwen3.7-flash-2026-07-15"
+      ],
+      "budget_reserve_cny": null,
+      "cost_estimation_enabled": false,
+      "embedding_currency_cost": null,
+      "embedding_known_total_tokens": 222.0,
+      "embedding_requests": 12,
+      "embedding_usage_unknown": 0,
+      "invoice_verified": false,
+      "known_generation_cost_estimate_cny": null,
+      "known_input_tokens": 51316,
+      "known_output_tokens": 5151,
+      "model_requests": 13,
+      "model_usage_unknown": 0,
+      "prices": null,
+      "rerank_known_total_tokens": 36887.0,
+      "rerank_requests": 12,
+      "rerank_usage_unknown": 0
+    },
+    "unexecuted_tasks": 0
+  },
+  "events": {
+    "QUEUED": 36,
+    "RUN_STARTED": 36,
+    "TOOL_STARTED": 265,
+    "RETRIEVAL_PHASE": 636,
+    "TOOL_ENDED": 238,
+    "FINALIZATION_STARTED": 36,
+    "MODEL_STARTED": 298,
+    "MODEL_ENDED": 298,
+    "ARTIFACT": 35,
+    "COMPLETED": 35,
+    "RESEARCH_STARTED": 27,
+    "SOURCE_READ": 124,
+    "NATIVE_FINISH_REPAIR": 2,
+    "FINALIZATION_VALIDATION_FAILED": 8,
+    "SUBTASK_QUEUED": 3,
+    "SUBTASK_RUNNING": 3,
+    "SUBTASK_COMPLETED": 3,
+    "FAILED": 1,
+    "tool_errors": 7,
+    "unread_citation_errors": 5
+  },
+  "comparison_with_R1": {
+    "input_token_ratio": 0.5882133098777205,
+    "old_model_calls": 273,
+    "new_model_calls": 298,
+    "unread_citation_errors_before": 12,
+    "unread_citation_errors_after": 5
+  },
+  "decision": "Keep rerank=false and thinking=false for the primary historical comparison; report separate setting ablations without selecting on these failure-stratified cases.",
+  "limitations": [
+    "six QASPER and six MuSiQue questions selected for past failures, only three answerable MuSiQue rows per mode",
+    "35 complete and one failed; reduced model input does not establish improved quality",
+    "R3 includes R2 and prompt/projection/reading changes; token reduction is not a one-variable causal estimate",
+    "rerank A answer F1 rises modestly on QASPER and by one answer on MuSiQue; evidence F1 declines; insufficient for general adoption",
+    "only one research run delegated (three workers); no overall parallel research benefit established"
+  ]
+}

@@ -1,0 +1,223 @@
+{
+  "experiment": "X3 upstream faults",
+  "date": "2026-09-18",
+  "basis": "stub upstream (eval/agentic-research/stub_upstream.py), not a real provider",
+  "load": "50 scripted research tasks, mode B, corpus research_corpus_stub; embedding no-response rates 0/10/30/50%; stub holds a no-response request for 90 s",
+  "before": "3381fa9 (P7: HTTP, retrieval channel and tool all 30 s, no retry)",
+  "after": "97edcc1 (W3)",
+  "command": "bash scripts/career-x3.sh (x3_upstream.py --rates 0,0.1,0.3,0.5 --tasks 50 --mode B --target embedding --seed 7)",
+  "run_dir": "local-data/agentic-research/runs/career_X3_v1",
+  "definitions": {
+    "success": "COMPLETED with an artifact and read evidence from every requested SRC document",
+    "wrong_completion": "COMPLETED without that evidence",
+    "honest_failure": "any other terminal state",
+    "wasted_model_calls": "model calls of tasks that did not succeed",
+    "embedding_failed": "Java-side embedding requests that ended unsuccessfully (embedding-usage.jsonl); the stub log misses hangs still open when a cell ends, so it is not used"
+  },
+  "failure_reasons": {
+    "before": {
+      "0.1": {
+        "RESEARCH_TIMEOUT": 6
+      },
+      "0.3": {
+        "RESEARCH_TIMEOUT": 23
+      },
+      "0.5": {
+        "RESEARCH_TIMEOUT": 30
+      }
+    },
+    "after": {
+      "0.5": {
+        "RESEARCH_FAILED_WITHOUT_EVIDENCE": 4,
+        "PARTIAL (no code)": 4,
+        "NATIVE_FINISH_REQUIRED": 1
+      }
+    }
+  },
+  "not_covered": "the circuit-breaker fix 77ca3ae: the eval command calls SiliconFlowEmbeddingClient directly, not through ModelRoutingExecutor; unit tests only",
+  "cells": [
+    {
+      "tree": "after",
+      "commit": "97edcc1",
+      "rate": 0.0,
+      "tasks": 50,
+      "recorded": 50,
+      "statuses": {
+        "COMPLETED": 50
+      },
+      "success": 50,
+      "wrong_completion": 0,
+      "honest_failure": 0,
+      "success_rate": 1.0,
+      "wrong_completion_rate": 0.0,
+      "p50_ms": 917,
+      "p95_ms": 1128,
+      "model_calls": 250,
+      "wasted_model_calls": 0,
+      "embedding_requests": 75,
+      "embedding_failed": 0,
+      "wall_seconds": 24.7
+    },
+    {
+      "tree": "before",
+      "commit": "3381fa9",
+      "rate": 0.0,
+      "tasks": 50,
+      "recorded": 50,
+      "statuses": {
+        "COMPLETED": 50
+      },
+      "success": 50,
+      "wrong_completion": 0,
+      "honest_failure": 0,
+      "success_rate": 1.0,
+      "wrong_completion_rate": 0.0,
+      "p50_ms": 857,
+      "p95_ms": 1032,
+      "model_calls": 250,
+      "wasted_model_calls": 0,
+      "embedding_requests": 75,
+      "embedding_failed": 0,
+      "wall_seconds": 23.4
+    },
+    {
+      "tree": "after",
+      "commit": "97edcc1",
+      "rate": 0.1,
+      "tasks": 50,
+      "recorded": 50,
+      "statuses": {
+        "COMPLETED": 50
+      },
+      "success": 50,
+      "wrong_completion": 0,
+      "honest_failure": 0,
+      "success_rate": 1.0,
+      "wrong_completion_rate": 0.0,
+      "p50_ms": 963,
+      "p95_ms": 13382,
+      "model_calls": 251,
+      "wasted_model_calls": 0,
+      "embedding_requests": 83,
+      "embedding_failed": 8,
+      "wall_seconds": 74.2
+    },
+    {
+      "tree": "before",
+      "commit": "3381fa9",
+      "rate": 0.1,
+      "tasks": 50,
+      "recorded": 50,
+      "statuses": {
+        "COMPLETED": 44,
+        "FAILED": 6
+      },
+      "success": 44,
+      "wrong_completion": 0,
+      "honest_failure": 6,
+      "success_rate": 0.88,
+      "wrong_completion_rate": 0.0,
+      "p50_ms": 902,
+      "p95_ms": 30144,
+      "model_calls": 226,
+      "wasted_model_calls": 6,
+      "embedding_requests": 72,
+      "embedding_failed": 6,
+      "wall_seconds": 112.0
+    },
+    {
+      "tree": "after",
+      "commit": "97edcc1",
+      "rate": 0.3,
+      "tasks": 50,
+      "recorded": 50,
+      "statuses": {
+        "COMPLETED": 50
+      },
+      "success": 50,
+      "wrong_completion": 0,
+      "honest_failure": 0,
+      "success_rate": 1.0,
+      "wrong_completion_rate": 0.0,
+      "p50_ms": 12926,
+      "p95_ms": 37342,
+      "model_calls": 260,
+      "wasted_model_calls": 0,
+      "embedding_requests": 117,
+      "embedding_failed": 42,
+      "wall_seconds": 292.7
+    },
+    {
+      "tree": "before",
+      "commit": "3381fa9",
+      "rate": 0.3,
+      "tasks": 50,
+      "recorded": 50,
+      "statuses": {
+        "COMPLETED": 27,
+        "FAILED": 17,
+        "PARTIAL": 6
+      },
+      "success": 27,
+      "wrong_completion": 0,
+      "honest_failure": 23,
+      "success_rate": 0.54,
+      "wrong_completion_rate": 0.0,
+      "p50_ms": 1075,
+      "p95_ms": 30670,
+      "model_calls": 169,
+      "wasted_model_calls": 41,
+      "embedding_requests": 66,
+      "embedding_failed": 23,
+      "wall_seconds": 375.1
+    },
+    {
+      "tree": "after",
+      "commit": "97edcc1",
+      "rate": 0.5,
+      "tasks": 50,
+      "recorded": 50,
+      "statuses": {
+        "COMPLETED": 41,
+        "FAILED": 5,
+        "PARTIAL": 4
+      },
+      "success": 41,
+      "wrong_completion": 0,
+      "honest_failure": 9,
+      "success_rate": 0.82,
+      "wrong_completion_rate": 0.0,
+      "p50_ms": 13285,
+      "p95_ms": 49941,
+      "model_calls": 262,
+      "wasted_model_calls": 42,
+      "embedding_requests": 156,
+      "embedding_failed": 91,
+      "wall_seconds": 589.0
+    },
+    {
+      "tree": "before",
+      "commit": "3381fa9",
+      "rate": 0.5,
+      "tasks": 50,
+      "recorded": 50,
+      "statuses": {
+        "FAILED": 23,
+        "COMPLETED": 20,
+        "PARTIAL": 7
+      },
+      "success": 20,
+      "wrong_completion": 0,
+      "honest_failure": 30,
+      "success_rate": 0.4,
+      "wrong_completion_rate": 0.0,
+      "p50_ms": 30133,
+      "p95_ms": 30623,
+      "model_calls": 143,
+      "wasted_model_calls": 51,
+      "embedding_requests": 63,
+      "embedding_failed": 30,
+      "wall_seconds": 465.1
+    }
+  ]
+}

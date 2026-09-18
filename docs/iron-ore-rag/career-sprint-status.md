@@ -35,6 +35,6 @@
 ## 已知事实与遗留问题
 
 - 用户自己的未跟踪笔记（如 `docs/current-code-notes-*`）出现时不修改、不提交。
-- **本地已有库需手动执行 `resources/database/upgrades/v1.1.0/260918_02_knowledge_base_access.sql`**：开发库必须执行；`research_corpus_stub` 在重跑 X2 或接管演示前执行。未执行 SQL 时，判定会因缺少列报错。
+- 迁移 `260918_02` 已于 2026-09-18 在 `ragent`（3 个有效库，全部 PUBLIC，所有者回填为 admin）和 `research_corpus_stub` 上执行；`research_corpus_v1` 未执行（X1 不经过判定）。其他本地库运行新代码前仍需执行。
 - AgentScope 自带 JVM 关闭钩子（`GracefulShutdownManager`）会在“模型已决定、工具未执行”处中断 Agent，所以 SIGTERM 仍重复 1 次模型调用；消除需持久化 tool_call 决定，未做。
 - X2 只跑单 Agent 模式；多 Agent 下已完成 worker 不重跑只由测试覆盖。X3 不含熔断修复 `77ca3ae`（只由单测覆盖）。

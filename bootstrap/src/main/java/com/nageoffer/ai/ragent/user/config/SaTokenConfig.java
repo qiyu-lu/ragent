@@ -18,7 +18,9 @@
 package com.nageoffer.ai.ragent.user.config;
 
 import cn.dev33.satoken.interceptor.SaInterceptor;
+import cn.dev33.satoken.router.SaRouter;
 import cn.dev33.satoken.stp.StpUtil;
+import com.nageoffer.ai.ragent.knowledge.service.KnowledgeAccessService;
 import com.nageoffer.ai.ragent.rag.config.DemoModeInterceptor;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletRequest;
@@ -36,6 +38,12 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 @RequiredArgsConstructor
 public class SaTokenConfig implements WebMvcConfigurer {
+
+    /**
+     * 只给管理员的运维与评测接口：链路追踪含其他用户的问题与召回片段，评测与图谱可越过知识库权限直接看内容，
+     * 摄取任务可向任意知识库写入。前端只在路由上隐藏这些页面，后端必须自己拦
+     */
+    static final String[] ADMIN_ONLY_PATHS = {"/admin/**", "/rag/traces/**", "/rag/eval/**", "/ingestion/**"};
 
     /**
      * 体验环境只读模式拦截器
@@ -71,6 +79,7 @@ public class SaTokenConfig implements WebMvcConfigurer {
                     }
                     // 执行登录检查
                     StpUtil.checkLogin();
+                    SaRouter.match(ADMIN_ONLY_PATHS).check(r -> StpUtil.checkRole(KnowledgeAccessService.ADMIN_ROLE));
                 }))
                 // 拦截所有路径
                 .addPathPatterns("/**")

@@ -19,7 +19,7 @@ package com.nageoffer.ai.ragent.core.ingest;
 
 import com.nageoffer.ai.ragent.core.chunk.ChunkingService;
 import com.nageoffer.ai.ragent.core.chunk.model.Chunk;
-import com.nageoffer.ai.ragent.core.chunk.model.EmbeddedChunk;
+import com.nageoffer.ai.ragent.core.ingest.embed.ChunkEmbeddings;
 import com.nageoffer.ai.ragent.core.ingest.embed.ChunkEmbeddingService;
 import com.nageoffer.ai.ragent.core.ingest.sink.ChunkIndexWriter;
 import com.nageoffer.ai.ragent.core.parser.DocumentParser;
@@ -98,16 +98,17 @@ public class DefaultIngestionKernel implements IngestionKernel {
 
         // ④ embed：模型与维度都来自落点，此处校验维度
         long embedStart = System.currentTimeMillis();
-        List<EmbeddedChunk> embedded = chunkEmbeddingService.embed(chunks, target);
+        ChunkEmbeddings embedded = chunkEmbeddingService.embedWithStats(chunks, target);
         long embedMillis = System.currentTimeMillis() - embedStart;
 
         // ⑤ index：扇出到全部落点，事务边界在写入器内
         long indexStart = System.currentTimeMillis();
-        chunkIndexWriter.replaceDocument(target, doc, embedded);
+        chunkIndexWriter.replaceDocument(target, doc, embedded.chunks());
         long indexMillis = System.currentTimeMillis() - indexStart;
 
         return new IngestionOutcome(mimeType, parser.getParserType(), blocks.size(), chunks,
-                new IngestionOutcome.IngestionTimings(parseMillis, chunkMillis, embedMillis, indexMillis));
+                new IngestionOutcome.IngestionTimings(parseMillis, chunkMillis, embedMillis, indexMillis),
+                embedded.stats());
     }
 
     /**

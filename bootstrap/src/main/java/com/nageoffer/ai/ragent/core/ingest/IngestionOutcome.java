@@ -18,6 +18,7 @@
 package com.nageoffer.ai.ragent.core.ingest;
 
 import com.nageoffer.ai.ragent.core.chunk.model.Chunk;
+import com.nageoffer.ai.ragent.core.ingest.embed.ChunkEmbeddings.EmbeddingStats;
 
 import java.util.List;
 
@@ -31,18 +32,21 @@ import java.util.List;
  * @param blockCount 解析产出的 Block 数量
  * @param chunks     最终落库的块
  * @param timings    各阶段耗时
+ * @param embedding  向量化的缓存命中与上游计数
  */
 public record IngestionOutcome(
         String mimeType,
         String parserType,
         int blockCount,
         List<Chunk> chunks,
-        IngestionTimings timings
+        IngestionTimings timings,
+        EmbeddingStats embedding
 ) {
 
     public IngestionOutcome {
         chunks = chunks == null ? List.of() : List.copyOf(chunks);
         timings = timings == null ? IngestionTimings.zero() : timings;
+        embedding = embedding == null ? EmbeddingStats.ZERO : embedding;
     }
 
     public int chunkCount() {

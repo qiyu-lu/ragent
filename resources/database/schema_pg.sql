@@ -354,10 +354,31 @@ CREATE TABLE t_knowledge_document_chunk_log (
     start_time         TIMESTAMP,
     end_time           TIMESTAMP,
     create_time        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    update_time        TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    update_time        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    embed_cache_hits   INTEGER,
+    embed_cache_misses INTEGER
 );
 CREATE INDEX idx_doc_id_log ON t_knowledge_document_chunk_log (doc_id);
 COMMENT ON TABLE t_knowledge_document_chunk_log IS '知识库文档分块日志表';
+COMMENT ON COLUMN t_knowledge_document_chunk_log.embed_cache_hits IS '向量取自嵌入缓存的块数';
+COMMENT ON COLUMN t_knowledge_document_chunk_log.embed_cache_misses IS '未命中缓存的块数（同批重复文本只上送一次）';
+
+-- W5 content-addressed embedding reuse. Existing databases use 260918_03_embedding_cache.sql.
+CREATE TABLE t_embedding_cache (
+    model_id    VARCHAR(160) NOT NULL,
+    dimension   INTEGER      NOT NULL,
+    text_sha256 VARCHAR(64)  NOT NULL,
+    embedding   REAL[]       NOT NULL,
+    create_time TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_used   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_embedding_cache PRIMARY KEY (model_id, dimension, text_sha256),
+    CONSTRAINT ck_embedding_cache_dimension CHECK (cardinality(embedding) = dimension)
+);
+CREATE INDEX idx_embedding_cache_last_used ON t_embedding_cache (last_used);
+COMMENT ON TABLE t_embedding_cache IS '内容寻址的嵌入缓存：同模型、同维度、同向量文本复用向量';
+COMMENT ON COLUMN t_embedding_cache.model_id IS '供应商:模型名（解析后的真实模型，不是候选别名）';
+COMMENT ON COLUMN t_embedding_cache.text_sha256 IS '向量文本 UTF-8 的 SHA-256';
+COMMENT ON COLUMN t_embedding_cache.last_used IS '最近一次写入或命中，容量超限时按它淘汰';
 
 CREATE TABLE t_knowledge_document_schedule (
     id                VARCHAR(20)       NOT NULL PRIMARY KEY,

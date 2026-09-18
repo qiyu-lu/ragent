@@ -123,6 +123,10 @@ rag:
       max-wait-seconds: 5
       lease-seconds: 300
 
+  ingestion:
+    embedding-cache:
+      enabled: true
+      max-entries: 100000  # 按 last_used 淘汰；1536 维一条约 6 KB
   knowledge:
     schedule:
       scan-delay-ms: 10000

@@ -35,14 +35,14 @@ psql_p2 < resources/database/init_data_pg.sql
 
 p2_catalog_sql="SELECT table_name, column_name, udt_name, is_nullable, column_default
   FROM information_schema.columns
-  WHERE table_schema = 'public' AND table_name IN ('t_research_run', 't_research_evidence', 't_research_event', 't_research_corpus_document', 't_knowledge_base', 't_knowledge_base_grant')
+  WHERE table_schema = 'public' AND table_name IN ('t_research_run', 't_research_evidence', 't_research_event', 't_research_corpus_document', 't_knowledge_base', 't_knowledge_base_grant', 't_embedding_cache', 't_knowledge_document_chunk_log')
   ORDER BY table_name, ordinal_position;
   SELECT conrelid::regclass, conname, pg_get_constraintdef(oid)
   FROM pg_constraint
-  WHERE conrelid IN ('t_research_run'::regclass, 't_research_evidence'::regclass, 't_research_event'::regclass, 't_research_corpus_document'::regclass, 't_knowledge_base'::regclass, 't_knowledge_base_grant'::regclass)
+  WHERE conrelid IN ('t_research_run'::regclass, 't_research_evidence'::regclass, 't_research_event'::regclass, 't_research_corpus_document'::regclass, 't_knowledge_base'::regclass, 't_knowledge_base_grant'::regclass, 't_embedding_cache'::regclass, 't_knowledge_document_chunk_log'::regclass)
   ORDER BY conrelid::regclass::text, conname;
   SELECT tablename, indexname, indexdef FROM pg_indexes
-  WHERE schemaname = 'public' AND tablename IN ('t_research_run', 't_research_evidence', 't_research_event', 't_research_corpus_document', 't_knowledge_vector', 't_knowledge_base', 't_knowledge_base_grant')
+  WHERE schemaname = 'public' AND tablename IN ('t_research_run', 't_research_evidence', 't_research_event', 't_research_corpus_document', 't_knowledge_vector', 't_knowledge_base', 't_knowledge_base_grant', 't_embedding_cache', 't_knowledge_document_chunk_log')
   ORDER BY tablename, indexname;"
 psql_p2 -Atc "$p2_catalog_sql" > "$p2_scratch/fresh-catalog.txt"
 
@@ -70,6 +70,11 @@ ALTER TABLE t_knowledge_base DROP COLUMN visibility;
 ALTER TABLE t_knowledge_base DROP COLUMN owner_user_id;
 INSERT INTO t_knowledge_base (id, name, embedding_model, collection_name, created_by)
 SELECT 'p2-legacy-kb', 'legacy', 'fixture', 'p2_legacy', username FROM t_user ORDER BY id LIMIT 1;
+
+-- W5: rewind the embedding cache and the chunk-log cache counters.
+DROP TABLE t_embedding_cache;
+ALTER TABLE t_knowledge_document_chunk_log DROP COLUMN embed_cache_hits;
+ALTER TABLE t_knowledge_document_chunk_log DROP COLUMN embed_cache_misses;
 SQL
 psql_p2 < resources/database/upgrades/v1.1.0/260917_02_research_evidence.sql
 psql_p2 < resources/database/upgrades/v1.1.0/260917_03_research_neighbors.sql
@@ -81,6 +86,8 @@ psql_p2 < resources/database/upgrades/v1.1.0/260917_04_research_corpus.sql
 psql_p2 < resources/database/upgrades/v1.1.0/260918_01_research_durable_execution.sql
 psql_p2 < resources/database/upgrades/v1.1.0/260918_02_knowledge_base_access.sql
 psql_p2 < resources/database/upgrades/v1.1.0/260918_02_knowledge_base_access.sql
+psql_p2 < resources/database/upgrades/v1.1.0/260918_03_embedding_cache.sql
+psql_p2 < resources/database/upgrades/v1.1.0/260918_03_embedding_cache.sql
 psql_p2 -Atc "$p2_catalog_sql" > "$p2_scratch/upgraded-catalog.txt"
 diff -u "$p2_scratch/fresh-catalog.txt" "$p2_scratch/upgraded-catalog.txt"
 

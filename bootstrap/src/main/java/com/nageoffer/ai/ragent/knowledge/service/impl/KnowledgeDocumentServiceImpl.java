@@ -38,6 +38,7 @@ import com.nageoffer.ai.ragent.core.ingest.IngestionKernel;
 import com.nageoffer.ai.ragent.core.ingest.IngestionOutcome;
 import com.nageoffer.ai.ragent.core.ingest.IngestionSpec;
 import com.nageoffer.ai.ragent.core.ingest.VectorTarget;
+import com.nageoffer.ai.ragent.core.ingest.embed.ChunkEmbeddings.EmbeddingStats;
 import com.nageoffer.ai.ragent.core.ingest.sink.ChunkIndexWriter;
 import com.nageoffer.ai.ragent.core.parser.registry.ParserRegistry;
 import com.nageoffer.ai.ragent.framework.context.UserContext;
@@ -274,6 +275,7 @@ public class KnowledgeDocumentServiceImpl implements KnowledgeDocumentService {
         long chunkDuration = 0;
         long embedDuration = 0;
         long persistDuration = 0;
+        EmbeddingStats embedding = EmbeddingStats.ZERO;
 
         try {
             // 管道模式暂停服务：管道将按自定义代码 / 动态脚本重新设计，届时分块沿用同一内核，
@@ -295,6 +297,7 @@ public class KnowledgeDocumentServiceImpl implements KnowledgeDocumentService {
             chunkDuration = outcome.timings().chunkMillis();
             embedDuration = outcome.timings().embedMillis();
             persistDuration = outcome.timings().indexMillis();
+            embedding = outcome.embedding();
             int savedCount = outcome.chunkCount();
             // 回填字节探测出的真实 MIME；展示用的 file_type 仍由扩展名决定，两者互不导出
             refreshMimeType(docId, outcome.mimeType());
@@ -302,13 +305,13 @@ public class KnowledgeDocumentServiceImpl implements KnowledgeDocumentService {
             markChunkSucceeded(docId, savedCount);
             long totalDuration = System.currentTimeMillis() - totalStartTime;
             updateChunkLog(chunkLog.getId(), DocumentStatus.SUCCESS.getCode(), savedCount,
-                    extractDuration, chunkDuration, embedDuration, persistDuration, totalDuration, null);
+                    extractDuration, chunkDuration, embedDuration, persistDuration, totalDuration, embedding, null);
         } catch (Exception e) {
             log.error("文档分块任务执行失败：docId={}", docId, e);
             markChunkFailed(documentDO.getId());
             long totalDuration = System.currentTimeMillis() - totalStartTime;
             updateChunkLog(chunkLog.getId(), DocumentStatus.FAILED.getCode(), 0,
-                    extractDuration, chunkDuration, embedDuration, persistDuration, totalDuration, e.getMessage());
+                    extractDuration, chunkDuration, embedDuration, persistDuration, totalDuration, embedding, e.getMessage());
         }
     }
 
@@ -342,7 +345,7 @@ public class KnowledgeDocumentServiceImpl implements KnowledgeDocumentService {
 
     private void updateChunkLog(String logId, String status, int chunkCount, long extractDuration,
                                 long chunkDuration, long embedDuration, long persistDuration,
-                                long totalDuration, String errorMessage) {
+                                long totalDuration, EmbeddingStats embedding, String errorMessage) {
         KnowledgeDocumentChunkLogDO update = KnowledgeDocumentChunkLogDO.builder()
                 .id(logId)
                 .status(status)
@@ -352,6 +355,8 @@ public class KnowledgeDocumentServiceImpl implements KnowledgeDocumentService {
                 .embedDuration(embedDuration)
                 .persistDuration(persistDuration)
                 .totalDuration(totalDuration)
+                .embedCacheHits(embedding.cacheHits())
+                .embedCacheMisses(embedding.cacheMisses())
                 .errorMessage(errorMessage)
                 .endTime(new Date())
                 .build();

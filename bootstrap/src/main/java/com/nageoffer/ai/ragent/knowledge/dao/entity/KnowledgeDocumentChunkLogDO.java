@@ -98,6 +98,16 @@ public class KnowledgeDocumentChunkLogDO {
     private Integer chunkCount;
 
     /**
+     * 向量取自嵌入缓存的块数
+     */
+    private Integer embedCacheHits;
+
+    /**
+     * 未命中嵌入缓存的块数
+     */
+    private Integer embedCacheMisses;
+
+    /**
      * 错误信息
      */
     private String errorMessage;

@@ -436,7 +436,7 @@
     }
   ],
   "conclusions": [
-    "Byte-identical requests hit (5/5); hits are 128-token aligned and exclude roughly the final message.",
+    "Byte-identical requests hit (4/4); hits are 128-token aligned and exclude roughly the final message.",
     "Any change inside the system message (appended line, tool order, reminder moved or changed) gives 0 even with 1,000-1,944 identical leading tokens (K6, rev, tail, cur step-to-step).",
     "The current layout changes the system message on every call, so C cannot hit; B's fixed 1280-token hits equal floor((714+632+17)/128)*128, a shared tools+static prefix served by the provider that the probe could not reproduce (cur B-3 = 0) and that never occurred for C.",
     "With a stable system message and append-only history, implicit hits were still unreliable step-to-step (1 of 4).",

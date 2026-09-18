@@ -42,6 +42,7 @@ import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Semaphore;
 import java.util.function.Function;
@@ -112,20 +113,47 @@ public class ResearchAgentFactory implements ResearchRunner, AutoCloseable {
                                 : properties.getToolTimeoutSeconds())).build())
                 .middleware(new ToolProgress(session, properties)).build();
              var cancellation = session.control.bindInterrupt(() -> agent.interrupt(context))) {
-            session.event("RESEARCH_STARTED", "正在按目标检索和阅读", Map.of("promptVersion", session.main() ? PROMPT_VERSION : WORKER_PROMPT_VERSION,
-                    "model", model.getModelName(), "role", role.key()));
             Map<String, Object> saved = new java.util.HashMap<>(session.claim.run().state());
             saved.remove("requestHash");
             // 按键排序：同一任务在任何进程里重建的首条消息逐字节一致，缓存前缀才能跨实例、跨续跑复用。
             var stable = json.writer().with(com.fasterxml.jackson.databind.SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
-            String request = session.main()
-                    ? stable.writeValueAsString(Map.of("brief", session.claim.run().brief(), "savedResearchState", saved))
-                    : stable.writeValueAsString(Map.of("task", session.task, "outputType", session.claim.run().brief().outputType(),
-                            "constraints", session.claim.run().brief().constraints(),
-                            "allowedKbIds", session.claim.run().brief().allowedKbIds()));
-            var message = Msg.builder().role(MsgRole.USER).textContent(request).build();
+            ResearchHistory history = session.main() ? session.history() : null;
+            List<Msg> input;
+            if (history == null) {
+                String request = session.main()
+                        ? stable.writeValueAsString(Map.of("brief", session.claim.run().brief(), "savedResearchState", saved))
+                        : stable.writeValueAsString(Map.of("task", session.task, "outputType", session.claim.run().brief().outputType(),
+                                "constraints", session.claim.run().brief().constraints(),
+                                "allowedKbIds", session.claim.run().brief().allowedKbIds()));
+                Map<String, Object> started = new java.util.LinkedHashMap<>();
+                started.put("promptVersion", session.main() ? PROMPT_VERSION : WORKER_PROMPT_VERSION);
+                started.put("model", model.getModelName());
+                started.put("role", role.key());
+                // 主 Agent 的原始首条请求随事件持久化，接管后据此重建逐字节相同的前缀。
+                if (session.main()) started.put("request", request);
+                session.event("RESEARCH_STARTED", "正在按目标检索和阅读", started);
+                input = List.of(Msg.builder().role(MsgRole.USER).textContent(request).build());
+            } else {
+                // 接管：预载已完成的工具往返，从中断处继续；在途的那一步丢弃并由模型重做。
+                var unreported = session.results().stream().map(r -> r.taskId())
+                        .filter(id -> !history.reportedWorkers(json).contains(id)).toList();
+                session.event("RESEARCH_RESUMED", "已从持久化的工具历史恢复研究",
+                        Map.of("promptVersion", PROMPT_VERSION, "model", model.getModelName(), "role", role.key(),
+                                "restoredToolCalls", history.steps().size(), "droppedToolCalls", history.droppedToolCalls(),
+                                "restoredWorkerResults", unreported.size()));
+                var concluded = history.outcome(json);
+                if (concluded != null) {
+                    session.conclude(concluded);
+                    return concluded;
+                }
+                input = new java.util.ArrayList<>(history.messages("research-" + session.taskId));
+                if (!unreported.isEmpty()) input.add(Msg.builder().role(MsgRole.USER).textContent(
+                        "Execution resumed after an interruption. These worker results were completed and validated before it; "
+                        + "use them instead of delegating the same goals again: "
+                        + json.writeValueAsString(session.results().stream().filter(r -> unreported.contains(r.taskId())).toList())).build());
+            }
             while (true) {
-                agent.streamEvents(message, context)
+                agent.streamEvents(input, context)
                         // 不保存 text/thinking 事件；只留下可回放的工具参数、结果和实际 usage。
                         .takeUntil(event -> event instanceof ToolResultEndEvent && session.outcome() != null)
                         .takeUntilOther(session.control.signal())
@@ -135,11 +163,7 @@ public class ResearchAgentFactory implements ResearchRunner, AutoCloseable {
                 session.requestFinishRepair();
                 session.event("NATIVE_FINISH_REPAIR", "正在修复研究结束协议",
                         Map.of("reason", "TEXT_WITHOUT_NATIVE_FINISH", "citableEvidenceCount", session.citableIds().size()));
-                message = Msg.builder().role(MsgRole.USER).textContent(
-                        "Your previous response did not finish through the native tool. Call finish_research now. "
-                        + "Use only findings supported by already-read evidence, with exact evidenceIds from the server reminder. "
-                        + "If unsupported, return empty findings and an explicit gap. Do not search again, output plain text, "
-                        + "or imitate a tool call in JSON. Preserve the existing research and user constraints.").build();
+                input = List.of(Msg.builder().role(MsgRole.USER).textContent(ResearchHistory.FINISH_REPAIR_MESSAGE).build());
             }
         } catch (RuntimeException e) { throw e; }
         catch (Exception e) { throw new IllegalStateException("研究请求构建失败", e); }
@@ -166,8 +190,14 @@ public class ResearchAgentFactory implements ResearchRunner, AutoCloseable {
                 session.check();
                 session.budget.acquireTool();
                 session.activeToolCallId = call.getId();
-                session.event("TOOL_STARTED", "正在执行 " + call.getName(),
-                        Map.of("toolCallId", call.getId(), "tool", call.getName(), "arguments", call.getInput()));
+                Map<String, Object> started = new java.util.LinkedHashMap<>();
+                started.put("toolCallId", call.getId());
+                started.put("tool", call.getName());
+                started.put("arguments", call.getInput());
+                // 接管重建历史时需要：同一轮模型输出的全部调用 ID，以及模型给出的原始参数文本。
+                started.put("batch", input.toolCalls().stream().map(io.agentscope.core.message.ToolUseBlock::getId).toList());
+                if (call.getContent() != null) started.put("rawArguments", call.getContent());
+                session.event("TOOL_STARTED", "正在执行 " + call.getName(), started);
                 StringBuilder output = new StringBuilder();
                 var execution = next.apply(new ActingInput(java.util.List.of(call)));
                 if (!"conduct_research".equals(call.getName())) {

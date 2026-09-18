@@ -233,6 +233,7 @@ public class ResearchRunService {
                 execution.claim = claim;
             }
             session = new ResearchSession(store, claim, new ResearchBudget(properties, claim.run().usage()), execution.control);
+            resume(session);
             try {
                 ResearchSession.Outcome outcome = runner.run(session);
                 completion.complete(session, outcome, null);
@@ -249,6 +250,20 @@ public class ResearchRunService {
             ResearchRun current = store.get(id, owner);
             if (current.status() == Status.QUEUED && !tasks.isShutdown()) schedule(id, owner, user);
         }
+    }
+
+    /** 本阶段已有工具历史（接管或停机交还后的再次领取）时，从事件恢复对话与本地状态，而不是从头执行。 */
+    private void resume(ResearchSession session) {
+        var claim = session.claim;
+        List<ResearchEvent> events = new java.util.ArrayList<>();
+        for (long after = 0; ; ) {
+            var page = store.events(claim.run().id(), claim.owner(), after, 500);
+            events.addAll(page);
+            if (page.size() < 500) break;
+            after = page.get(page.size() - 1).sequence();
+        }
+        var history = com.nageoffer.ai.ragent.research.runtime.ResearchHistory.from(events);
+        if (history != null) session.resume(history, id -> evidenceStore.find(claim.run().id(), claim.owner(), id).evidence(), json);
     }
 
     /** 接管的任务没有原请求线程：按 owner_user_id 从用户表重建身份；用户已不存在时只保留 ID，不带角色。 */

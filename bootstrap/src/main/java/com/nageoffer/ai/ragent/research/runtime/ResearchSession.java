@@ -77,6 +77,48 @@ public class ResearchSession {
     private String retrievalIssue;
     private int consecutiveRetrievalFailures;
     volatile String activeToolCallId;
+    private ResearchHistory history;
+
+    /**
+     * 接管后恢复主 Agent 的本地状态：已读证据由调用方从证据表取回后传入；检索计数、候选与已读候选按已完成的
+     * 工具调用重放，与首次执行时经过同样的记账，不重新访问检索服务。
+     */
+    @SuppressWarnings("unchecked")
+    public synchronized void resume(ResearchHistory history, java.util.function.Function<String, EvidenceRecord> evidence, ObjectMapper json) {
+        if (!main()) throw new IllegalStateException("只有主 Agent 从工具历史恢复");
+        this.history = history;
+        for (var step : history.steps()) {
+            if (!step.succeeded()) continue;
+            switch (step.tool()) {
+                case "search_knowledge" -> {
+                    Object query = step.arguments().get("query");
+                    Object docs = step.arguments().get("document_ids");
+                    String key = normalize(String.valueOf(query)) + "|" + (docs instanceof List<?> list
+                            ? list.stream().map(String::valueOf).sorted().toList() : List.of());
+                    searchCounts.merge(key, 1, Integer::sum);
+                    try {
+                        List<String> ids = new ArrayList<>();
+                        for (var hit : json.readTree(step.output())) {
+                            ids.add(hit.path("evidenceId").asText());
+                            candidateDocuments.put(hit.path("evidenceId").asText(), hit.path("docId").asText());
+                        }
+                        candidates(ids);
+                    } catch (Exception ignored) { }
+                }
+                case "read_source" -> {
+                    for (String id : step.readEvidenceIds()) {
+                        EvidenceRecord record = evidence.apply(id);
+                        if (record != null) delivered(record);
+                    }
+                    Object requested = step.arguments().get("evidence_id");
+                    if (requested != null) readCandidate(requested.toString());
+                }
+                default -> { }
+            }
+        }
+        for (int i = 0; i < history.repairs() && finishRepairCallsRemaining != 0; i++) requestFinishRepair();
+    }
+    public synchronized ResearchHistory history() { return history; }
 
     public <T> T retrieve(java.util.function.Supplier<T> action) {
         check();
@@ -204,7 +246,9 @@ public class ResearchSession {
     public void restoreResults(ObjectMapper json) {
         if (claim.run().state().get("subtasks") instanceof Map<?, ?> saved) {
             for (var entry : saved.values()) if (entry instanceof Map<?, ?> state) {
-                if (state.get("task") instanceof Map<?, ?> task) delegatedGoals.add(normalize(task.get("goal").toString()));
+                // 执行者失联时在途的 worker 被标为中断：它的目标可以在预算内重派，其余目标保持去重。
+                if (state.get("task") instanceof Map<?, ?> task && !"INTERRUPTED".equals(state.get("status")))
+                    delegatedGoals.add(normalize(task.get("goal").toString()));
                 if (state.get("result") == null) continue;
                 SubtaskResult result = json.convertValue(state.get("result"), SubtaskResult.class);
                 Set<String> ids = new HashSet<>();

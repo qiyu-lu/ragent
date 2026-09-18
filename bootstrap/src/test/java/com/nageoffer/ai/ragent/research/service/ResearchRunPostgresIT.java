@@ -567,6 +567,32 @@ class ResearchRunPostgresIT {
     }
 
     @Test
+    void takeoverRestoresToolHistoryAndReadEvidenceFromTheDatabase() throws Exception {
+        var run = run();
+        var old = claim(run);
+        var evidence = new ResearchEvidenceStore(jdbc, json);
+        var read = new com.nageoffer.ai.ragent.research.model.EvidenceRecord(run.id(), "ev-resume-" + run.id(), kb, "doc", "paper.md", "v1", List.of("chunk"), "hash", "已读正文", Map.of("chunk_index", 0), "main", false, true,
+                com.nageoffer.ai.ragent.research.model.EvidenceRecord.SourceExtent.CHUNK);
+        evidence.save(owner, new com.nageoffer.ai.ragent.research.model.EvidenceSnapshot(read, "已读正文", "metadata"));
+        assertTrue(store.event(old, "RESEARCH_STARTED", "started", Map.of("request", "{\"brief\":{}}"), Map.of("modelCalls", 1)));
+        assertTrue(store.event(old, "TOOL_STARTED", "read", Map.of("toolCallId", "call-1", "tool", "read_source", "arguments", Map.of("evidence_id", read.evidenceId()), "batch", List.of("call-1")), Map.of("modelCalls", 1, "toolCalls", 1)));
+        assertTrue(store.event(old, "SOURCE_READ", "read", Map.of("evidenceId", read.evidenceId()), Map.of("modelCalls", 1, "toolCalls", 1)));
+        assertTrue(store.event(old, "TOOL_ENDED", "read", Map.of("toolCallId", "call-1", "tool", "read_source", "status", "SUCCESS", "output", "{}"), Map.of("modelCalls", 1, "toolCalls", 1)));
+        assertTrue(store.event(old, "TOOL_STARTED", "search", Map.of("toolCallId", "call-2", "tool", "search_knowledge", "arguments", Map.of("query", "next"), "batch", List.of("call-2")), Map.of("modelCalls", 2, "toolCalls", 2)));
+        expireLease(run.id());
+        var restored = new java.util.concurrent.atomic.AtomicReference<ResearchSession>();
+        var b = service(session -> { if (session.claim.run().id().equals(run.id())) restored.set(session); return gapOnly(); }, new ResearchProperties());
+        try {
+            pollUntilTerminal(b, run.id(), owner);
+            var session = restored.get();
+            assertEquals(List.of("call-1"), session.history().steps().stream().map(com.nageoffer.ai.ragent.research.runtime.ResearchHistory.Step::toolCallId).toList());
+            assertEquals(1, session.history().droppedToolCalls());
+            assertEquals(Set.of(read.evidenceId()), session.delivered().keySet());
+            assertEquals(2, session.budget.snapshot().get("modelCalls"), "the budget continues from the persisted usage, including the lost call");
+        } finally { b.close(); }
+    }
+
+    @Test
     void polledRunsRebuildTheOwnerFromTheUserTable() throws Exception {
         String userId = String.valueOf(Math.abs(UUID.randomUUID().getMostSignificantBits()) % 1_000_000_000_000L);
         jdbc.update("INSERT INTO t_user (id, username, password, role) VALUES (?, ?, 'x', 'user')", userId, "u" + userId);

@@ -99,6 +99,7 @@ public class ResearchTools {
                 throw new ClientException("必须提出一个长度合理的明确问题");
             }
             session.conclude(new ResearchSession.Outcome(question, null));
+            session.event("RESEARCH_CONCLUDED", "研究等待用户补充条件", Map.of("question", question));
             return Map.of("status", "WAITING_INPUT", "question", question);
         });
     }
@@ -142,6 +143,8 @@ public class ResearchTools {
                     session.workerFailure() || !session.executionIssues().isEmpty()
                             ? SubtaskResult.Status.PARTIAL : SubtaskResult.Status.COMPLETED, session.executionIssues());
             session.conclude(new ResearchSession.Outcome(null, result));
+            // 结束调用的 TOOL_ENDED 会随流截断而丢失；结论单独落库，接管后据此直接进入产物生成，不再调用模型。
+            if (session.main()) session.event("RESEARCH_CONCLUDED", "研究结论已确定", Map.of("result", result));
             return result;
         });
     }

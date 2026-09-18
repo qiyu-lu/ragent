@@ -4,8 +4,8 @@
 
 | 项 | 值 |
 | --- | --- |
-| 更新时间 | 2026-09-18（W1 完成，标签 `career-w1`） |
-| 当前工作项 | W3 未开始 |
+| 更新时间 | 2026-09-18（W3 进行中） |
+| 当前工作项 | W3：模拟上游已完成（`4ace8c0`）；下一步抖动退避，再交 X3 |
 | 分支 / 提交 | `feat/llm-backend-hardening`，自 `65c99c7`（标签 `career-v0-baseline`）拉出；W1 完成于标签 `career-w1` |
 | 回归通过数 | `LC_ALL=en_US.UTF-8 bash scripts/validate-agentic-research-p7.sh`：基线 Python 33/33、Java 217/217；W1 后 Python 36/36、Java 220/220，约 20 s |
 | 最近的运行目录 | `local-data/agentic-research/runs/career_X1_v1_*`（X1）；汇总 `eval/agentic-research/manifests/career-x1-2026-09-18.json` |
@@ -14,7 +14,7 @@
 
 - [x] S0 分支、基线标签、提交计划、基线回归
 - [x] W1 缓存友好的上下文布局 + X1（改动说明 [2026-09-18-prompt-cache-stable-prefix.md](changes/2026-09-18-prompt-cache-stable-prefix.md)）
-- [ ] W3 模拟上游与故障注入基准 + X3
+- [ ] W3 模拟上游与故障注入基准 + X3（[x] 模拟上游、stub profile、小语料、启动脚本；[ ] 抖动退避；[ ] X3）
 - [ ] W2 心跳租约、跨实例接管、断点续跑、优雅停机 + X2
 - [ ] W4 权限隔离 + 越权矩阵
 - [ ] W5 内容寻址的 embedding 复用 + X5
@@ -29,7 +29,7 @@
 
 ## 下一步
 
-W3（计划 §5）：模拟上游 `stub_upstream.py`、`stub` profile、固定小语料与一条命令的启动脚本 → 实验 X3 → 带抖动的退避。开场白用计划 §11 的标准句。
+W3：embedding 重试改为带抖动的指数退避（`AbstractOpenAIStyleEmbeddingClient` 现为固定 300 ms）并补测试；核对研究路径 embedding 失败是否进入候选熔断统计；然后写 X3 交接脚本。模拟上游用法：`scripts/stub-upstream.sh [--embedding-hang 0.3 …]`，语料库 `research_corpus_stub`（SRC-001…060）；治理前工作树 `../ragent-x3/before` @ `3381fa9`（已编译，经 `AI_PROVIDERS_*_URL` 环境变量接入模拟上游，无需配置还原）。smoke（4 题）：50% 无响应时治理前 3/4 在 30 s 处 `RESEARCH_TIMEOUT` 失败，治理后 4/4 完成。
 
 ## 已知事实与遗留问题
 

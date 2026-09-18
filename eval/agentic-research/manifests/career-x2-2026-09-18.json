@@ -1,0 +1,240 @@
+{
+  "experiment": "X2 executor takeover",
+  "date": "2026-09-18",
+  "basis": "stub upstream, separate executor JVMs sharing one run database; not a real provider",
+  "command": "bash scripts/career-takeover-demo.sh (x2_takeover.py, defaults)",
+  "run_dir": "local-data/agentic-research/runs/career_X2_v1",
+  "settings": {
+    "lease": 6,
+    "heartbeat": 2,
+    "poll": 1,
+    "grace": 20,
+    "chat_latency_ms": "700:900",
+    "commit": "cb42dc4"
+  },
+  "load": "per scenario 2 runs (T5: 1), mode B, each goal names 4 SRC keys: 4 searches + 4 reads + finish + artifact = 10 model calls when clean",
+  "clean_model_calls": 10,
+  "definitions": {
+    "recovery_seconds": "first fault to the new owner's RUN_STARTED (host clock vs database clock on the same host)",
+    "duplicate_model_calls": "model calls of a completed run minus the clean count",
+    "invariants": "one terminal event, at most one ARTIFACT event, contiguous event sequence, no finished tool call (same tool and arguments) executed twice, no INTERRUPTED status"
+  },
+  "scenarios": [
+    {
+      "scenario": "T0",
+      "faults": [],
+      "chat_requests": 20,
+      "wall_seconds": 10.8,
+      "runs": [
+        {
+          "case": "T0-00",
+          "status": "COMPLETED",
+          "error": null,
+          "takeovers": 0,
+          "released": 0,
+          "resumed": 0,
+          "dropped_tool_calls": 0,
+          "model_calls": 10,
+          "recovery_seconds": null,
+          "all_keys_read": true,
+          "executors": 1,
+          "invariants_hold": true
+        },
+        {
+          "case": "T0-01",
+          "status": "COMPLETED",
+          "error": null,
+          "takeovers": 0,
+          "released": 0,
+          "resumed": 0,
+          "dropped_tool_calls": 0,
+          "model_calls": 10,
+          "recovery_seconds": null,
+          "all_keys_read": true,
+          "executors": 1,
+          "invariants_hold": true
+        }
+      ]
+    },
+    {
+      "scenario": "T1",
+      "faults": [
+        "kill -9"
+      ],
+      "chat_requests": 22,
+      "runs": [
+        {
+          "case": "T1-00",
+          "status": "COMPLETED",
+          "error": null,
+          "takeovers": 1,
+          "released": 0,
+          "resumed": 1,
+          "dropped_tool_calls": 0,
+          "model_calls": 11,
+          "recovery_seconds": 4.94,
+          "all_keys_read": true,
+          "executors": 2,
+          "invariants_hold": true
+        },
+        {
+          "case": "T1-01",
+          "status": "COMPLETED",
+          "error": null,
+          "takeovers": 1,
+          "released": 0,
+          "resumed": 1,
+          "dropped_tool_calls": 0,
+          "model_calls": 11,
+          "recovery_seconds": 4.94,
+          "all_keys_read": true,
+          "executors": 2,
+          "invariants_hold": true
+        }
+      ]
+    },
+    {
+      "scenario": "T2",
+      "faults": [
+        "start"
+      ],
+      "chat_requests": 20,
+      "runs": [
+        {
+          "case": "T2-00",
+          "status": "COMPLETED",
+          "error": null,
+          "takeovers": 0,
+          "released": 0,
+          "resumed": 0,
+          "dropped_tool_calls": 0,
+          "model_calls": 10,
+          "recovery_seconds": null,
+          "all_keys_read": true,
+          "executors": 1,
+          "invariants_hold": true
+        },
+        {
+          "case": "T2-01",
+          "status": "COMPLETED",
+          "error": null,
+          "takeovers": 0,
+          "released": 0,
+          "resumed": 0,
+          "dropped_tool_calls": 0,
+          "model_calls": 10,
+          "recovery_seconds": null,
+          "all_keys_read": true,
+          "executors": 1,
+          "invariants_hold": true
+        }
+      ]
+    },
+    {
+      "scenario": "T3",
+      "faults": [
+        "SIGTERM"
+      ],
+      "chat_requests": 22,
+      "sigterm_exit_seconds": 0.91,
+      "sigterm_exit_code": 143,
+      "runs": [
+        {
+          "case": "T3-00",
+          "status": "COMPLETED",
+          "error": null,
+          "takeovers": 0,
+          "released": 1,
+          "resumed": 1,
+          "dropped_tool_calls": 0,
+          "model_calls": 11,
+          "recovery_seconds": 0.95,
+          "all_keys_read": true,
+          "executors": 2,
+          "invariants_hold": true
+        },
+        {
+          "case": "T3-01",
+          "status": "COMPLETED",
+          "error": null,
+          "takeovers": 0,
+          "released": 1,
+          "resumed": 1,
+          "dropped_tool_calls": 0,
+          "model_calls": 11,
+          "recovery_seconds": 0.95,
+          "all_keys_read": true,
+          "executors": 2,
+          "invariants_hold": true
+        }
+      ]
+    },
+    {
+      "scenario": "T4",
+      "faults": [
+        "SIGSTOP",
+        "SIGCONT"
+      ],
+      "chat_requests": 22,
+      "old_executor_lease_lost_logs": 6,
+      "old_executor_alive": true,
+      "runs": [
+        {
+          "case": "T4-00",
+          "status": "COMPLETED",
+          "error": null,
+          "takeovers": 1,
+          "released": 0,
+          "resumed": 1,
+          "dropped_tool_calls": 0,
+          "model_calls": 11,
+          "recovery_seconds": 4.97,
+          "all_keys_read": true,
+          "executors": 2,
+          "invariants_hold": true
+        },
+        {
+          "case": "T4-01",
+          "status": "COMPLETED",
+          "error": null,
+          "takeovers": 1,
+          "released": 0,
+          "resumed": 1,
+          "dropped_tool_calls": 0,
+          "model_calls": 11,
+          "recovery_seconds": 4.97,
+          "all_keys_read": true,
+          "executors": 2,
+          "invariants_hold": true
+        }
+      ]
+    },
+    {
+      "scenario": "T5",
+      "faults": [
+        "kill -9",
+        "kill -9",
+        "kill -9",
+        "kill -9"
+      ],
+      "chat_requests": 1,
+      "executors_killed": 4,
+      "runs": [
+        {
+          "case": "T5-00",
+          "status": "FAILED",
+          "error": "EXECUTOR_LOST",
+          "takeovers": 4,
+          "released": 0,
+          "resumed": 1,
+          "dropped_tool_calls": 0,
+          "model_calls": 2,
+          "recovery_seconds": 6.71,
+          "all_keys_read": false,
+          "executors": 4,
+          "invariants_hold": true
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,86 @@
+# 研究长任务的持久化执行：心跳租约、跨实例接管、断点续跑、优雅停机
+
+## 记录信息
+
+| 项目 | 内容 |
+| --- | --- |
+| 日期 | `2026-09-18` |
+| 所属阶段 | 秋招冲刺 W2：长任务的持久化执行 |
+| 状态 | 已实施；回归通过；X2 进程级故障实验（基于模拟上游）已完成 |
+| 分支 | `feat/llm-backend-hardening` |
+| Git 提交 | 止血 `0ea6060`；租约与接管 `30e5cb6`（含迁移）、测试隔离 `5e18a8f`；续跑 `f3ed6b7`；优雅停机 `51c7ea7`、`0c47515`；X2 工具 `cb42dc4`；标签 `career-w2` |
+
+## 改动目的与发现过程
+
+研究任务是分钟级的长任务，发版、宕机、扩缩容都会碰上。只读核对（计划 E2）发现当前实现在多实例下比“丢任务”更糟：
+
+- `interruptOrphans()` 在**启动和关闭**时把**全库**所有 QUEUED / RUNNING 任务标为 INTERRUPTED，不区分执行者——任何实例启动或停止都会杀掉其他实例的健康任务；
+- 租约在领取时一次性设为 `maxDuration + 30 = 330 s`，没有续租，也没有人扫描过期租约；
+- 调度只在收到请求的实例的内存线程池里，队列满直接 `FAILED(RUN_QUEUE_FULL)`；接管线程里没有 `LoginUser`；
+- 重启后只能整体重新发起，已花的模型调用全部作废。
+
+已有可复用的基础：每次领取递增 `epoch` 并发新 `lease_token`，所有写入在同一短事务里核对二者（fencing）；事件序号在行锁内原子分配；证据按稳定 ID 幂等保存；预算已能从持久化的 usage 恢复。
+
+## 方案取舍与选择理由
+
+- **队列放哪**：Redis / RocketMQ 都在栈里，但任务状态本来就在 PostgreSQL，另起队列要解决“两处状态不一致”。参考 db-scheduler 与 Quartz JDBC 集群，直接用 `FOR UPDATE SKIP LOCKED` 轮询：多实例并发领取互不阻塞，领取与状态变更同一事务。
+- **租约**：短租约（30 s）+ 定时续租（10 s），而不是一次给足整个任务时长，这样失联实例最多 30 s 后就能被接管。续租条件与写保护相同（epoch、lease_token、未过期）。租约时间统一取**数据库时钟**，实例之间的时钟偏差不参与判定。续租失败即立即取消本地执行；即使本地没来得及停，迟到写入也会被 fencing 拒绝（Kleppmann 的 fencing token）。
+- **续跑粒度**：参考 Temporal 的事件历史与 LangGraph 的按步检查点，不另存 Agent 快照，而是由已有的持久事件重建对话——`TOOL_STARTED`（参数）与 `TOOL_ENDED`（输出）成对还原为 tool_call 与工具结果。没有配对完成的那一步丢弃并重做，语义是**至少一次**；检索与阅读只读、证据按稳定 ID 幂等，重做安全。AgentScope 2.0.1 支持以消息列表作为输入预载历史，所以不需要计划里的退化方案。
+- **重建的前缀逐字节相同**：首条用户消息改为随 `RESEARCH_STARTED` 持久化原文，工具参数保存模型给出的原始文本，assistant 消息带上 SDK 写入的 Agent 名。这样接管后的请求与首次执行同一步的请求逐字节相同，W1 的提示缓存跨实例仍然命中。
+- **毒任务**：一个任务若每次执行都让执行者崩溃，无限接管会拖垮整个集群。接管次数 `takeover_count` 超过 3 即 `FAILED(EXECUTOR_LOST)`；停机交还不计入。
+- **停机**：参考 Spring Boot 优雅停机与 Kubernetes 的 terminationGracePeriod。在途任务不被打断，在下一次模型调用开始前把任务交还队列（回到 QUEUED，其他实例无需等租约过期），宽限期（20 s）内没走到步边界的直接交还并取消。
+
+## 实现与调用链
+
+```text
+创建 / 补充条件 ──> 本机线程池（快速路径；池满时任务留在库里）
+每个实例每 5 s 轮询 ──> claimAvailable: QUEUED 或 RUNNING 且 lease_until <= now()
+                        FOR UPDATE SKIP LOCKED，数量 = 本机空闲槽位
+  claimLocked: epoch+1、新 lease_token、executor_id、lease_until = now() + 30 s
+               接管时：takeover_count+1，在途 worker 标 INTERRUPTED，> 3 次则 FAILED(EXECUTOR_LOST)
+  按 owner_user_id 从 t_user 重建 LoginUser
+  ResearchHistory.from(本阶段事件) ──> 预载消息；证据、检索计数、候选、已完成 worker 结果恢复
+     已有 RESEARCH_CONCLUDED ──> 直接生成产物，不再调用模型
+心跳每 10 s ──> renew（epoch、token、未过期）失败 ──> 取消本地执行
+停机 ──> 停止轮询 → 请求交还 → 主 Agent 在下一次模型调用前停下 → release: RUNNING → QUEUED
+```
+
+主要代码：`research/service/ResearchRunStore`（`claim`、`claimAvailable`、`renew`、`release`）、`ResearchRunService`（心跳、轮询、身份、续跑、停机）、`research/runtime/ResearchHistory`（新增）、`ResearchSession.resume`、`ResearchAgentFactory`（预载与事件字段）、`ResearchControl`（交还请求与停机识别）；迁移 `resources/database/upgrades/v1.1.0/260918_01_research_durable_execution.sql`（`executor_id`、`takeover_count`、轮询用部分索引），`schema_pg.sql` 同步，新建库与升级库的结构比对脚本已纳入该迁移。
+
+实现中发现并修复的两处：`finish_research` 的 `TOOL_ENDED` 从未落库（得出结论后流被截断，X3 的 50 个任务里 0 条），改为结论单独写 `RESEARCH_CONCLUDED`；AgentScope 自带的 JVM 关闭钩子与我们的停机并发执行，会在“模型已决定、工具未执行”处中断 Agent 并关闭模型 HTTP 传输，它先到时任务曾被写成 FAILED，现在识别为停机并交还。
+
+## 验证与效果
+
+回归：Python 41/41、Java 13 + 227（W3 后 13 + 212）。新增用例覆盖：实例 B 启停不影响实例 A 的任务；过期接管且旧执行者迟到写入被拒；心跳让 4 s 的任务在 2 s 租约下不被接管；毒任务第 4 次接管判失败；池满不再判失败；停机在步边界交还、超出宽限期强制交还；接管从数据库恢复工具历史与已读证据；由事件重建的请求在三个截断点与首次执行逐字节相同（完成一步后 / 工具在途 / 已得出结论）。
+
+X2：多个执行器是共享一个随机隔离运行库的独立 JVM，走生产的 `ResearchRunService`；模型与 embedding 指向模拟上游（每次模型调用 0.7—0.9 s）。每场景 2 个任务（T5 为 1 个），每个任务 4 次检索 + 4 次阅读 + 结束 + 产物 = 10 次模型调用。租约 6 s、心跳 2 s、轮询 1 s（为缩短实验，生产默认 30 / 10 / 5 s）。**全部数字基于模拟上游。** 汇总见 `eval/agentic-research/manifests/career-x2-2026-09-18.json`。
+
+| 场景 | 结果 | 恢复时间 | 重复模型调用 / 任务 | 不变量 |
+| --- | --- | ---: | ---: | --- |
+| T0 无故障 | 2/2 完成，均由 A 执行 | — | 0 | 全部成立 |
+| T1 `kill -9` 执行者 | 2/2 完成，A→B，接管 1 次 | 4.94 s | 1 | 全部成立 |
+| T2 运行中启动新实例 | 2/2 完成，仍由 A 执行，无中断、无接管 | — | 0 | 全部成立 |
+| T3 `SIGTERM` | 2/2 完成，A 交还、B 续跑，不计接管；A 0.91 s 退出 | 0.95 s | 1 | 全部成立 |
+| T4 `SIGSTOP` 超过租约后 `SIGCONT` | 2/2 完成，A→B；A 恢复后续租被拒 6 次并自行停止 | 4.97 s | 1 | 全部成立 |
+| T5 每个接手的执行者都被杀 | 4 个执行者失联后 `FAILED(EXECUTOR_LOST)` | — | — | 全部成立 |
+
+不变量逐任务检查：恰好一个终态事件、至多一个产物、事件序号连续、已完成的工具调用（同名同参数）没有执行第二次、没有 INTERRUPTED 状态。所有完成的任务都读到了 4 个目标文档的证据。重复的那一次都是崩溃时在途的模型调用，已完成的检索和阅读一次也没有重做。
+
+## 限制与停止状态
+
+- T3 理论上可以不重复：我们的交还点在模型调用之前，但 AgentScope 的 JVM 关闭钩子先在“模型已决定、工具未执行”处中断，模型的决定没有落库，接手方只能再调用一次。要消除需在模型返回时持久化 tool_call 决定并让 SDK 执行待处理调用，未做。
+- X2 只用单 Agent 模式：模拟上游的策略不读续跑提示，多 Agent 模式下“已完成的 worker 不重跑”只由单测与集成测试覆盖。在途 worker 被标为中断，其目标允许重派，是否重派由主 Agent 决定。
+- 恢复时间取决于租约：失联接管约等于“租约剩余 + 轮询间隔”，生产默认最坏约 35 s；租约越短，数据库续租写入越多。
+- 续跑只恢复主 Agent；结束修复的计数按事件近似恢复。工具输出落库上限 40,000 字符，超出时重建的前缀不再逐字节相同（只影响缓存命中，不影响正确性）。旧版本事件没有原始请求，这类任务接管后从头执行。
+- 接管身份来自用户表；用户已删除时只保留 ID、不带角色（W4 权限按最小权限处理）。
+- 每个场景只跑一次；恢复时间是单次测量，不是分布。
+
+## 数据兼容与回滚
+
+迁移只增列与部分索引，可重复执行；存量任务状态不变，INTERRUPTED 只为读取历史保留。新增事件类型 `RUN_RELEASED`、`RESEARCH_RESUMED`、`RESEARCH_CONCLUDED` 与新增字段（`request`、`batch`、`rawArguments`）只增不改；前端对未知事件类型按通用事件列出，不需改动。
+
+```bash
+git revert cb42dc4 0c47515 51c7ea7 f3ed6b7 5e18a8f 30e5cb6 0ea6060
+```
+
+执行前先检查当前分支、HEAD 和工作区。回滚后回到单实例语义；新增的两列可保留不用。

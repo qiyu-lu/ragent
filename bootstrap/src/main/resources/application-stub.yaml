@@ -1,0 +1,21 @@
+# 模拟上游 profile：eval/agentic-research/stub_upstream.py（OpenAI 兼容、脚本化工具调用、确定性向量、故障旋钮）。
+# 只覆盖供应商地址与凭证，客户端、传输与协议仍走生产代码路径；不改 application.yaml。
+# 启动模拟上游与固定小语料：scripts/stub-upstream.sh。Spring 应用用 --spring.profiles.active=stub；
+# ResearchRunCommand 读取环境变量 SPRING_PROFILES_ACTIVE=stub。零接口费，产出的数字必须注明“基于模拟上游”。
+ai:
+  providers:
+    bailian:
+      url: ${STUB_UPSTREAM_URL:http://127.0.0.1:18080}
+      api-key: stub-only
+    siliconflow:
+      url: ${STUB_UPSTREAM_URL:http://127.0.0.1:18080}
+      api-key: stub-only
+
+research:
+  main-model-id: research-flash
+  worker-model-id: research-flash
+  finalization-model-id: research-flash
+
+rag:
+  rerank:
+    enabled: false

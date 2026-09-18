@@ -105,6 +105,24 @@ public class ResearchRunCommand {
         properties.setFinalizationModelId(selected.get(ResearchModelRole.FINALIZATION));
     }
 
+    /** 与 Spring Boot 同序：环境变量 > 激活的 profile 文件 > application.yaml；stub profile 把供应商指向模拟上游。 */
+    static StandardEnvironment environment(String activeProfiles) throws java.io.IOException {
+        var environment = new StandardEnvironment();
+        List<String> profiles = new ArrayList<>(List.of(activeProfiles.split(",")));
+        Collections.reverse(profiles);
+        for (String profile : profiles) {
+            var resource = new ClassPathResource("application-" + profile.trim() + ".yaml");
+            if (profile.isBlank() || !resource.exists()) continue;
+            for (var propertySource : new YamlPropertySourceLoader().load("application-" + profile.trim(), resource)) {
+                environment.getPropertySources().addLast(propertySource);
+            }
+        }
+        for (var propertySource : new YamlPropertySourceLoader().load("application", new ClassPathResource("application.yaml"))) {
+            environment.getPropertySources().addLast(propertySource);
+        }
+        return environment;
+    }
+
     public static void main(String[] args) throws Exception {
         Job job = JSON.readValue(Path.of(args[0]).toFile(), Job.class);
         boolean evaluation = job.evaluationMode() != null;
@@ -130,10 +148,7 @@ public class ResearchRunCommand {
         var runJdbc = new JdbcTemplate(runData);
         Path directory = Path.of(job.runDir());
         Files.createDirectories(directory);
-        var environment = new StandardEnvironment();
-        for (var propertySource : new YamlPropertySourceLoader().load("application", new ClassPathResource("application.yaml"))) {
-            environment.getPropertySources().addLast(propertySource);
-        }
+        var environment = environment(System.getenv().getOrDefault("SPRING_PROFILES_ACTIVE", ""));
         var models = Binder.get(environment).bind("ai", Bindable.of(AIModelProperties.class)).orElseThrow(IllegalStateException::new);
         var properties = Binder.get(environment).bind("research", Bindable.of(ResearchProperties.class)).orElseThrow(IllegalStateException::new);
         if (evaluation) {

@@ -108,7 +108,9 @@ public class ResearchCorpusCommand {
             var defaults = new RAGDefaultProperties(); defaults.setDimension(job.dimension());
             var candidate = new AIModelProperties.ModelCandidate();
             candidate.setId("qwen-emb-8b"); candidate.setProvider("siliconflow"); candidate.setModel("Qwen/Qwen3-Embedding-8B"); candidate.setDimension(job.dimension());
-            var provider = new AIModelProperties.ProviderConfig(); provider.setUrl("https://api.siliconflow.cn");
+            // 与 ResearchRunCommand 的宽松绑定同名：指向模拟上游时只换地址，客户端与协议不变。
+            var provider = new AIModelProperties.ProviderConfig();
+            provider.setUrl(System.getenv().getOrDefault("AI_PROVIDERS_SILICONFLOW_URL", "https://api.siliconflow.cn"));
             provider.setApiKey(key); provider.setEndpoints(Map.of("embedding", "/v1/embeddings"));
             var target = new ModelTarget(candidate.getId(), candidate, provider, null);
             var http = new OkHttpClient.Builder().callTimeout(120, TimeUnit.SECONDS).readTimeout(120, TimeUnit.SECONDS);

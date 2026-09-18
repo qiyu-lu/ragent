@@ -21,6 +21,8 @@ import com.nageoffer.ai.ragent.infra.config.AIModelProperties;
 import com.nageoffer.ai.ragent.research.config.ResearchProperties;
 import com.nageoffer.ai.ragent.research.runtime.ResearchModelFactory;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.context.properties.bind.Bindable;
+import org.springframework.boot.context.properties.bind.Binder;
 
 import java.util.List;
 import java.util.Map;
@@ -66,5 +68,17 @@ class ResearchEvaluationModelsTest {
         config.getChat().getCandidates().get(1).setEnabled(false);
         assertThrows(IllegalArgumentException.class, () -> ResearchRunCommand.configureEvaluationModels(job(Map.of("main", "max-snapshot")), config, properties));
         assertEquals("research-max", properties.getMainModelId());
+    }
+
+    @Test void stubProfilePointsProvidersAtTheStubWithoutChangingTheModelRegistry() throws Exception {
+        var plain = Binder.get(ResearchRunCommand.environment("")).bind("ai", Bindable.of(AIModelProperties.class)).get();
+        var stub = Binder.get(ResearchRunCommand.environment("stub")).bind("ai", Bindable.of(AIModelProperties.class)).get();
+        assertEquals("https://dashscope.aliyuncs.com", plain.getProviders().get("bailian").getUrl());
+        assertTrue(stub.getProviders().get("bailian").getUrl().startsWith("http://127.0.0.1:"));
+        assertEquals(stub.getProviders().get("bailian").getUrl(), stub.getProviders().get("siliconflow").getUrl());
+        assertEquals("/compatible-mode/v1/chat/completions", stub.getProviders().get("bailian").getEndpoints().get("chat"));
+        assertEquals(plain.getChat().getCandidates().size(), stub.getChat().getCandidates().size());
+        var research = Binder.get(ResearchRunCommand.environment("stub")).bind("research", Bindable.of(ResearchProperties.class)).get();
+        assertEquals("research-flash", research.getMainModelId());
     }
 }

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import shutil
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 import hashlib
@@ -71,6 +72,8 @@ def fingerprints():
         "infra-ai/src/main/java/com/nageoffer/ai/ragent/infra/embedding/SiliconFlowEmbeddingClient.java",
         "infra-ai/src/main/java/com/nageoffer/ai/ragent/infra/embedding/EmbeddingUsageCapture.java",
         "infra-ai/src/main/java/com/nageoffer/ai/ragent/infra/token/HeuristicTokenCounterService.java")]
+    paths += list((REPO / "infra-ai/src/main/java/com/nageoffer/ai/ragent/infra/rerank").glob("*.java"))
+    paths += [REPO / "bootstrap/src/main/java/com/nageoffer/ai/ragent/rag/core/retrieval/postprocessor/RerankPostProcessor.java"]
     return {str(p.relative_to(REPO)): sha256_file(p) for p in sorted(paths)}
 
 
@@ -109,7 +112,7 @@ def expected_budget(config):
 
 
 def resource_summary(directory, config):
-    calls, embeddings = {}, {}
+    calls, embeddings, reranks = {}, {}, {}
     for path in sorted(directory.glob("attempts/*/usage.jsonl")):
         for row in rows(path):
             call = row["call"]
@@ -117,6 +120,9 @@ def resource_summary(directory, config):
     for path in sorted(directory.glob("attempts/*/embedding-usage.jsonl")):
         for row in rows(path):
             embeddings[row["call_id"]] = row
+    for path in sorted(directory.glob("attempts/*/rerank-usage.jsonl")):
+        for row in rows(path):
+            reranks[row["call_id"]] = row
     estimate_cost = config.get("estimate_generation_cost", False)
     known_cost = sum(call_cost(c, config) or 0 for c in calls.values()) if estimate_cost else None
     unknown = sum(c.get("usageStatus") != "provider" for c in calls.values())
@@ -126,6 +132,9 @@ def resource_summary(directory, config):
             "budget_reserve_cny": known_cost + unknown * 0.03 if estimate_cost else None,
             "cost_estimation_enabled": estimate_cost,
             "actual_models": sorted({c["model"] for c in calls.values()}),
+            "rerank_requests": len(reranks),
+            "rerank_usage_unknown": sum(c.get("usage_status") != "provider" for c in reranks.values()),
+            "rerank_known_total_tokens": sum((c.get("usage") or {}).get("total_tokens", 0) for c in reranks.values()),
             "embedding_requests": len(embeddings),
             "embedding_known_total_tokens": sum((c.get("usage") or {}).get("total_tokens", 0) for c in embeddings.values()),
             "embedding_usage_unknown": sum(c.get("usage_status") != "provider" for c in embeddings.values()),
@@ -144,6 +153,17 @@ def monetary_limit(config, resources):
 
 
 def run_job(args, attempt, job):
+    runtime = args.run_dir / "runtime-classes"
+    if not runtime.exists():
+        frozen = json.loads((args.run_dir / "run.json").read_text())
+        expected = frozen.get("identity", frozen)["source_sha256"]
+        if any(sha256_file(REPO / name) != digest for name, digest in expected.items()):
+            raise ValueError("Source changed before runtime freeze")
+        runtime.mkdir()
+        for module in ("bootstrap", "framework", "infra-ai"):
+            shutil.copytree(REPO / module / "target/classes", runtime / module)
+        write_json(args.run_dir / "runtime-sha256.json", {str(p.relative_to(runtime)): sha256_file(p)
+                    for p in sorted(runtime.rglob("*")) if p.is_file()})
     env = dict(os.environ)
     if not env.get("BAILIAN_API_KEY") or not env.get("SILICONFLOW_API_KEY"):
         env.update(idea_environment(args.idea, "RagentApplication"))
@@ -170,7 +190,7 @@ def run_job(args, attempt, job):
         paths = [line.strip() for line in resolved.splitlines() if line.startswith("/") and ".jar" in line]
         if len(paths) != 1:
             raise ValueError("Classpath resolution failed")
-        classpath = os.pathsep.join([str(REPO / p / "target/classes") for p in ("bootstrap", "framework", "infra-ai")] + paths)
+        classpath = os.pathsep.join([str(runtime / p) for p in ("bootstrap", "framework", "infra-ai")] + paths)
         with (attempt / "java.log").open("w") as log:
             process = subprocess.run(["java", "-Xmx1g", "-cp", classpath, "com.nageoffer.ai.ragent.research.eval.ResearchRunCommand", str(attempt / "job.json")],
                                      cwd=REPO, env=env, stdout=log, stderr=subprocess.STDOUT)
@@ -239,6 +259,17 @@ def score_run(directory, prepared, profile, queries, config, modes):
     return summary
 
 
+def interleaved_cases(cases, modes, completed):
+    """Counterbalance mode order per question; resume preserves the original ordering."""
+    result = []
+    for index, case in enumerate(cases):
+        shift = index % len(modes)
+        for mode in modes[shift:] + modes[:shift]:
+            if (case["id"], mode) not in completed:
+                result.append({**case, "mode": mode})
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--prepared", type=Path, default=Path("local-data/agentic-research/prepared/research-data-v1"))
@@ -297,8 +328,9 @@ def main():
         return
     if args.execute and not args.score_only:
         completed = {(p["questionId"], p["mode"]) for p in collect(args.run_dir, queries)}
-        for mode in modes:
-            pending = [c for c in cases if (c["id"], mode) not in completed]
+        batches = [("MIXED", interleaved_cases(cases, modes, completed))] if config.get("execution_order") == "interleaved" else [
+            (mode, [c for c in cases if (c["id"], mode) not in completed]) for mode in modes]
+        for mode, pending in batches:
             if not pending:
                 continue
             resources = resource_summary(args.run_dir, config)
@@ -311,7 +343,8 @@ def main():
             job = {"runDir": str(attempt), "cases": pending, "generateArtifacts": True, "evaluationMode": mode,
                    "concurrency": config["concurrency"], "maxCostCny": remaining,
                    "generationInstruction": config["generation_instruction"],
-                   "expectedModel": config["model_id"], "expectedBudget": expected_budget(config)}
+                   "expectedModel": config["model_id"], "expectedBudget": expected_budget(config),
+                   "thinking": config.get("thinking", False), "rerank": config["retrieval"].get("rerank", False)}
             write_json(attempt / "job.json", job)
             print("Running mode {}: {} fixed tasks; monetary cap {}.".format(mode, len(pending), "disabled" if remaining is None else remaining), flush=True)
             code = run_job(args, attempt, job)

@@ -111,6 +111,10 @@ public class BoundedResearchModel implements Model {
                         + ". Read immediately after a search, before opening another search. When forced to finish, use ONLY the read IDs;"
                         + " omit unsupported findings and describe gaps. Do not attach a read ID to a fact only seen in another candidate.";
             }
+            reminder += "\nReading coverage: " + session.readingCoverage()
+                    + ". Scope may contain distractors: read each TARGET document for comparisons, not every allowed document. "
+                    + "Before another search, read a relevant pending candidate; seek only specific unresolved facts. "
+                    + "A related-work mention is not proof a method was an experimental baseline. Check lists before claiming items are missing.";
             // 兼容端点通常只可靠处理开头的系统指令，不在工具结果后追加第二条 system。
             if (finalization) {
                 // 生成输入已按证据裁剪，不混入要求调用研究工具的提示。
@@ -143,7 +147,7 @@ public class BoundedResearchModel implements Model {
                 session.budget.startCall(id, getModelName(), estimate(trimmed, tools), finalization ? "finalization" : session.main() ? "main" : "worker", session.taskId);
                 ToolChoice choice = session.finishingRepair() || session.remainingModelCalls(properties.getMaxWorkerModelCalls()) <= 1
                         ? new ToolChoice.Specific("finish_research") : new ToolChoice.Required();
-                if (!session.finishingRepair() && !session.main() && session.remainingModelCalls(properties.getMaxWorkerModelCalls()) > 1
+                if (!session.finishingRepair() && session.remainingModelCalls(properties.getMaxWorkerModelCalls()) > 1
                         && session.requiresRead()) choice = new ToolChoice.Specific("read_source");
                 GenerateOptions effective = tools == null || tools.isEmpty() ? options
                         : GenerateOptions.mergeOptions(GenerateOptions.builder().toolChoice(choice).build(), options);

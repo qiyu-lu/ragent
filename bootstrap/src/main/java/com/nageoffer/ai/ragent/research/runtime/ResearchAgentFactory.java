@@ -47,7 +47,7 @@ import java.util.function.Function;
 
 @Component
 public class ResearchAgentFactory implements ResearchRunner, AutoCloseable {
-    public static final String PROMPT_VERSION = "research-main-v3";
+    public static final String PROMPT_VERSION = "research-main-v4";
     private final ResearchModelFactory models;
     private final ResearchProperties properties;
     private final KnowledgeSearchService search;
@@ -56,7 +56,7 @@ public class ResearchAgentFactory implements ResearchRunner, AutoCloseable {
     private final TokenCounterService tokens;
     private final Semaphore modelQuota;
     private final String prompt;
-    public static final String WORKER_PROMPT_VERSION = "research-worker-v2";
+    public static final String WORKER_PROMPT_VERSION = "research-worker-v3";
     private final String workerPrompt;
     private final ResearchWorkerCoordinator coordinator;
     private final boolean delegationEnabled;

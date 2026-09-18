@@ -130,7 +130,8 @@ class ResearchNativeToolsTest {
             assertEquals("fixture-native", body.path("model").asText());
             assertFalse(body.path("enable_thinking").asBoolean(true));
             assertEquals(5, body.path("tools").size());
-            assertEquals("required", body.path("tool_choice").asText());
+            if (i == 1 || i == 3) assertEquals("read_source", body.path("tool_choice").path("function").path("name").asText());
+            else assertEquals("required", body.path("tool_choice").asText());
             if (i > 0) {
                 String expected = List.of("search-1", "read-1", "search-2", "read-2").get(i - 1);
                 boolean matched = false;
@@ -407,6 +408,22 @@ class ResearchNativeToolsTest {
                 .setBody("{\"error\":{\"message\":\"unauthorized\",\"type\":\"authentication_error\"}}"));
         assertThrows(RuntimeException.class, () -> factory().run(session));
         assertEquals(1, server.getRequestCount());
+    }
+
+    @Test
+    void mainReadsCandidateBeforeFurtherSearchAndReceivesConciseSource() throws Exception {
+        tool("search", "search_knowledge", Map.of("query", "X"));
+        tool("premature", "search_knowledge", Map.of("query", "Y"));
+        tool("read", "read_source", Map.of("evidence_id", "ev-one"));
+        tool("finish", "finish_research", Map.of("findings", List.of(Map.of("statement", "7 ms", "evidenceIds", List.of("ev-one"))), "gaps", List.of(), "conflicts", List.of()));
+        assertNotNull(factory().run(session).result());
+        server.takeRequest();
+        var forcedRead = json.readTree(server.takeRequest().getBody().readUtf8());
+        assertEquals("read_source", forcedRead.path("tool_choice").path("function").path("name").asText());
+        var feedback = server.takeRequest().getBody().readUtf8();
+        assertTrue(feedback.contains("Read a relevant candidate before searching again"));
+        verify(search, times(1)).search(anyString(), anyString(), anyString(), anyString(), anyList(), any(), anyInt());
+        assertEquals(List.of("doc"), session.readingCoverage().get("directlyReadDocumentIds"));
     }
 
     private void tool(String id, String name, Map<String, Object> arguments) throws Exception {

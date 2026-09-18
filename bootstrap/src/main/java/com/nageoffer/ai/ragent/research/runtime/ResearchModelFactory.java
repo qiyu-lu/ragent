@@ -37,6 +37,8 @@ public class ResearchModelFactory {
     private final AIModelProperties models;
     private final ResearchProperties research;
     private java.util.concurrent.Semaphore quota;
+    private boolean thinking;
+    public void setThinkingForEvaluation(boolean enabled) { this.thinking = enabled; }
 
     /** 主、worker 与产物生成共享同一请求配额。 */
     public synchronized java.util.concurrent.Semaphore quota() {
@@ -66,6 +68,6 @@ public class ResearchModelFactory {
                 // SDK 流取消会关闭 HTTP；关闭 thinking，usage 独立记录供应商返回值。
                 .stream(true).generateOptions(GenerateOptions.builder().temperature(0.0)
                         .maxTokens(research.getMaxOutputTokens()).parallelToolCalls(false)
-                        .additionalBodyParams(Map.of("enable_thinking", false)).build()).build();
+                        .additionalBodyParams(Map.of("enable_thinking", thinking)).build()).build();
     }
 }

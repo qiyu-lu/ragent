@@ -39,6 +39,29 @@ public class ResearchSession {
     private final Set<String> candidates = new HashSet<>();
     private Set<String> latestCandidates = Set.of();
     private boolean awaitingRead;
+    private final Set<String> readCandidates = new HashSet<>();
+    private final Map<String, Integer> searchCounts = new HashMap<>();
+    private final Map<String, String> candidateDocuments = new LinkedHashMap<>();
+
+    public synchronized void beforeSearch(String query, List<String> documents) {
+        if (query == null || query.isBlank() || query.length() > 10000) throw new ClientException("检索问题无效");
+        if (requiresRead()) throw new ClientException("Read a relevant candidate before searching again. Unread IDs: " + unreadCandidates());
+        String key = normalize(query) + "|" + (documents == null ? List.of() : documents.stream().sorted().toList());
+        int count = searchCounts.getOrDefault(key, 0);
+        if (count >= 2) throw new ClientException("REPEATED_SEARCH: inspect existing candidates or use a focused query for a specific unresolved fact.");
+        searchCounts.put(key, count + 1);
+    }
+    public synchronized void candidateHits(List<com.nageoffer.ai.ragent.research.model.KnowledgeSearchHit> hits) {
+        hits.forEach(h -> candidateDocuments.put(h.evidenceId(), h.docId()));
+        candidates(hits.stream().map(com.nageoffer.ai.ragent.research.model.KnowledgeSearchHit::evidenceId).toList());
+    }
+    public synchronized void readCandidate(String requested) { readCandidates.add(requested); }
+    public synchronized Map<String, Object> readingCoverage() {
+        var docs = delivered.values().stream().map(EvidenceRecord::docId).distinct().sorted().toList();
+        var unreadDocs = latestCandidates.stream().map(candidateDocuments::get).filter(Objects::nonNull)
+                .filter(id -> !docs.contains(id)).distinct().sorted().toList();
+        return Map.of("directlyReadDocumentIds", docs, "latestCandidateDocumentsNotRead", unreadDocs);
+    }
     private final Map<String, SubtaskResult> results = new LinkedHashMap<>();
     private final Set<String> acceptedIds = new LinkedHashSet<>();
     private final Set<String> delegatedGoals = new HashSet<>();
@@ -119,6 +142,7 @@ public class ResearchSession {
     public synchronized Set<String> unreadCandidates() {
         Set<String> unread = new LinkedHashSet<>(latestCandidates);
         unread.removeAll(delivered.keySet());
+        unread.removeAll(readCandidates);
         return Set.copyOf(unread);
     }
     public synchronized void requireReadable(String id) {

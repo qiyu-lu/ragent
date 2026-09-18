@@ -56,12 +56,13 @@ public class ResearchTools {
                         && !session.documents().containsAll(documents)) throw new ClientException("搜索不能扩大子任务文档范围");
                 if (documents == null || documents.isEmpty()) selected = session.documents();
             }
+            session.beforeSearch(query, selected);
             final var scope = selected;
             var hits = session.retrieve(() -> search.search(session.claim.run().id(), session.claim.owner(), session.taskId, query,
                     List.of(), scope, count));
             session.check();
-            session.candidates(hits.stream().map(com.nageoffer.ai.ragent.research.model.KnowledgeSearchHit::evidenceId).toList());
-            return hits;
+            session.candidateHits(hits);
+            return hits.stream().map(ResearchSourceView::candidate).toList();
         });
     }
 
@@ -75,6 +76,7 @@ public class ResearchTools {
                     : reader.read(session.claim.run().id(), session.claim.owner(), id, readMode, session.documents());
             session.check();
             session.delivered(result.evidence());
+            session.readCandidate(id);
             var e = result.evidence();
             var source = new java.util.LinkedHashMap<String, Object>();
             source.put("evidenceId", e.evidenceId()); source.put("docId", e.docId()); source.put("docName", e.documentName());
@@ -82,7 +84,7 @@ public class ResearchTools {
             source.put("excerpt", e.text()); source.put("chunkIds", e.chunkIds()); source.put("truncated", e.truncated());
             source.put("sourceExtent", e.sourceExtent()); source.put("sourceState", result.sourceState());
             session.event("SOURCE_READ", "已查阅来源：" + e.documentName(), source);
-            return result;
+            return ResearchSourceView.read(result);
         });
     }
 

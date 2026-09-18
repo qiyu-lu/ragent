@@ -87,6 +87,28 @@ public class BaiLianRerankClient implements RerankClient {
     }
 
     private List<RetrievedChunk> doRerank(String query, List<RetrievedChunk> candidates, int topN, ModelTarget target) {
+        var operation = com.nageoffer.ai.ragent.infra.operation.RequestOperation.current();
+        java.util.Map<String,Object> observation = new java.util.LinkedHashMap<>();
+        if (operation != null) observation.putAll(operation.identity());
+        observation.put("call_id", java.util.UUID.randomUUID().toString());
+        observation.put("provider", provider()); observation.put("model", target.candidate().getModel());
+        observation.put("usage", null); observation.put("usage_status", "unknown");
+        observation.put("success", false); observation.put("request_state", "STARTED");
+        RerankUsageCapture.record(observation);
+        long started = System.nanoTime();
+        try {
+            var result = operation == null ? request(query, candidates, topN, target, observation)
+                    : operation.measure("rerank.http", () -> request(query, candidates, topN, target, observation));
+            observation.put("success", true); return result;
+        } catch (RuntimeException error) {
+            observation.put("error_type", error.getClass().getSimpleName()); throw error;
+        } finally {
+            observation.put("elapsed_ms", (System.nanoTime() - started) / 1_000_000);
+            observation.put("request_state", "COMPLETED"); RerankUsageCapture.record(observation);
+        }
+    }
+
+    private List<RetrievedChunk> request(String query, List<RetrievedChunk> candidates, int topN, ModelTarget target, java.util.Map<String,Object> observation) {
         AIModelProperties.ProviderConfig provider = HttpResponseHelper.requireProvider(target, provider());
 
         if (candidates == null || candidates.isEmpty() || topN <= 0) {
@@ -120,7 +142,12 @@ public class BaiLianRerankClient implements RerankClient {
                 .build();
 
         JsonObject respJson;
-        try (Response response = httpClient.newCall(request).execute()) {
+        var operation = com.nageoffer.ai.ragent.infra.operation.RequestOperation.current();
+        var call = httpClient.newCall(request);
+        if (operation != null) call.timeout().timeout(Math.min(12000, operation.remainingMillis()), java.util.concurrent.TimeUnit.MILLISECONDS);
+        try (var cancellation = operation == null ? (com.nageoffer.ai.ragent.infra.operation.RequestOperation.Binding) () -> {} : operation.onCancel(call::cancel);
+             Response response = call.execute()) {
+            observation.put("http_status", response.code());
             if (!response.isSuccessful()) {
                 String body = HttpResponseHelper.readBody(response.body());
                 log.warn("{} rerank 请求失败: status={}, body={}", provider(), response.code(), body);
@@ -131,7 +158,12 @@ public class BaiLianRerankClient implements RerankClient {
                 );
             }
             respJson = HttpResponseHelper.parseJson(response.body(), provider());
+            if (respJson.has("usage") && !respJson.get("usage").isJsonNull()) {
+                observation.put("usage", new com.google.gson.Gson().fromJson(respJson.get("usage"), java.util.Map.class));
+                observation.put("usage_status", "provider");
+            }
         } catch (IOException e) {
+            if (operation != null) operation.remainingMillis();
             throw new ModelClientException(provider() + " rerank 请求失败: " + e.getMessage(), ModelClientErrorType.NETWORK_ERROR, null, e);
         }
 

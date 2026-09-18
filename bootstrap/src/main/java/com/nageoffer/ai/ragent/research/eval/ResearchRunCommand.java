@@ -66,10 +66,10 @@ import java.util.concurrent.*;
 public class ResearchRunCommand {
     public record Case(String id, String collection, List<String> sourceDocumentIds, String goal,
                         ResearchBrief.OutputType outputType, long cancelAfterMillis, String reply, Boolean cancelWhenWorkersRunning,
-                        List<String> constraints) { }
+                        List<String> constraints, String mode) { }
     public record Job(String runDir, List<Case> cases, Boolean generateArtifacts,
                       String evaluationMode, Integer concurrency, Double maxCostCny, String generationInstruction,
-                      String expectedModel, Map<String, Integer> expectedBudget) { }
+                      String expectedModel, Map<String, Integer> expectedBudget, Boolean thinking, Boolean rerank) { }
     @Configuration(proxyBeanMethods = false)
     @EnableTransactionManagement
     static class Transactions { }
@@ -80,10 +80,12 @@ public class ResearchRunCommand {
         boolean evaluation = job.evaluationMode() != null;
         int concurrency = job.concurrency() == null ? 1 : job.concurrency();
         if (job.cases().isEmpty() || job.cases().size() > (evaluation ? 6000 : 6)
-                || evaluation && (!Set.of("A", "B", "C").contains(job.evaluationMode()) || !Boolean.TRUE.equals(job.generateArtifacts())
+                || evaluation && (!Set.of("A", "B", "C", "MIXED").contains(job.evaluationMode()) || !Boolean.TRUE.equals(job.generateArtifacts())
                 || job.maxCostCny() != null && (!Double.isFinite(job.maxCostCny()) || job.maxCostCny() <= 0))
                 || concurrency < 1 || concurrency > 2 || !evaluation && concurrency != 1
-                || job.cases().stream().map(Case::id).distinct().count() != job.cases().size()) {
+                || job.cases().stream().anyMatch(c -> evaluation && (!Set.of("A", "B", "C").contains(c.mode() == null ? job.evaluationMode() : c.mode())
+                        || c.mode() != null && !"MIXED".equals(job.evaluationMode()) && !c.mode().equals(job.evaluationMode())))
+                || job.cases().stream().map(c -> c.id() + "/" + c.mode()).distinct().count() != job.cases().size()) {
             throw new IllegalArgumentException("Invalid bounded smoke/evaluation job");
         }
         String corpusUrl = required("RAGENT_POSTGRES_URL");
@@ -124,6 +126,7 @@ public class ResearchRunCommand {
         java.util.concurrent.atomic.DoubleAdder estimatedCost = new java.util.concurrent.atomic.DoubleAdder();
         try (var context = new AnnotationConfigApplicationContext();
              var embeddingUsage = Files.newBufferedWriter(directory.resolve("embedding-usage.jsonl"));
+             var rerankUsage = Files.newBufferedWriter(directory.resolve("rerank-usage.jsonl"));
              var predictions = Files.newBufferedWriter(directory.resolve("predictions.jsonl"));
              var traces = Files.newBufferedWriter(directory.resolve("traces.jsonl"));
              var usage = Files.newBufferedWriter(directory.resolve("usage.jsonl"))) {
@@ -160,21 +163,39 @@ public class ResearchRunCommand {
             var searchProperties = new SearchChannelProperties();
             searchProperties.getChannels().setTimeoutMs(properties.getToolTimeoutSeconds() * 1000L);
             var vector = new VectorSearchChannel(new PgVectorRetrieverService(corpusJdbc, embedding), searchProperties, retrieval);
-            var engine = new MultiChannelRetrievalEngine(List.of(vector), List.of(),
+            List<com.nageoffer.ai.ragent.rag.core.retrieval.postprocessor.SearchResultPostProcessor> processors = new ArrayList<>();
+            if (Boolean.TRUE.equals(job.rerank())) {
+                var rerankCandidate = models.getRerank().getCandidates().stream().filter(c -> "qwen3-rerank".equals(c.getId())).findFirst().orElseThrow();
+                var rerankTarget = new ModelTarget(rerankCandidate.getId(), rerankCandidate, models.getProviders().get(rerankCandidate.getProvider()), null);
+                var rerankClient = new com.nageoffer.ai.ragent.infra.rerank.BaiLianRerankClient(new okhttp3.OkHttpClient.Builder().callTimeout(12,TimeUnit.SECONDS).build());
+                com.nageoffer.ai.ragent.infra.rerank.RerankService reranking = (query, chunks, topN) -> {
+                    try (var capture = new com.nageoffer.ai.ragent.infra.rerank.RerankUsageCapture(event -> append(rerankUsage, event))) {
+                        return rerankClient.rerank(query, chunks, topN, rerankTarget);
+                    }
+                };
+                var ragProperties = new com.nageoffer.ai.ragent.rag.config.RAGConfigProperties();
+                ragProperties.setRerankEnabled(true);
+                processors.add(new com.nageoffer.ai.ragent.rag.core.retrieval.postprocessor.RerankPostProcessor(reranking, ragProperties));
+            }
+            var engine = new MultiChannelRetrievalEngine(List.of(vector), processors,
                     new RetrievalScopeResolver(searchProperties, new KbCollectionProvider(bases)), retrieval, searchProperties);
             var search = new KnowledgeSearchService(engine, bases, docs, catalog, evidence, JSON);
             var reader = new SourceReader(evidence, catalog, new EvidenceSnapshotFactory(JSON));
             var modelFactory = new ResearchModelFactory(models, properties);
+            modelFactory.setThinkingForEvaluation(Boolean.TRUE.equals(job.thinking()));
             if (evaluation) Files.writeString(directory.resolve("runtime.json"), JSON.writeValueAsString(Map.of(
-                    "research", properties, "mode", job.evaluationMode(), "retrieval", Map.of("channel", "PGVector", "rerank", false,
+                    "research", properties, "mode", job.evaluationMode(), "thinking", Boolean.TRUE.equals(job.thinking()), "retrieval", Map.of("channel", "PGVector", "rerank", Boolean.TRUE.equals(job.rerank()),
                     "recallBudget", 20, "candidateLimit", 40, "oneShotTopK", 10))));
             var finalization = Boolean.TRUE.equals(job.generateArtifacts()) ? new ResearchCompletionService(store,
                     new ResearchArtifactGenerator(modelFactory, properties, evidence, new PlanDraftValidator(), JSON, new HeuristicTokenCounterService(),
                             evaluation && job.generationInstruction() != null ? job.generationInstruction() : ""), JSON) : null;
-            try (var runner = new ResearchAgentFactory(modelFactory, properties, search, reader, JSON, new HeuristicTokenCounterService(), !"B".equals(job.evaluationMode()))) {
-            ResearchRunner execution = "A".equals(job.evaluationMode()) ? new OneShotResearchRunner(search, reader) : runner;
+            try (var delegated = new ResearchAgentFactory(modelFactory, properties, search, reader, JSON, new HeuristicTokenCounterService(), true);
+                 var single = new ResearchAgentFactory(modelFactory, properties, search, reader, JSON, new HeuristicTokenCounterService(), false)) {
+            var oneShot = new OneShotResearchRunner(search, reader);
             List<Future<?>> futures = new ArrayList<>();
             for (Case example : job.cases()) futures.add(runs.submit(() -> {
+                String mode = example.mode() == null ? job.evaluationMode() : example.mode();
+                ResearchRunner execution = "A".equals(mode) ? oneShot : "B".equals(mode) ? single : delegated;
                 if (evaluation && job.maxCostCny() != null && estimatedCost.sum() + 0.3 > job.maxCostCny()) {
                     throw new IllegalStateException("EVALUATION_COST_LIMIT");
                 }
@@ -187,7 +208,7 @@ public class ResearchRunCommand {
                 for (int i = 0; i < documents.size(); i++) goal = goal.replace("[[DOC_" + i + "]]", documents.get(i));
                 var brief = new ResearchBrief(goal, example.outputType(),
                         example.constraints() == null ? List.of() : example.constraints(), List.of(kb), documents);
-                var run = store.create("p3-real-smoke", "p3-smoke", example.id(), brief);
+                var run = store.create("p3-real-smoke", "p3-smoke", evaluation ? example.id() + "-" + mode : example.id(), brief);
                 execute(store, execution, finalization, run, properties, example.cancelAfterMillis(), Boolean.TRUE.equals(example.cancelWhenWorkersRunning()), cancels);
                 run = store.get(run.id(), "p3-real-smoke");
                 if (run.status() == ResearchRun.Status.WAITING_INPUT && example.reply() != null) {
@@ -196,19 +217,19 @@ public class ResearchRunCommand {
                     run = store.get(run.id(), "p3-real-smoke");
                 }
                 if (evaluation) {
-                    Map<String, Object> prediction = Map.of("caseId", example.id(), "mode", job.evaluationMode(),
+                    Map<String, Object> prediction = Map.of("caseId", example.id(), "mode", mode,
                             "elapsedMillis", (System.nanoTime() - started) / 1_000_000, "run", run,
                             "sources", evidence.readSources(run.id(), "p3-real-smoke"));
                     append(predictions, prediction);
                 } else append(predictions, run);
                 for (var event : store.events(run.id(), "p3-real-smoke", 0, 500)) append(traces,
-                        Map.of("runId", run.id(), "caseId", example.id(), "event", event));
+                        Map.of("runId", run.id(), "caseId", example.id(), "mode", mode == null ? "smoke" : mode, "event", event));
                 if (run.usage().get("calls") instanceof List<?> calls) for (Object call : calls) append(usage,
-                        Map.of("runId", run.id(), "caseId", example.id(), "call", call));
+                        Map.of("runId", run.id(), "caseId", example.id(), "mode", mode == null ? "smoke" : mode, "call", call));
                 if (job.maxCostCny() != null && run.usage().get("calls") instanceof List<?> calls) for (Object value : calls) {
                     if (value instanceof Map<?, ?> call) estimatedCost.add(estimateCost(call));
                 }
-                System.out.println(example.id() + " " + run.status() + " calls=" + run.usage().get("modelCalls")
+                System.out.println(example.id() + " " + mode + " " + run.status() + " calls=" + run.usage().get("modelCalls")
                         + (job.maxCostCny() == null ? "" : " estimatedCny=" + estimatedCost.sum()));
             }));
             for (Future<?> future : futures) future.get();

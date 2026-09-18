@@ -5,7 +5,7 @@
 | 项 | 值 |
 | --- | --- |
 | 更新时间 | 2026-09-18（X1 完成，W1 收尾中） |
-| 当前工作项 | W1 收尾：X1 汇总已提交，下一项改动说明与索引 |
+| 当前工作项 | W1 收尾：X1 汇总与改动说明已提交，下一项打标签、删除 X1 工作树 |
 | 分支 / 提交 | `feat/llm-backend-hardening`，自 `65c99c7`（标签 `career-v0-baseline`）拉出 |
 | 回归通过数 | `LC_ALL=en_US.UTF-8 bash scripts/validate-agentic-research-p7.sh`：基线 Python 33/33、Java 217/217；W1 后 Python 36/36、Java 220/220，约 20 s |
 | 最近的运行目录 | `local-data/agentic-research/runs/career_X1_v1_*`（X1 已完成）；协议探针见 `eval/agentic-research/manifests/career-cache-probe-2026-09-18.json` |
@@ -13,7 +13,7 @@
 ## 进度
 
 - [x] S0 分支、基线标签、提交计划、基线回归
-- [ ] W1 缓存友好的上下文布局 + X1（[x] 文档与探针 [x] 布局与压缩 [x] 台账与报告 [x] X1 [ ] 改动说明、标签）
+- [ ] W1 缓存友好的上下文布局 + X1（[x] 文档与探针 [x] 布局与压缩 [x] 台账与报告 [x] X1 [x] 改动说明 [ ] 标签）
 - [ ] W3 模拟上游与故障注入基准 + X3
 - [ ] W2 心跳租约、跨实例接管、断点续跑、优雅停机 + X2
 - [ ] W4 权限隔离 + 越权矩阵
@@ -32,7 +32,7 @@
 - 缓存：命中率 B 9.8%→78.4%、C 0.2%→80.0%；计费输入/输入 92.2%→32.3%、99.8%→30.7%；单任务计费输入 62,678→19,361（−69%）、76,458→19,352（−75%），其中单任务输入本身也降 12%、18%（after 调用更少）。
 - 延迟：单次调用 P50 B −7.8%、C −0.6%，P95 −18%、−0.9%；每个任务的首次调用慢约 0.35 s；首 token 只有 after 有（P50 687 / 771 ms）；单任务耗时 P50 45→34 s、41→36 s。
 - 护栏：完成 B 38 + 1 FAILED + 1 PARTIAL → 40、C 40 → 39 + 1 PARTIAL；答案 F1 配对自助法 95% 区间均含 0，唯 MuSiQue C 可回答 6 题 3 降 0 升（2 题同实体但措辞冗长，1 题 6 次调用即给出不同实体，旧版 14 次）。未触发压缩；C 几乎不委派，worker 缓存未被 X1 覆盖。
-- 下一步：写 W1 改动说明与 `changes/README.md` 索引 → 打标签 `career-w1` → 删除 `../ragent-x1/{before,after}` 两个工作树。
+- 改动说明：[`changes/2026-09-18-prompt-cache-stable-prefix.md`](changes/2026-09-18-prompt-cache-stable-prefix.md)（已入索引）。下一步：打标签 `career-w1` → 删除 `../ragent-x1/{before,after}` 两个工作树。
 
 ## 已知事实与遗留问题
 

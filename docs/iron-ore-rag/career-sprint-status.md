@@ -4,16 +4,16 @@
 
 | 项 | 值 |
 | --- | --- |
-| 更新时间 | 2026-09-18（W1 代码完成，X1 已备好、待用户后台运行） |
-| 当前工作项 | W1：第 1—3 项完成（代码 `b186852`、`73deab5`），第 4 项 X1 待运行 |
+| 更新时间 | 2026-09-18（X1 完成，W1 收尾中） |
+| 当前工作项 | W1 收尾：X1 汇总已提交，下一项改动说明与索引 |
 | 分支 / 提交 | `feat/llm-backend-hardening`，自 `65c99c7`（标签 `career-v0-baseline`）拉出 |
 | 回归通过数 | `LC_ALL=en_US.UTF-8 bash scripts/validate-agentic-research-p7.sh`：基线 Python 33/33、Java 217/217；W1 后 Python 36/36、Java 220/220，约 20 s |
-| 最近的运行目录 | X1 未开始：`local-data/agentic-research/runs/career_X1_v1_*`；协议探针 34 次调用见 `eval/agentic-research/manifests/career-cache-probe-2026-09-18.json` |
+| 最近的运行目录 | `local-data/agentic-research/runs/career_X1_v1_*`（X1 已完成）；协议探针见 `eval/agentic-research/manifests/career-cache-probe-2026-09-18.json` |
 
 ## 进度
 
 - [x] S0 分支、基线标签、提交计划、基线回归
-- [ ] W1 缓存友好的上下文布局 + X1（[x] 文档与探针 [x] 布局与压缩 [x] 台账与报告 [ ] X1）
+- [ ] W1 缓存友好的上下文布局 + X1（[x] 文档与探针 [x] 布局与压缩 [x] 台账与报告 [x] X1 [ ] 改动说明、标签）
 - [ ] W3 模拟上游与故障注入基准 + X3
 - [ ] W2 心跳租约、跨实例接管、断点续跑、优雅停机 + X2
 - [ ] W4 权限隔离 + 越权矩阵
@@ -27,12 +27,12 @@
 - 稳定前缀后隐式命中逐步仍不稳定（4 次中 1 次）；显式标记打在最新一条历史上则逐步确定命中整段旧前缀、只写增量。AgentScope 自带的消息级标记被百炼忽略，所以由传输层改写为内容块并读回写入量。
 - 实现：系统消息只放静态提示；提醒改为末尾临时 user 消息、不进记忆；越线一次压到 60%（先存根后整轮移除，水位固定）；首条消息按键排序；台账新增 `durationMs`、`firstTokenMs`、`cacheCreationTokens`、`cacheType`；`cache_report.py` 对 P7 复算与 E1 一致（B 5.19%、C 0.02%）。限制：压缩后回看超过 20 个内容块时显式缓存要重写一次前缀；探针 34 次调用多于计划的 3—5 次（查明 C 的 0、重放新代码请求）。
 
-## 下一步：X1（由用户在终端后台运行，编码 Agent 不等待、不轮询）
+## X1 结果（2026-09-18 16:57—17:52，真实百炼 Flash + SiliconFlow；汇总 `eval/agentic-research/manifests/career-x1-2026-09-18.json`）
 
-- 命令：`cd /home/sd101t/IdeaProjects/ragent-iron-ore-rag && nohup bash scripts/career-x1.sh > local-data/agentic-research/runs/career_X1_v1.log 2>&1 &`；预计 60—90 分钟（P7 单任务 P50 约 35 s、并发 2；embedding 慢时更长），约 166 个任务的真实调用；中断后原命令重跑即续跑。
-- 过程：工作树 `../ragent-x1/before`（`career-v0-baseline`）与 `../ragent-x1/after`（`73deab5`）已建好并编译；先跑 smoke（固定题外 3 题 × B、C），embedding 失败率 > 10% 或任务缺失、失败 > 2 个即停；再按 before B → after B → after C → before C 各跑 40 题（`manifests/career-cache-case-ids.json`，配置 `configs/career-x1.json` 与 P7 相同）。
-- 结果：总日志 `runs/career_X1_v1.log`，各批日志 `runs/career_X1_v1_<批次>.log`；批次目录 `runs/career_X1_v1_{smoke_B,smoke_C,before_B,after_B,after_C,before_C}/`（`summary.json` 含完成率与 F1 护栏）；缓存报告 `runs/career_X1_v1_cache_report.{md,json}`（`runs/` 即 `local-data/agentic-research/runs/`）。
-- X1 之后：写精简汇总 `eval/agentic-research/manifests/career-x1-<日期>.json`、改动说明与 `changes/README.md` 索引，更新本文件，打标签 `career-w1`，`git worktree remove` 两个 X1 工作树。smoke 若因 embedding 停止，先按计划附录切本地 embedding。
+- 缓存：命中率 B 9.8%→78.4%、C 0.2%→80.0%；计费输入/输入 92.2%→32.3%、99.8%→30.7%；单任务计费输入 62,678→19,361（−69%）、76,458→19,352（−75%），其中单任务输入本身也降 12%、18%（after 调用更少）。
+- 延迟：单次调用 P50 B −7.8%、C −0.6%，P95 −18%、−0.9%；每个任务的首次调用慢约 0.35 s；首 token 只有 after 有（P50 687 / 771 ms）；单任务耗时 P50 45→34 s、41→36 s。
+- 护栏：完成 B 38 + 1 FAILED + 1 PARTIAL → 40、C 40 → 39 + 1 PARTIAL；答案 F1 配对自助法 95% 区间均含 0，唯 MuSiQue C 可回答 6 题 3 降 0 升（2 题同实体但措辞冗长，1 题 6 次调用即给出不同实体，旧版 14 次）。未触发压缩；C 几乎不委派，worker 缓存未被 X1 覆盖。
+- 下一步：写 W1 改动说明与 `changes/README.md` 索引 → 打标签 `career-w1` → 删除 `../ragent-x1/{before,after}` 两个工作树。
 
 ## 已知事实与遗留问题
 

@@ -1,0 +1,565 @@
+{
+  "experiment": "X1 prompt cache before/after (career sprint W1)",
+  "date": "2026-09-18",
+  "finished": "2026-09-18 17:52:36",
+  "upstream": "real Bailian qwen3.7-flash-2026-07-15 (all roles) + SiliconFlow Qwen3-Embedding-8B; not a simulated upstream",
+  "before": {
+    "commit": "65c99c7",
+    "tag": "career-v0-baseline"
+  },
+  "after": {
+    "commit": "73deab5",
+    "explicitPromptCache": true
+  },
+  "workload": {
+    "caseIds": "eval/agentic-research/manifests/career-cache-case-ids.json",
+    "caseIdsSha256": "ebf71d9f5bed6555744aad01deb89aacc854fa48f2de68b6a17f369dc6a1cbb3",
+    "questions": "first 20 QASPER validation + first 20 MuSiQue dev regression queries",
+    "modes": [
+      "B",
+      "C"
+    ],
+    "config": "eval/agentic-research/configs/career-x1.json",
+    "configSha256": "fdb91ae14e5daed1c58185724cf1823948b15ed85033a796a56cb1ee62c15e24",
+    "order": "ABBA: before B, after B, after C, before C; concurrency 2; same corpus research_corpus_v1"
+  },
+  "smoke": {
+    "caseIds": "eval/agentic-research/manifests/career-cache-smoke-ids.json",
+    "gate": "embedding failures <= 10% and 6/6 recorded",
+    "runs": {
+      "smoke_B": {
+        "started": "2026-09-18 16:56:59",
+        "recorded": 3,
+        "embeddingCalls": 8,
+        "embeddingFailed": 0
+      },
+      "smoke_C": {
+        "started": "2026-09-18 16:57:49",
+        "recorded": 3,
+        "embeddingCalls": 8,
+        "embeddingFailed": 1
+      }
+    }
+  },
+  "billingRates": {
+    "explicit_hit": 0.1,
+    "explicit_write": 1.25,
+    "implicit_hit": 0.2,
+    "source": "https://help.aliyun.com/zh/model-studio/context-cache",
+    "unit": "input-token equivalents, not currency"
+  },
+  "derivation": "cache_report.py over the four run directories; guardrails from each summary.json; paired bootstrap of per-question answer F1 (seed 20260918, 10000 resamples)",
+  "arms": {
+    "before_B": {
+      "started": "2026-09-18 16:58:48",
+      "runDir": "local-data/agentic-research/runs/career_X1_v1_before_B",
+      "cache": {
+        "tasks": 40,
+        "modelCalls": 441,
+        "mainCallsPerTask": 9.93,
+        "inputTokens": 2720518,
+        "inputPerTask": 68013,
+        "cachedTokens": 266752,
+        "cacheWriteTokens": 0,
+        "hitRatio": 0.0981,
+        "mainHitRatio": 0.098,
+        "mainPerCallHitRatio": {
+          "p10": 0.0,
+          "p50": 0.0935,
+          "p90": 0.3783
+        },
+        "mainHitRatioByCallIndex": {
+          "1": 0.323,
+          "2": 0.184,
+          "3": 0.189,
+          "4": 0.141,
+          "5": 0.113,
+          "6-8": 0.087,
+          "9+": 0.064
+        },
+        "billedInputTokens": 2507116.4,
+        "billedToInputRatio": 0.9216,
+        "billedInputPerTask": 62677.9,
+        "callMs": {
+          "p50": 2096,
+          "p95": 7220
+        },
+        "mainCallMsByIndex": {
+          "1": [
+            1242,
+            2515
+          ],
+          "2": [
+            2070,
+            6647
+          ],
+          "3": [
+            1630,
+            4446
+          ],
+          "4": [
+            1885,
+            3642
+          ],
+          "5": [
+            1707,
+            6347
+          ],
+          "6-8": [
+            2215,
+            7251
+          ],
+          "9+": [
+            2338,
+            9637
+          ]
+        },
+        "firstTokenMs": null,
+        "taskSeconds": {
+          "p50": 44.8,
+          "p95": 65.5
+        }
+      },
+      "guardrails": {
+        "qasper": {
+          "records": 20,
+          "statuses": {
+            "COMPLETED": 18,
+            "FAILED": 1,
+            "PARTIAL": 1
+          },
+          "answerScored": 20,
+          "answerF1": 0.3872,
+          "answerEM": 0.25,
+          "evidenceF1": 0.5,
+          "answerabilityAccuracy": 0.85,
+          "answerFormatErrors": 0
+        },
+        "musique": {
+          "records": 20,
+          "statuses": {
+            "COMPLETED": 20
+          },
+          "answerScored": 6,
+          "answerF1": 0.7097,
+          "answerEM": 0.3333,
+          "evidenceF1": 0.75,
+          "answerabilityAccuracy": 0.35,
+          "answerFormatErrors": 0
+        }
+      },
+      "embeddingCalls": 173,
+      "embeddingFailed": 12,
+      "events": {
+        "NATIVE_FINISH_REPAIR": 3,
+        "MODEL_RETRY": 2
+      }
+    },
+    "after_B": {
+      "started": "2026-09-18 17:13:52",
+      "runDir": "local-data/agentic-research/runs/career_X1_v1_after_B",
+      "cache": {
+        "tasks": 40,
+        "modelCalls": 423,
+        "mainCallsPerTask": 9.47,
+        "inputTokens": 2399233,
+        "inputPerTask": 59981,
+        "cachedTokens": 1881937,
+        "cacheWriteTokens": 274263,
+        "hitRatio": 0.7844,
+        "mainHitRatio": 0.8237,
+        "mainPerCallHitRatio": {
+          "p10": 0.5707,
+          "p50": 0.8232,
+          "p90": 0.9045
+        },
+        "mainHitRatioByCallIndex": {
+          "1": 0.717,
+          "2": 0.524,
+          "3": 0.793,
+          "4": 0.721,
+          "5": 0.829,
+          "6-8": 0.828,
+          "9+": 0.887
+        },
+        "billedInputTokens": 774439.4,
+        "billedToInputRatio": 0.3228,
+        "billedInputPerTask": 19361.0,
+        "callMs": {
+          "p50": 1933,
+          "p95": 5923
+        },
+        "mainCallMsByIndex": {
+          "1": [
+            1590,
+            2019
+          ],
+          "2": [
+            1981,
+            3030
+          ],
+          "3": [
+            1502,
+            2217
+          ],
+          "4": [
+            1885,
+            5379
+          ],
+          "5": [
+            1581,
+            5507
+          ],
+          "6-8": [
+            1860,
+            7645
+          ],
+          "9+": [
+            2153,
+            6597
+          ]
+        },
+        "firstTokenMs": {
+          "p50": 687,
+          "p95": 1476
+        },
+        "taskSeconds": {
+          "p50": 34.1,
+          "p95": 58.5
+        }
+      },
+      "guardrails": {
+        "qasper": {
+          "records": 20,
+          "statuses": {
+            "COMPLETED": 20
+          },
+          "answerScored": 20,
+          "answerF1": 0.2773,
+          "answerEM": 0.05,
+          "evidenceF1": 0.456,
+          "answerabilityAccuracy": 0.8,
+          "answerFormatErrors": 1
+        },
+        "musique": {
+          "records": 20,
+          "statuses": {
+            "COMPLETED": 20
+          },
+          "answerScored": 6,
+          "answerF1": 0.6839,
+          "answerEM": 0.3333,
+          "evidenceF1": 0.8056,
+          "answerabilityAccuracy": 0.55,
+          "answerFormatErrors": 0
+        }
+      },
+      "embeddingCalls": 131,
+      "embeddingFailed": 6,
+      "events": {
+        "NATIVE_FINISH_REPAIR": 4
+      }
+    },
+    "before_C": {
+      "started": "2026-09-18 17:38:45",
+      "runDir": "local-data/agentic-research/runs/career_X1_v1_before_C",
+      "cache": {
+        "tasks": 40,
+        "modelCalls": 457,
+        "mainCallsPerTask": 10.18,
+        "inputTokens": 3062938,
+        "inputPerTask": 76573,
+        "cachedTokens": 5760,
+        "cacheWriteTokens": 0,
+        "hitRatio": 0.0019,
+        "mainHitRatio": 0.002,
+        "mainPerCallHitRatio": {
+          "p10": 0.0,
+          "p50": 0.0,
+          "p90": 0.0
+        },
+        "mainHitRatioByCallIndex": {
+          "1": 0.02,
+          "2": 0.026,
+          "3": 0.0,
+          "4": 0.0,
+          "5": 0.0,
+          "6-8": 0.0,
+          "9+": 0.0
+        },
+        "billedInputTokens": 3058330.0,
+        "billedToInputRatio": 0.9985,
+        "billedInputPerTask": 76458.2,
+        "callMs": {
+          "p50": 1974,
+          "p95": 5490
+        },
+        "mainCallMsByIndex": {
+          "1": [
+            1172,
+            1989
+          ],
+          "2": [
+            1740,
+            3002
+          ],
+          "3": [
+            1617,
+            2478
+          ],
+          "4": [
+            1961,
+            3979
+          ],
+          "5": [
+            1663,
+            3528
+          ],
+          "6-8": [
+            1888,
+            3019
+          ],
+          "9+": [
+            2351,
+            7433
+          ]
+        },
+        "firstTokenMs": null,
+        "taskSeconds": {
+          "p50": 41.3,
+          "p95": 73.8
+        }
+      },
+      "guardrails": {
+        "qasper": {
+          "records": 20,
+          "statuses": {
+            "COMPLETED": 20
+          },
+          "answerScored": 20,
+          "answerF1": 0.2602,
+          "answerEM": 0.05,
+          "evidenceF1": 0.3417,
+          "answerabilityAccuracy": 0.85,
+          "answerFormatErrors": 0
+        },
+        "musique": {
+          "records": 20,
+          "statuses": {
+            "COMPLETED": 20
+          },
+          "answerScored": 6,
+          "answerF1": 0.8968,
+          "answerEM": 0.6667,
+          "evidenceF1": 0.75,
+          "answerabilityAccuracy": 0.5,
+          "answerFormatErrors": 0
+        }
+      },
+      "embeddingCalls": 181,
+      "embeddingFailed": 16,
+      "events": {
+        "NATIVE_FINISH_REPAIR": 1
+      }
+    },
+    "after_C": {
+      "started": "2026-09-18 17:25:42",
+      "runDir": "local-data/agentic-research/runs/career_X1_v1_after_C",
+      "cache": {
+        "tasks": 40,
+        "modelCalls": 411,
+        "mainCallsPerTask": 9.22,
+        "inputTokens": 2522125,
+        "inputPerTask": 63053,
+        "cachedTokens": 2017319,
+        "cacheWriteTokens": 270213,
+        "hitRatio": 0.7998,
+        "mainHitRatio": 0.8362,
+        "mainPerCallHitRatio": {
+          "p10": 0.6399,
+          "p50": 0.8391,
+          "p90": 0.9073
+        },
+        "mainHitRatioByCallIndex": {
+          "1": 0.775,
+          "2": 0.605,
+          "3": 0.818,
+          "4": 0.747,
+          "5": 0.848,
+          "6-8": 0.841,
+          "9+": 0.893
+        },
+        "billedInputTokens": 774091.2,
+        "billedToInputRatio": 0.3069,
+        "billedInputPerTask": 19352.3,
+        "callMs": {
+          "p50": 1962,
+          "p95": 5441
+        },
+        "mainCallMsByIndex": {
+          "1": [
+            1527,
+            2103
+          ],
+          "2": [
+            2116,
+            3178
+          ],
+          "3": [
+            1617,
+            2317
+          ],
+          "4": [
+            1872,
+            3221
+          ],
+          "5": [
+            1750,
+            5730
+          ],
+          "6-8": [
+            2070,
+            7501
+          ],
+          "9+": [
+            2281,
+            8704
+          ]
+        },
+        "firstTokenMs": {
+          "p50": 771,
+          "p95": 1546
+        },
+        "taskSeconds": {
+          "p50": 35.6,
+          "p95": 71.0
+        }
+      },
+      "guardrails": {
+        "qasper": {
+          "records": 20,
+          "statuses": {
+            "COMPLETED": 19,
+            "PARTIAL": 1
+          },
+          "answerScored": 20,
+          "answerF1": 0.2752,
+          "answerEM": 0.1,
+          "evidenceF1": 0.4119,
+          "answerabilityAccuracy": 0.85,
+          "answerFormatErrors": 0
+        },
+        "musique": {
+          "records": 20,
+          "statuses": {
+            "COMPLETED": 20
+          },
+          "answerScored": 6,
+          "answerF1": 0.6531,
+          "answerEM": 0.3333,
+          "evidenceF1": 0.75,
+          "answerabilityAccuracy": 0.5,
+          "answerFormatErrors": 0
+        }
+      },
+      "embeddingCalls": 139,
+      "embeddingFailed": 14,
+      "events": {
+        "NATIVE_FINISH_REPAIR": 3
+      }
+    }
+  },
+  "deltas": {
+    "B": {
+      "hitRatio": [
+        0.0981,
+        0.7844
+      ],
+      "billedToInputRatio": [
+        0.9216,
+        0.3228
+      ],
+      "billedInputPerTaskChange": -0.6911,
+      "inputPerTaskChange": -0.1181,
+      "callMsP50Change": -0.0778,
+      "callMsP95Change": -0.1796,
+      "firstCallMsP50": [
+        1242,
+        1590
+      ],
+      "taskSecondsP50Change": -0.2388
+    },
+    "C": {
+      "hitRatio": [
+        0.0019,
+        0.7998
+      ],
+      "billedToInputRatio": [
+        0.9985,
+        0.3069
+      ],
+      "billedInputPerTaskChange": -0.7469,
+      "inputPerTaskChange": -0.1766,
+      "callMsP50Change": -0.0061,
+      "callMsP95Change": -0.0089,
+      "firstCallMsP50": [
+        1172,
+        1527
+      ],
+      "taskSecondsP50Change": -0.138
+    }
+  },
+  "pairedAnswerF1": {
+    "qasper/B": {
+      "n": 20,
+      "meanDiff": -0.11,
+      "bootstrap95": [
+        -0.3029,
+        0.0542
+      ],
+      "up": 9,
+      "down": 7,
+      "p7OlderCodeAnswerF1": 0.105
+    },
+    "musique/B": {
+      "n": 6,
+      "meanDiff": -0.0258,
+      "bootstrap95": [
+        -0.3611,
+        0.2354
+      ],
+      "up": 2,
+      "down": 1,
+      "p7OlderCodeAnswerF1": 0.8571
+    },
+    "qasper/C": {
+      "n": 20,
+      "meanDiff": 0.015,
+      "bootstrap95": [
+        -0.1513,
+        0.1791
+      ],
+      "up": 7,
+      "down": 7,
+      "p7OlderCodeAnswerF1": 0.2399
+    },
+    "musique/C": {
+      "n": 6,
+      "meanDiff": -0.2437,
+      "bootstrap95": [
+        -0.4745,
+        -0.045
+      ],
+      "up": 0,
+      "down": 3,
+      "p7OlderCodeAnswerF1": 0.8184
+    }
+  },
+  "observations": [
+    "Main-agent hit ratio rose from 9.8% (B) and 0.2% (C) to 82.4% and 83.6%; the first call of each run already hit 72-78% because runs share the static system message and tools.",
+    "Billed input per task fell 69% (B) and 75% (C); input per task also fell 12% and 18% because after-runs made fewer calls, so billedToInputRatio is the cache-only measure.",
+    "Call latency did not improve reliably: overall P50 -7.8% (B) and -0.6% (C), P95 -18% and -0.9%; first calls were about 0.35 s slower in both modes; before-runs lack first-token timing.",
+    "Answer F1 changes are within paired-bootstrap noise except MuSiQue C (n=6): 3 of 6 answerable questions dropped, none rose; two gave the same entity in a verbose sentence, one answered a different entity after 6 calls instead of 14.",
+    "No CONTEXT_COMPACTED event occurred; compaction is covered only by protocol tests. C delegated in 1 of 40 before-runs and 0 of 40 after-runs, so worker caching was not exercised."
+  ]
+}

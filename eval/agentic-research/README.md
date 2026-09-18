@@ -74,8 +74,8 @@ python3 eval/agentic-research/smoke_research.py --run-dir local-data/agentic-res
 父任务收到的是 `SubtaskResult` 列表。`state.subtasks` 保存每个任务的范围、状态、已读 ID 与压缩结果；事件通过 `taskId` 区分。主 Agent 自己阅读的 ID 位于 `readEvidenceIds`，worker findings 中经验证的引用位于 `acceptedWorkerEvidenceIds`。后者允许引用，但不代表主 Agent 看过 worker 原文或完整历史。失败/超时保留其他 worker 成功结果；取消、过期 epoch、已结束子任务后的重复回调均不能覆盖已提交结果。重启和主任务提前结束会关闭仍在运行的子状态，保留已有快照。
 
 ```bash
-# P4 核心故障测试；复用 P3 helper 的随机 research_p3_* 隔离库和清理
-bash scripts/validate-agentic-research-p4.sh
+# 研究核心故障测试已并入 P7 回归；复用 P3 helper 的随机 research_p3_* 隔离库和清理
+bash scripts/validate-agentic-research-p7.sh
 
 # 4 个 P4 请求：跨文档比较、PLAN 研究、串行多跳、两个 worker 在途取消；无 API 调用
 python3 eval/agentic-research/smoke_research.py --phase p4 --run-dir local-data/agentic-research/runs/<new-id>
@@ -93,8 +93,8 @@ python3 eval/agentic-research/smoke_research.py --phase p4 --case comparison-wor
 GET `/{runId}/events` 按 Accept 返回分页 JSON 或 `text/event-stream`。SSE 发送 progress、artifact 和 snapshot，支持 after / Last-Event-ID；订阅、刷新及重连只读持久记录，不创建模型执行。主动 cancel 才取消研究。最终生成使用预留的两次调用，结构与已读引用校验后原子提交 artifact 和事件；生成失败保留研究摘要、落 FAILED，不发布非法结果。计划未知参数保留待确认，用户约束标为 user_input。
 
 ```bash
-# 本地模型 HTTP 和随机 PostgreSQL 隔离库回归，不消耗供应商额度
-bash scripts/validate-agentic-research-p6.sh
+# 本地模型 HTTP 和随机 PostgreSQL 隔离库回归（已并入 P7），不消耗供应商额度
+bash scripts/validate-agentic-research-p7.sh
 
 # P5 完整生成 smoke 请求准备；不加 --execute 时无付费请求
 python3 eval/agentic-research/smoke_research.py --phase p5 --case comparison-workers --case plan-workers --run-dir local-data/agentic-research/runs/<new-id>
@@ -205,8 +205,6 @@ python3 eval/agentic-research/evaluate_applications.py --run-dir local-data/agen
 python3 eval/agentic-research/evaluate_applications.py --run-dir local-data/agentic-research/runs/<new-app-id> --execute
 # 新批次只复测两个冻结样例；不能改名成 24 项回归
 python3 eval/agentic-research/evaluate_applications.py --run-dir local-data/agentic-research/runs/<new-demo-id> --case comparison-03 --case plan-02 --execute
-bash scripts/demo-agentic-research.sh
-bash scripts/demo-agentic-research.sh --execute
 # 程序行为与既有链回归：随机隔离数据库、本地 HTTP 桩，不调用付费模型
 bash scripts/validate-agentic-research-p7.sh
 bash scripts/validate-agentic-research-p2-database.sh

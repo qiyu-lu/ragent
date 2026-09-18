@@ -404,6 +404,10 @@ class ResearchRunPostgresIT {
     private List<Map<String, Object>> starts(String id) {
         return store.events(id, owner, 0, 500).stream().filter(e -> e.type().equals("RUN_STARTED")).map(e -> e.payload()).toList();
     }
+    /** 同库的其他用例可能留下更早的排队任务，轮询按空闲槽位先领旧任务，所以反复轮询直到目标任务结束。 */
+    private void pollUntilTerminal(ResearchRunService service, String id, String runOwner) throws Exception {
+        await(() -> { service.poll(); return store.get(id, runOwner).status().terminal(); });
+    }
     private void contiguous(String id) {
         var events = store.events(id, owner, 0, 500);
         for (int i = 0; i < events.size(); i++) assertEquals(i + 1, events.get(i).sequence());
@@ -437,8 +441,7 @@ class ResearchRunPostgresIT {
             assertFalse(survivorRuns.contains(run.id()), "a live lease must not be taken over");
             // 模拟实例 A 失联：它不再续租，租约过期。
             expireLease(run.id());
-            b.poll();
-            await(() -> store.get(run.id(), owner).status().terminal());
+            pollUntilTerminal(b, run.id(), owner);
             assertEquals(1, survivorRuns.stream().filter(run.id()::equals).count());
             release.countDown();
             await(() -> lateWrite.get() != null);
@@ -534,8 +537,7 @@ class ResearchRunPostgresIT {
             a.create(request("q2"));
             var third = a.create(request("q3"));
             assertEquals(Status.QUEUED, store.get(third.id(), owner).status(), "a full local queue no longer fails the run");
-            b.poll();
-            await(() -> store.get(third.id(), owner).status().terminal());
+            pollUntilTerminal(b, third.id(), owner);
             assertNotEquals("RUN_QUEUE_FULL", store.get(third.id(), owner).errorSummary());
         } finally { release.countDown(); a.close(); b.close(); }
     }
@@ -556,8 +558,7 @@ class ResearchRunPostgresIT {
             var queued = store.get(run.id(), owner);
             assertEquals(Status.QUEUED, queued.status());
             assertTrue(store.events(run.id(), owner, 0, 500).stream().anyMatch(e -> e.type().equals("RUN_RELEASED")));
-            b.poll();
-            await(() -> store.get(run.id(), owner).status().terminal());
+            pollUntilTerminal(b, run.id(), owner);
             assertNotEquals("EXECUTION_CANCELLED", store.get(run.id(), owner).errorSummary());
             assertEquals(0, jdbc.queryForObject("SELECT takeover_count FROM t_research_run WHERE id = ?", Integer.class, run.id()));
             assertFalse(starts(run.id()).get(1).containsKey("takeover"));
@@ -571,15 +572,13 @@ class ResearchRunPostgresIT {
         jdbc.update("INSERT INTO t_user (id, username, password, role) VALUES (?, ?, 'x', 'user')", userId, "u" + userId);
         jdbc.update("INSERT INTO t_conversation (id, conversation_id, user_id, title) VALUES (?, ?, ?, 'fixture')", "c" + userId, "c" + userId, userId);
         var seen = new java.util.concurrent.atomic.AtomicReference<com.nageoffer.ai.ragent.framework.context.LoginUser>();
-        var b = service(session -> { seen.set(UserContext.get()); return gapOnly(); }, new ResearchProperties());
+        var b = service(session -> { if (session.claim.owner().equals(userId)) seen.set(UserContext.get()); return gapOnly(); }, new ResearchProperties());
         try {
             var run = store.create(userId, "c" + userId, "identity", brief());
-            b.poll();
-            await(() -> seen.get() != null);
+            pollUntilTerminal(b, run.id(), userId);
             assertEquals(userId, seen.get().getUserId());
             assertEquals("u" + userId, seen.get().getUsername());
             assertEquals("user", seen.get().getRole());
-            await(() -> store.get(run.id(), userId).status().terminal());
         } finally { b.close(); }
     }
 

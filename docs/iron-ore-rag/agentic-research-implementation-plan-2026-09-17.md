@@ -542,7 +542,7 @@ R1 已将评测金额计算与拦截改为显式可选：默认 `estimate_genera
 
 单元测试、模拟故障测试与真实 API 评测分别记录。结果下降和失败样本保留，不覆盖旧批次；报告说明真实运行规模，不能把 400 题抽样写成全量评测。执行顺序仍为定位问题、针对性复现、受影响路径真实复测，再运行固定回归。
 
-### 8.6 失败诊断与后续改进（2026-09-18，R1 完成，R2 待实施）
+### 8.6 失败诊断与后续改进（2026-09-18，R1 完成，R2 已实现并复测）
 
 实施前诊断读取了 P7 固定 regression 的 predictions、逐次 trace、embedding usage 和源码，并运行本地 Toolkit schema / JSON 转换探针；该诊断批次没有新增供应商调用、数据库操作或质量复测。离线脚本、输入 SHA-256、逐项分类和探针结果保存在 `local-data/agentic-research/runs/20260918T011625_failure_audit/`，见[诊断结果](../../local-data/agentic-research/runs/20260918T011625_failure_audit/audit.json)与[本地探针](../../local-data/agentic-research/runs/20260918T011625_failure_audit/result.txt)。下表保留修复前的证据边界。
 
@@ -656,7 +656,7 @@ npm --prefix frontend run build
 | P7 对照与可靠性 | 已完成：smoke 120、regression 1200、应用 24/引用 85、v4 复测 2；173/28 程序回归，负结果保留 | `3381fa9`；见固定对照与应用报告 |
 | P8 清理与交接 | 已完成：当前流程/启动/迁移/失败说明、最终验证、真实演示 4 请求/10 引用，负结果保留 | `docs: finalize research workflow and implementation handoff`；见交接清单和执行记录 |
 | R1 契约与结束恢复 | 已完成；114 项后端相关检查、29 项 Python 检查；36 个诊断任务 35/1/0，原文负例保留 | `fix: repair research tool contracts and native finish recovery`；见第 8.6 节、执行记录与 R1 清单 |
-| R2—R5 后续改进 | 待实施 | 检索与连接恢复、有效阅读、产物与模型适配、固定对照，按 8.6 分批留档 |
+| R2—R5 后续改进 | R2 实现与故障测试完成；真实 v1 退化和 v2 复测留档，R3—R5 接续 | 检索与连接恢复、有效阅读、产物与模型适配、固定对照，按 8.6 分批留档 |
 
 后续可直接使用下面的实施指令：
 

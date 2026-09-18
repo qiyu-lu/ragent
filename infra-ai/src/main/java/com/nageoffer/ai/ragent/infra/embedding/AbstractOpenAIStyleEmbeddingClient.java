@@ -18,6 +18,7 @@
 package com.nageoffer.ai.ragent.infra.embedding;
 
 import cn.hutool.core.collection.CollUtil;
+import com.nageoffer.ai.ragent.infra.operation.RequestOperation;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -116,6 +117,32 @@ public abstract class AbstractOpenAIStyleEmbeddingClient implements EmbeddingCli
      * 构建请求、发送 HTTP、解析 OpenAI 格式响应
      */
     protected List<List<Float>> doEmbed(List<String> texts, ModelTarget target) {
+        var operation = RequestOperation.current();
+        if (operation == null) return request(texts, target, 1);
+        // Cache belongs to one run; endpoint, model and dimensions are part of its identity.
+        String key = ModelUrlResolver.resolveUrl(target.provider(), target.candidate(), ModelCapability.EMBEDDING)
+                + "|" + provider() + "|" + target.candidate().getModel() + "|" + target.candidate().getDimension()
+                + "|" + new com.google.gson.Gson().toJson(texts);
+        var cached = texts.size() == 1 ? operation.cached(key) : null;
+        if (cached != null) {
+            operation.record("embedding.cache", "HIT", 0, Map.of());
+            return cached;
+        }
+        for (int attempt = 1; ; attempt++) {
+            try {
+                final int number = attempt;
+                var result = operation.measure("embedding.http", () -> request(texts, target, number));
+                if (texts.size() == 1) operation.cache(key, result);
+                return result;
+            } catch (RequestOperation.Failure error) {
+                if (!error.retryable || attempt >= 2 || operation.remainingMillis() < 1500) throw error;
+                operation.record("embedding.retry", "SCHEDULED", 0, Map.of("attempt", attempt + 1, "code", error.code));
+                operation.backoff(300);
+            }
+        }
+    }
+
+    private List<List<Float>> request(List<String> texts, ModelTarget target, int attempt) {
         AIModelProperties.ProviderConfig provider = HttpResponseHelper.requireProvider(target, provider());
         if (requiresApiKey()) {
             HttpResponseHelper.requireApiKey(provider, provider());
@@ -143,6 +170,9 @@ public abstract class AbstractOpenAIStyleEmbeddingClient implements EmbeddingCli
 
         JsonObject json = null;
         Map<String, Object> observation = new LinkedHashMap<>();
+        var operation = RequestOperation.current();
+        if (operation != null) observation.putAll(operation.identity());
+        observation.put("attempt", attempt);
         observation.put("call_id", java.util.UUID.randomUUID().toString());
         observation.put("started_at", Instant.now().toString());
         observation.put("provider", provider());
@@ -155,8 +185,12 @@ public abstract class AbstractOpenAIStyleEmbeddingClient implements EmbeddingCli
         observation.put("request_state", "STARTED");
         EmbeddingUsageCapture.record(observation);
         long started = System.nanoTime();
+        var transport = new com.nageoffer.ai.ragent.infra.operation.HttpPhaseTrace();
         try {
-            try (Response response = httpClient.newCall(request).execute()) {
+            var call = (operation == null ? httpClient : httpClient.newBuilder().eventListener(transport).build()).newCall(request);
+            if (operation != null) call.timeout().timeout(Math.min(12000, operation.remainingMillis()), java.util.concurrent.TimeUnit.MILLISECONDS);
+            try (var cancellation = operation == null ? (RequestOperation.Binding) () -> {} : operation.onCancel(call::cancel);
+                 Response response = call.execute()) {
                 observation.put("http_status", response.code());
                 observation.put("request_id", response.header("x-request-id"));
                 if (!response.isSuccessful()) {
@@ -175,6 +209,7 @@ public abstract class AbstractOpenAIStyleEmbeddingClient implements EmbeddingCli
                 }
                 if (json.has("id")) observation.put("request_id", json.get("id").getAsString());
             } catch (IOException e) {
+                if (operation != null) operation.remainingMillis();
                 throw new ModelClientException(
                         provider() + " embedding 请求失败: " + e.getMessage(),
                         ModelClientErrorType.NETWORK_ERROR, null, e);
@@ -212,12 +247,24 @@ public abstract class AbstractOpenAIStyleEmbeddingClient implements EmbeddingCli
                 results.add(vector);
             }
 
+            if (results.size() != texts.size() || results.stream().anyMatch(v ->
+                    v.size() != target.candidate().getDimension() || v.stream().anyMatch(n -> !Float.isFinite(n)))) {
+                throw new ModelClientException("Invalid embedding count/dimensions", ModelClientErrorType.INVALID_RESPONSE, null);
+            }
             observation.put("success", true);
             return results;
         } catch (RuntimeException failure) {
             observation.put("error_type", failure.getClass().getSimpleName());
+            if (failure.getCause() != null) observation.put("cause_type", failure.getCause().getClass().getSimpleName());
             throw failure;
         } finally {
+            if (operation != null) {
+                observation.put("transport", transport.snapshot());
+                operation.record("embedding.transport", Boolean.TRUE.equals(observation.get("success")) ? "COMPLETED" : "FAILED",
+                        (System.nanoTime() - started) / 1_000_000,
+                        Map.of("attempt", attempt, "transport", transport.snapshot(),
+                                "causeType", observation.getOrDefault("cause_type", "none")));
+            }
             observation.put("request_state", "COMPLETED");
             observation.put("elapsed_ms", (System.nanoTime() - started) / 1_000_000);
             EmbeddingUsageCapture.record(observation);

@@ -71,6 +71,63 @@ class EmbeddingUsageCaptureTest {
         }
         assertEquals(false, records.get(1).get("success"));
     }
+    @Test void transientFailureRetriesOnceAndCacheDoesNotCreateFakeUsage() throws Exception {
+        var http = mock(OkHttpClient.class); var call = mock(Call.class);
+        when(http.newCall(any())).thenReturn(call);
+        researchClient(http); when(call.timeout()).thenReturn(new okio.Timeout());
+        when(call.execute()).thenReturn(response("{}").newBuilder().code(503).build())
+                .thenReturn(response("{\"data\":[{\"embedding\":[1,2]}]}"));
+        List<Map<String, Object>> records = new ArrayList<>();
+        var cache = new java.util.concurrent.ConcurrentHashMap<String, List<List<Float>>>();
+        try (var op = new com.nageoffer.ai.ragent.infra.operation.RequestOperation(java.time.Duration.ofSeconds(5),
+                Map.of("toolCallId", "tool-1"), event -> {}, cache); var binding = op.bind();
+             var capture = new EmbeddingUsageCapture(records::add)) {
+            var client = new SiliconFlowEmbeddingClient(http);
+            assertEquals(client.embed("same query", target()), client.embed("same query", target()));
+        }
+        verify(call, times(2)).execute();
+        assertEquals(4, records.size());
+        assertEquals("tool-1", records.get(3).get("toolCallId"));
+        assertEquals(2, records.get(3).get("attempt"));
+        assertEquals(false, records.get(1).get("success"));
+        assertEquals(1, cache.size());
+    }
+    @Test void authorizationFailureIsNotRetriedOrCached() throws Exception {
+        var http = mock(OkHttpClient.class); var call = mock(Call.class);
+        when(http.newCall(any())).thenReturn(call); researchClient(http); when(call.timeout()).thenReturn(new okio.Timeout());
+        when(call.execute()).thenReturn(response("{}").newBuilder().code(401).build());
+        var cache = new java.util.concurrent.ConcurrentHashMap<String, List<List<Float>>>();
+        try (var op = new com.nageoffer.ai.ragent.infra.operation.RequestOperation(java.time.Duration.ofSeconds(5),
+                Map.of(), event -> {}, cache); var binding = op.bind()) {
+            var failure = assertThrows(com.nageoffer.ai.ragent.infra.operation.RequestOperation.Failure.class,
+                    () -> new SiliconFlowEmbeddingClient(http).embed("text", target()));
+            assertFalse(failure.retryable);
+        }
+        verify(call).execute(); assertTrue(cache.isEmpty());
+    }
+    @Test void cancellationClosesTheActualHttpCallWithoutRetry() throws Exception {
+        var http = mock(OkHttpClient.class); var call = mock(Call.class);
+        when(http.newCall(any())).thenReturn(call); researchClient(http); when(call.timeout()).thenReturn(new okio.Timeout());
+        var entered = new java.util.concurrent.CountDownLatch(1);
+        var released = new java.util.concurrent.CountDownLatch(1);
+        doAnswer(i -> { released.countDown(); return null; }).when(call).cancel();
+        when(call.execute()).thenAnswer(i -> { entered.countDown(); released.await(3, java.util.concurrent.TimeUnit.SECONDS); throw new IOException("cancelled"); });
+        var executor = java.util.concurrent.Executors.newSingleThreadExecutor();
+        try (var op = new com.nageoffer.ai.ragent.infra.operation.RequestOperation(java.time.Duration.ofSeconds(5),
+                Map.of(), event -> {}, new java.util.concurrent.ConcurrentHashMap<>())) {
+            var pending = executor.submit(() -> { try (var binding = op.bind()) { return new SiliconFlowEmbeddingClient(http).embed("text", target()); } });
+            assertTrue(entered.await(2, java.util.concurrent.TimeUnit.SECONDS)); op.cancel();
+            var failure = assertThrows(java.util.concurrent.ExecutionException.class, () -> pending.get(2, java.util.concurrent.TimeUnit.SECONDS));
+            assertInstanceOf(java.util.concurrent.CancellationException.class, failure.getCause());
+            verify(call).cancel(); verify(call).execute();
+        } finally { executor.shutdownNow(); }
+    }
+    private void researchClient(OkHttpClient http) {
+        var builder = mock(OkHttpClient.Builder.class);
+        when(http.newBuilder()).thenReturn(builder);
+        when(builder.eventListener(any())).thenReturn(builder);
+        when(builder.build()).thenReturn(http);
+    }
     private Response response(String body) {
         return new Response.Builder().request(new Request.Builder().url("http://localhost").build())
                 .protocol(Protocol.HTTP_1_1).code(200).message("OK").header("x-request-id","request-1")

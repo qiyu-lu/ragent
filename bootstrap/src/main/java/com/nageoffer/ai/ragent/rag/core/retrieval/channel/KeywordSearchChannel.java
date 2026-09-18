@@ -104,6 +104,8 @@ public class KeywordSearchChannel implements SearchChannel {
                     .latencyMs(latency)
                     .build();
         } catch (Exception e) {
+            if (com.nageoffer.ai.ragent.infra.operation.RequestOperation.current() != null)
+                throw com.nageoffer.ai.ragent.infra.operation.RequestOperation.failure("keyword", e);
             log.error("关键词检索失败", e);
             return emptyResult(System.currentTimeMillis() - startTime);
         }

@@ -1,6 +1,7 @@
 import { api } from "@/services/api";
 import { storage } from "@/utils/storage";
-import { activeResearch, type ResearchRun, type ResearchEvent } from "@/types/research";
+import { type ResearchRun, type ResearchEvent } from "@/types/research";
+import { subscribeResearchStream } from "./researchStream";
 import type { SourceRef } from "@/types";
 
 export const createResearch = (request: {
@@ -10,8 +11,8 @@ export const createResearch = (request: {
   outputType: "REPORT" | "PLAN";
   allowedKbIds: string[];
 }) => api.post<ResearchRun, ResearchRun>("/rag/research/runs", request);
-export const getResearch = (id: string) =>
-  api.get<ResearchRun, ResearchRun>(`/rag/research/runs/${encodeURIComponent(id)}`);
+export const getResearch = (id: string, signal?: AbortSignal) =>
+  api.get<ResearchRun, ResearchRun>(`/rag/research/runs/${encodeURIComponent(id)}`, { signal });
 export const listResearch = (conversationId: string) =>
   api.get<ResearchRun[], ResearchRun[]>("/rag/research/runs", { params: { conversationId } });
 export const cancelResearch = (id: string) =>
@@ -93,92 +94,13 @@ export function subscribeResearch(
     connection: (reconnecting: boolean) => void;
   }
 ) {
-  const control = new AbortController();
-  let cursor = after;
-  let settled = false;
   const base = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
-  const reconnectDelay = () =>
-    new Promise<void>((resolve) => {
-      const done = () => {
-        clearTimeout(timer);
-        control.signal.removeEventListener("abort", done);
-        resolve();
-      };
-      const timer = setTimeout(done, 1500);
-      control.signal.addEventListener("abort", done, { once: true });
-      if (control.signal.aborted) done();
-    });
-  void (async () => {
-    while (!control.signal.aborted && !settled) {
-      try {
-        const run = await getResearch(id);
-        if (control.signal.aborted) break;
-        callbacks.snapshot(run);
-        if (!activeResearch(run)) break;
-        const response = await fetch(
-          `${base}/rag/research/runs/${encodeURIComponent(id)}/events?after=${cursor}`,
-          {
-            headers: {
-              Accept: "text/event-stream",
-              Authorization: storage.getToken() || "",
-              "Last-Event-ID": String(cursor)
-            },
-            signal: control.signal
-          }
-        );
-
-        if (
-          !response.ok ||
-          !response.body ||
-          !response.headers.get("content-type")?.includes("text/event-stream")
-        )
-          throw new Error("RESEARCH_STREAM_UNAVAILABLE");
-        callbacks.connection(false);
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-        try {
-          while (!control.signal.aborted) {
-            const next = await reader.read();
-            if (next.done) break;
-            buffer += decoder.decode(next.value, { stream: true });
-            buffer = buffer.replace(/\r\n/g, "\n");
-            let end: number;
-            while ((end = buffer.indexOf("\n\n")) >= 0) {
-              const frame = buffer.slice(0, end);
-              buffer = buffer.slice(end + 2);
-              let name = "message";
-              const data: string[] = [];
-              for (const line of frame.split("\n")) {
-                if (line.startsWith("event:")) name = line.slice(6).trim();
-                if (line.startsWith("data:")) data.push(line.slice(5).trimStart());
-              }
-              if (!data.length) continue;
-              const parsed = JSON.parse(data.join("\n"));
-              if (name === "snapshot") {
-                callbacks.snapshot(parsed as ResearchRun);
-                settled = !activeResearch(parsed as ResearchRun);
-              } else if (name === "progress" || name === "artifact") {
-                const event = parsed as ResearchEvent;
-                if (event.sequence > cursor) {
-                  callbacks.event(event);
-                  cursor = event.sequence;
-                }
-              }
-            }
-          }
-        } finally {
-          await reader.cancel().catch(() => undefined);
-          reader.releaseLock();
-        }
-      } catch {
-        if (control.signal.aborted) break;
-      }
-      if (!settled && !control.signal.aborted) {
-        callbacks.connection(true);
-        await reconnectDelay();
-      }
-    }
-  })();
-  return () => control.abort();
+  return subscribeResearchStream(after, callbacks, {
+    snapshot: (signal) => getResearch(id, signal),
+    open: (cursor, signal) => fetch(
+      `${base}/rag/research/runs/${encodeURIComponent(id)}/events?after=${cursor}`,
+      { headers: { Accept: "text/event-stream", Authorization: storage.getToken() || "",
+        "Last-Event-ID": String(cursor) }, signal }
+    )
+  });
 }

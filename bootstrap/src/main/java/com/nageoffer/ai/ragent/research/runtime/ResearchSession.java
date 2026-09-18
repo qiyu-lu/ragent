@@ -45,6 +45,20 @@ public class ResearchSession {
     private int localModelCalls;
     private int finishRepairCallsRemaining = -1;
     private volatile Outcome outcome;
+    volatile String activeToolCallId;
+
+    public <T> T retrieve(java.util.function.Supplier<T> action) {
+        check();
+        try (var operation = new com.nageoffer.ai.ragent.infra.operation.RequestOperation(budget.retrievalTimeout(),
+                Map.of("runId", claim.run().id(), "taskId", taskId,
+                        "toolCallId", activeToolCallId == null ? UUID.randomUUID().toString() : activeToolCallId),
+                event -> event("RETRIEVAL_PHASE", "检索阶段状态", event), budget.embeddingCache);
+             var cancellation = control.bindInterrupt(operation::cancel);
+             var binding = operation.bind()) {
+            return operation.measure("search_knowledge", action);
+        } catch (RuntimeException error) { throw error; }
+        catch (Exception error) { throw new IllegalStateException(error); }
+    }
 
     public ResearchSession(ResearchRunStore store, ResearchRunStore.Claim claim,
                             ResearchBudget budget, ResearchControl control) {

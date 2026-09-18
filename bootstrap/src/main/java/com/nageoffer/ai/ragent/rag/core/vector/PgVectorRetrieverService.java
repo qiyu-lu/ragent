@@ -71,9 +71,10 @@ public class PgVectorRetrieverService implements VectorRetrieverService {
     private List<RetrievedChunk> queryByCollections(float[] vector, List<String> collectionNames, int limit, List<String> documentIds) {
         // 提升召回率；迭代扫描保证过滤后仍能填满 LIMIT，消除过滤向量检索的召回悬崖（pgvector >= 0.8）
         // noinspection SqlDialectInspection,SqlNoDataSourceInspection
-        jdbcTemplate.execute("SET hnsw.ef_search = 200");
+        var operation = com.nageoffer.ai.ragent.infra.operation.RequestOperation.current();
+        if (operation == null) jdbcTemplate.execute("SET hnsw.ef_search = 200");
         // noinspection SqlDialectInspection,SqlNoDataSourceInspection
-        jdbcTemplate.execute("SET hnsw.iterative_scan = relaxed_order");
+        if (operation == null) jdbcTemplate.execute("SET hnsw.iterative_scan = relaxed_order");
 
         String vectorLiteral = toVectorLiteral(vector);
         String placeholders = collectionNames.stream().map(c -> "?").collect(java.util.stream.Collectors.joining(", "));
@@ -94,7 +95,31 @@ public class PgVectorRetrieverService implements VectorRetrieverService {
         args.add(limit);
 
         // noinspection SqlDialectInspection,SqlNoDataSourceInspection
-        return jdbcTemplate.query("SELECT id, content, collection_name, metadata->>'doc_id' AS doc_id, 1 - (embedding <=> ?::vector) AS score FROM t_knowledge_vector WHERE collection_name IN (" + placeholders + ")" + documentFilter + " ORDER BY embedding <=> ?::vector LIMIT ?",
+        String sql = "SELECT id, content, collection_name, metadata->>'doc_id' AS doc_id, 1 - (embedding <=> ?::vector) AS score FROM t_knowledge_vector WHERE collection_name IN (" + placeholders + ")" + documentFilter + " ORDER BY embedding <=> ?::vector LIMIT ?";
+        if (operation != null) return operation.measure("postgres.query", () -> jdbcTemplate.execute(
+                (org.springframework.jdbc.core.ConnectionCallback<List<RetrievedChunk>>) connection -> {
+                    try (var settings = connection.createStatement()) {
+                        settings.setQueryTimeout(Math.max(1, (int) Math.min(5, operation.remainingMillis() / 1000)));
+                        settings.execute("SET hnsw.ef_search = 200");
+                        settings.execute("SET hnsw.iterative_scan = relaxed_order");
+                    }
+                    try (var statement = connection.prepareStatement(sql);
+                         var cancellation = operation.onCancel(() -> {
+                             try { statement.cancel(); } catch (java.sql.SQLException ignored) { }
+                         })) {
+                        statement.setQueryTimeout(Math.max(1, (int) Math.min(5, operation.remainingMillis() / 1000)));
+                        for (int i = 0; i < args.size(); i++) statement.setObject(i + 1, args.get(i));
+                        operation.remainingMillis();
+                        List<RetrievedChunk> chunks = new java.util.ArrayList<>();
+                        try (var rs = statement.executeQuery()) {
+                            while (rs.next()) chunks.add(RetrievedChunk.builder().id(rs.getString("id"))
+                                    .text(rs.getString("content")).collectionName(rs.getString("collection_name"))
+                                    .docId(rs.getString("doc_id")).score(rs.getFloat("score")).build());
+                        }
+                        return chunks;
+                    }
+                }));
+        return jdbcTemplate.query(sql,
                 (rs, rowNum) -> RetrievedChunk.builder()
                         .id(rs.getString("id"))
                         .text(rs.getString("content"))

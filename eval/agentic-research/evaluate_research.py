@@ -56,6 +56,9 @@ def fingerprints():
     paths = list((REPO / "bootstrap/src/main/java/com/nageoffer/ai/ragent/research").rglob("*.java"))
     paths += list((REPO / "bootstrap/src/main/resources/prompts").glob("research-*.txt"))
     paths += list(Path(__file__).resolve().parent.glob("*.py"))
+    paths += list((REPO / "infra-ai/src/main/java/com/nageoffer/ai/ragent/infra/operation").glob("*.java"))
+    paths += [REPO / "infra-ai/src/main/java/com/nageoffer/ai/ragent/infra/embedding/AbstractOpenAIStyleEmbeddingClient.java",
+              REPO / "infra-ai/src/main/java/com/nageoffer/ai/ragent/infra/model/ModelRoutingExecutor.java"]
     paths += [REPO / p for p in (
         "pom.xml", "bootstrap/pom.xml", "framework/pom.xml", "infra-ai/pom.xml", "resources/database/schema_pg.sql",
         "bootstrap/src/main/resources/application.yaml",

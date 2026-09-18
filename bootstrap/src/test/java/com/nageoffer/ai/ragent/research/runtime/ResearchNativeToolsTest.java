@@ -333,6 +333,7 @@ class ResearchNativeToolsTest {
     void modelTimeoutCancelsHttpAndReturnsTheSharedQuota() throws Exception {
         limits.setModelCallTimeoutSeconds(1);
         server.enqueue(new MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE));
+        server.enqueue(new MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE));
         var factory = factory();
         assertThrows(RuntimeException.class, () -> factory.run(session));
         var calls = (List<Map<String, Object>>) session.budget.snapshot().get("calls");
@@ -378,6 +379,34 @@ class ResearchNativeToolsTest {
         assertEquals(2, session.budget.snapshot().get("modelCalls"));
         session.budget.acquireModel(true);
         session.budget.acquireModel(true);
+    }
+
+    @Test
+    void truncatedToolStreamIsDiscardedAndRetriedFromCompletedHistory() throws Exception {
+        String partial = json.writeValueAsString(Map.of("id", "broken", "choices", List.of(Map.of("index", 0,
+                "delta", Map.of("tool_calls", List.of(Map.of("index", 0, "id", "never-execute", "type", "function",
+                        "function", Map.of("name", "search_knowledge", "arguments", "{\"query\":\"X\"}"))))))));
+        server.enqueue(new MockResponse().setHeader("Content-Type", "text/event-stream").setBody("data: " + partial + "\n\n"));
+        tool("finish", "finish_research", Map.of("findings", List.of(), "gaps", List.of("Insufficient evidence"), "conflicts", List.of()));
+        assertNotNull(factory().run(session).result());
+        assertEquals(2, server.getRequestCount());
+        String before = server.takeRequest().getBody().readUtf8();
+        String after = server.takeRequest().getBody().readUtf8();
+        assertEquals(json.readTree(before).path("messages").get(1), json.readTree(after).path("messages").get(1));
+        assertFalse(after.contains("never-execute"));
+        verifyNoInteractions(search, reader);
+        var calls = (List<Map<String, Object>>) session.budget.snapshot().get("calls");
+        assertEquals("FAILED", calls.get(0).get("status"));
+        assertEquals("unknown", calls.get(0).get("usageStatus"));
+        assertEquals("COMPLETED", calls.get(1).get("status"));
+    }
+
+    @Test
+    void authenticationFailureIsNotRetried() {
+        server.enqueue(new MockResponse().setResponseCode(401).setHeader("Content-Type", "application/json")
+                .setBody("{\"error\":{\"message\":\"unauthorized\",\"type\":\"authentication_error\"}}"));
+        assertThrows(RuntimeException.class, () -> factory().run(session));
+        assertEquals(1, server.getRequestCount());
     }
 
     private void tool(String id, String name, Map<String, Object> arguments) throws Exception {

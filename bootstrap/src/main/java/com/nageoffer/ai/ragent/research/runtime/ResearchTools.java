@@ -56,8 +56,9 @@ public class ResearchTools {
                         && !session.documents().containsAll(documents)) throw new ClientException("搜索不能扩大子任务文档范围");
                 if (documents == null || documents.isEmpty()) selected = session.documents();
             }
-            var hits = search.search(session.claim.run().id(), session.claim.owner(), session.taskId, query,
-                    List.of(), selected, count);
+            final var scope = selected;
+            var hits = session.retrieve(() -> search.search(session.claim.run().id(), session.claim.owner(), session.taskId, query,
+                    List.of(), scope, count));
             session.check();
             session.candidates(hits.stream().map(com.nageoffer.ai.ragent.research.model.KnowledgeSearchHit::evidenceId).toList());
             return hits;
@@ -145,6 +146,10 @@ public class ResearchTools {
             Object result = action.get();
             session.check();
             return result;
+        } catch (com.nageoffer.ai.ragent.infra.operation.RequestOperation.Failure e) {
+            return ToolResultBlock.error("SEARCH_FAILED phase=" + e.phase + " code=" + e.code + " retryable=" + e.retryable
+                    + ". This is an execution failure, NOT evidence that no source exists. "
+                    + (e.retryable ? "A bounded retry is allowed; preserve already-read evidence." : "Do not repeat the same failing request."));
         } catch (ClientException | IllegalArgumentException e) {
             // 参数错误作为原生 tool result 回传，额度由 acting middleware 统一计数。
             return ToolResultBlock.error(e.getMessage());

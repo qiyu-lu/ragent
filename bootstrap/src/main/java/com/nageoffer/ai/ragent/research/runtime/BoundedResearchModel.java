@@ -72,6 +72,26 @@ public class BoundedResearchModel implements Model {
 
     @Override
     public Flux<ChatResponse> stream(List<Msg> messages, List<ToolSchema> tools, GenerateOptions options) {
+        return attempt(messages, tools, options).retryWhen(reactor.util.retry.Retry.backoff(1, Duration.ofMillis(300))
+                .jitter(0.2).filter(error -> !session.control.cancelled() && retryable(error))
+                .doBeforeRetry(signal -> session.event("MODEL_RETRY", "模型传输失败，保留已完成步骤后重试",
+                        Map.of("attempt", 2, "reason", signal.failure().getClass().getSimpleName()))))
+                .takeUntilOther(session.control.signal());
+    }
+
+    static boolean retryable(Throwable error) {
+        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+            if (cause instanceof java.util.concurrent.CancellationException || cause instanceof ResearchBudget.Exhausted) return false;
+            if (cause instanceof io.agentscope.core.model.ModelHttpException http) return http.isRetryableHttpStatus();
+            if (cause instanceof java.io.IOException || cause instanceof java.util.concurrent.TimeoutException
+                    || cause instanceof IncompleteResponse) return true;
+        }
+        return false;
+    }
+    static final class IncompleteResponse extends RuntimeException {
+        IncompleteResponse() { super("MODEL_STREAM_INCOMPLETE"); }
+    }
+    private Flux<ChatResponse> attempt(List<Msg> messages, List<ToolSchema> tools, GenerateOptions options) {
         return Flux.defer(() -> {
             session.check();
             List<Msg> withBudget = new ArrayList<>(messages);
@@ -100,7 +120,7 @@ public class BoundedResearchModel implements Model {
             } else withBudget.add(0, Msg.builder().role(MsgRole.SYSTEM).textContent(reminder).build());
             List<Msg> trimmed = trim(withBudget, tools);
             try {
-                long until = System.nanoTime() + Math.min(session.budget.remaining().toNanos(),
+                long until = System.nanoTime() + Math.min((finalization ? session.budget.remaining() : session.budget.explorationRemaining()).toNanos(),
                         Duration.ofSeconds(properties.getModelCallTimeoutSeconds()).toNanos());
                 while (!quota.tryAcquire(100, TimeUnit.MILLISECONDS)) {
                     session.check();
@@ -148,7 +168,7 @@ public class BoundedResearchModel implements Model {
                             "nativeToolOutputSeen", nativeSeen.get(), "textOutputSeen", textSeen.get(), "finishReason", finishReason.get(),
                             "errorType", errorType.get(), "phase", finalization ? "finalization" : "research"));
                 };
-                Duration timeout = Duration.ofMillis(Math.min(session.budget.remaining().toMillis(),
+                Duration timeout = Duration.ofMillis(Math.min((finalization ? session.budget.remaining() : session.budget.explorationRemaining()).toMillis(),
                         properties.getModelCallTimeoutSeconds() * 1000L));
                 return Flux.defer(() -> {
                             session.check();
@@ -163,7 +183,10 @@ public class BoundedResearchModel implements Model {
                             }
                         })
                         // 整次请求超时，不能靠持续发小数据包无限延长 idle timeout。
-                        .collectList().timeout(timeout).flatMapMany(Flux::fromIterable)
+                        .collectList().timeout(timeout).flatMapMany(responses -> {
+                            if (responses.isEmpty() || "unknown".equals(finishReason.get())) return Flux.error(new IncompleteResponse());
+                            return Flux.fromIterable(responses);
+                        })
                         .doOnComplete(() -> finish.accept("COMPLETED"))
                         .doOnError(error -> {
                             errorType.set(error.getClass().getSimpleName());

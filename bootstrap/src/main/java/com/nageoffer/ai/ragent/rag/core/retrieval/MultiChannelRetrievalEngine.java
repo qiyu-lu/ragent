@@ -18,6 +18,7 @@
 package com.nageoffer.ai.ragent.rag.core.retrieval;
 
 import cn.hutool.core.collection.CollUtil;
+import com.nageoffer.ai.ragent.infra.operation.RequestOperation;
 import com.nageoffer.ai.ragent.framework.convention.RetrievedChunk;
 import com.nageoffer.ai.ragent.framework.convention.RetrievedChunkKey;
 import com.nageoffer.ai.ragent.framework.trace.RagTraceNode;
@@ -197,6 +198,13 @@ public class MultiChannelRetrievalEngine {
                 .sorted(Comparator.comparingInt(channel -> channel.getType().ordinal()))
                 .toList();
 
+        var operation = RequestOperation.current();
+        if (sourceBound && operation != null) {
+            if (enabledChannels.isEmpty()) throw new RequestOperation.Failure("channels", "NO_RETRIEVAL_CHANNEL", false, null);
+            // Each channel is bounded and cancellable. Errors are not empty search results.
+            return enabledChannels.stream().map(channel -> operation.execute(ragRetrievalExecutor,
+                    "channel." + channel.getName(), () -> channel.search(context))).toList();
+        }
         if (enabledChannels.isEmpty()) {
             // 全站无任何知识召回、退化为裸 LLM，属配置事故而非正常降级，不能静默
             log.warn("没有任何启用的检索通道，本次不做知识召回；请检查 rag.search.channels.*.enabled 与对应后端开关");
@@ -296,6 +304,7 @@ public class MultiChannelRetrievalEngine {
                         (afterSize - beforeSize > 0 ? "+" : "") + (afterSize - beforeSize)
                 );
             } catch (Exception e) {
+                if (RequestOperation.current() != null) throw RequestOperation.failure("post." + processor.getName(), e);
                 if (capture != null) {
                     capture.record(context.getMainQuestion(), "post-" + processor.getName(), chunks,
                             TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started), e.getClass().getSimpleName());

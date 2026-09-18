@@ -64,6 +64,8 @@ public class ModelRoutingExecutor {
                 healthStore.markSuccess(target.id());
                 return response;
             } catch (Exception e) {
+                if (com.nageoffer.ai.ragent.infra.operation.RequestOperation.current() != null)
+                    throw com.nageoffer.ai.ragent.infra.operation.RequestOperation.failure("model.routing", e);
                 last = e;
                 healthStore.markFailure(target.id());
                 log.warn("{} model failed, fallback to next. modelId={}, provider={}", label, target.id(), target.candidate().getProvider(), e);

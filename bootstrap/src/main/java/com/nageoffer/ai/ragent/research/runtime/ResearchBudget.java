@@ -34,6 +34,7 @@ public class ResearchBudget {
     private final ResearchProperties limits;
     private final long activeStarted = System.nanoTime();
     private final long previousActiveMillis;
+    final java.util.concurrent.ConcurrentMap<String, List<List<Float>>> embeddingCache = new java.util.concurrent.ConcurrentHashMap<>();
     private int modelCalls;
     private int toolCalls;
     private int workersCreated;
@@ -53,14 +54,14 @@ public class ResearchBudget {
     }
 
     public synchronized void acquireModel(boolean finalization) {
-        checkTime();
+        if (finalization) checkTime(); else explorationRemaining();
         int cap = limits.getMaxModelCalls() - (finalization ? 0 : limits.getReservedFinalizationModelCalls());
         if (modelCalls >= cap) throw new Exhausted("MODEL_CALL_BUDGET");
         modelCalls++;
     }
 
     public synchronized void acquireTool() {
-        checkTime();
+        explorationRemaining();
         if (toolCalls >= limits.getMaxToolCalls()) throw new Exhausted("TOOL_CALL_BUDGET");
         toolCalls++;
     }
@@ -121,6 +122,16 @@ public class ResearchBudget {
         return Duration.ofMillis(remaining);
     }
 
+    public Duration explorationRemaining() {
+        long reserve = Math.min(30_000, limits.getMaxDurationSeconds() * 1000L / 5);
+        long millis = remaining().toMillis() - reserve;
+        if (millis <= 0) throw new Exhausted("EXPLORATION_DURATION_BUDGET");
+        return Duration.ofMillis(millis);
+    }
+    public Duration retrievalTimeout() {
+        return Duration.ofMillis(Math.min(explorationRemaining().toMillis(),
+                Math.max(100, limits.getToolTimeoutSeconds() * 1000L - 2000)));
+    }
     public void checkTime() { remaining(); }
 
     private long activeMillis() {

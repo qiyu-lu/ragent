@@ -41,7 +41,7 @@ public class OneShotResearchRunner implements ResearchRunner {
         session.budget.acquireTool();
         String query = session.claim.run().brief().goal();
         session.event("TOOL_STARTED", "一次知识检索", Map.of("tool", "search_knowledge", "arguments", Map.of("query", query, "limit", 10)));
-        var hits = search.search(session.claim.run().id(), session.claim.owner(), "main", query, List.of(), List.of(), 10);
+        var hits = session.retrieve(() -> search.search(session.claim.run().id(), session.claim.owner(), "main", query, List.of(), List.of(), 10));
         session.event("TOOL_ENDED", "检索上下文已取得", Map.of("tool", "search_knowledge", "evidenceIds", hits.stream().map(h -> h.evidenceId()).toList()));
         for (var hit : hits) {
             // 仅固定命中块的正文，不追加查询或邻接展开；读取检查来源和实际生成输入。

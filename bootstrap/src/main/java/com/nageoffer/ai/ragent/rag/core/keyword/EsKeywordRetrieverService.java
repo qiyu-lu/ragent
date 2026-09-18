@@ -96,6 +96,8 @@ public class EsKeywordRetrieverService implements KeywordRetrieverService {
                     .map(this::toChunk)
                     .toList();
         } catch (Exception e) {
+            if (com.nageoffer.ai.ragent.infra.operation.RequestOperation.current() != null)
+                throw com.nageoffer.ai.ragent.infra.operation.RequestOperation.failure("keyword.http", e);
             log.error("ES 关键词检索失败, index={}, collections={}, query={}", index, collectionNames, query, e);
             return List.of();
         }

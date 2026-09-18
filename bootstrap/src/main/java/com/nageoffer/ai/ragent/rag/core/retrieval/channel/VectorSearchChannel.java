@@ -96,6 +96,8 @@ public class VectorSearchChannel implements SearchChannel {
                     .build();
 
         } catch (Exception e) {
+            if (com.nageoffer.ai.ragent.infra.operation.RequestOperation.current() != null)
+                throw com.nageoffer.ai.ragent.infra.operation.RequestOperation.failure("vector", e);
             log.error("向量检索失败", e);
             return emptyResult(System.currentTimeMillis() - startTime);
         }

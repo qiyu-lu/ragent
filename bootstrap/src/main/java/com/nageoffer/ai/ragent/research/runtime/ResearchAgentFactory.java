@@ -160,6 +160,7 @@ public class ResearchAgentFactory implements ResearchRunner, AutoCloseable {
             return Flux.fromIterable(input.toolCalls()).concatMap(call -> Flux.defer(() -> {
                 session.check();
                 session.budget.acquireTool();
+                session.activeToolCallId = call.getId();
                 session.event("TOOL_STARTED", "正在执行 " + call.getName(),
                         Map.of("toolCallId", call.getId(), "tool", call.getName(), "arguments", call.getInput()));
                 StringBuilder output = new StringBuilder();

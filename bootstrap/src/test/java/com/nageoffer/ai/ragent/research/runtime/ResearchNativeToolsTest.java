@@ -505,6 +505,8 @@ class ResearchNativeToolsTest {
         assertEquals(323, calls.get(1).get("cacheCreationTokens"));
         assertEquals(1949, calls.get(1).get("cachedTokens"));
         assertFalse(calls.get(2).containsKey("cacheCreationTokens"));
+        assertTrue(calls.stream().allMatch(c -> ((Number) c.get("durationMs")).longValue() >= 0
+                && ((Number) c.get("firstTokenMs")).longValue() >= 0));
     }
 
     @Test
@@ -517,6 +519,8 @@ class ResearchNativeToolsTest {
         var calls = (List<Map<String, Object>>) session.budget.snapshot().get("calls");
         assertEquals("TIMED_OUT", calls.get(0).get("status"));
         assertEquals("unknown", calls.get(0).get("usageStatus"));
+        assertTrue(((Number) calls.get(0).get("durationMs")).longValue() >= 900, "Failed calls still record how long they held the caller");
+        assertFalse(calls.get(0).containsKey("firstTokenMs"), "No chunk arrived, so there is no first-token latency");
         tool("gap", "finish_research", Map.of("findings", List.of(), "gaps", List.of("Missing source"), "conflicts", List.of()));
         assertNotNull(factory.run(session).result());
     }

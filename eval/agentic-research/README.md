@@ -219,3 +219,11 @@ bash scripts/validate-agentic-research-p2-database.sh
 当前最终生成只传已读正文、引用身份、extent/截断及原文章节/表格上下文；语料版本、数据集托管名和 split 不进入此证据投影，服务端引用快照仍完整保留。v4 输入隔离通过程序检查，但真实两例复测仍出现残缺公式过度解释和 PLAN 必填数组缺失；这不是语义可靠性的保证。24 项源文核对记录见 [P7 应用核对清单](manifests/p7-application-source-review.json)，核对者为 Codex 原文检查，没有独立盲评或裁判模型 API。
 
 P8 四请求演示已真实记录 2 COMPLETED/2 PARTIAL，10 条引用原文核对见[P8 清单](manifests/research-p8-handoff-2026-09-18.json)。一次检索未完成多跳命名问题，比较没有读到第二篇，PLAN 的 batch/window 只有待确认项而无请求要求的 null 条目；这些负结果保留，没有替换完整回归。原始输出、runtime、trace/usage、semantic-review.json 和执行库清理位于 `local-data/agentic-research/runs/20260917T192824_P8_demo_v4/`。
+
+## 提示缓存与调用延迟报告（秋招 W1）
+
+`cache_report.py` 只读已冻结批次的 `attempts/*/usage.jsonl`、`traces.jsonl` 与 `predictions.jsonl`，不调用 API。按批次标签、模式、角色输出调用数、输入、命中、命中率及单次调用命中率分布、显式缓存写入量，以及按供应商折扣折算的计费输入（输入 token 当量，不是金额）；延迟给出按 Agent 内调用序号分组的 P50/P95。调用耗时以 `MODEL_STARTED` 到 `MODEL_ENDED` 的事件时间为准，新旧批次口径一致；首 token 时延只有 W1 之后的台账有（`firstTokenMs`）。折扣默认取[百炼上下文缓存文档](https://help.aliyun.com/zh/model-studio/context-cache)（隐式命中 20%、显式命中 10%、显式写入 125%），可用参数覆盖。
+
+```bash
+python3 eval/agentic-research/cache_report.py --run before=local-data/agentic-research/runs/<before> --run after=local-data/agentic-research/runs/<after> --out <summary.json>
+```

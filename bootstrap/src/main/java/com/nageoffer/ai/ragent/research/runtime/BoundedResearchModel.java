@@ -48,6 +48,7 @@ import java.util.UUID;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
@@ -159,12 +160,17 @@ public class BoundedResearchModel implements Model {
                 AtomicReference<String> errorType = new AtomicReference<>("none");
                 AtomicBoolean recorded = new AtomicBoolean();
                 var cache = delegate instanceof PromptCacheTransport.TrackedModel tracked ? tracked.cache() : null;
+                AtomicLong sent = new AtomicLong(Long.MIN_VALUE);
+                AtomicLong firstChunk = new AtomicLong(Long.MIN_VALUE);
                 java.util.function.Consumer<String> finish = status -> {
                     if (!recorded.compareAndSet(false, true)) return;
                     ChatUsage actual = usage.get();
+                    long ended = System.nanoTime();
                     var written = cache == null ? null : cache.take();
-                    var metrics = new ResearchBudget.CallMetrics(written == null ? null : written.creationTokens(),
-                            written == null ? null : written.type());
+                    var metrics = new ResearchBudget.CallMetrics(
+                            sent.get() == Long.MIN_VALUE ? null : (ended - sent.get()) / 1_000_000,
+                            firstChunk.get() == Long.MIN_VALUE ? null : (firstChunk.get() - sent.get()) / 1_000_000,
+                            written == null ? null : written.creationTokens(), written == null ? null : written.type());
                     session.budget.finishCall(id, status, requestId.get(), actual == null ? null : actual.getInputTokens(),
                             actual == null ? null : actual.getOutputTokens(), actual == null ? null : actual.getCachedTokens(), metrics);
                     session.event("MODEL_ENDED", "研究模型请求已结束", Map.of("callId", id, "model", getModelName(), "status", status,
@@ -176,8 +182,10 @@ public class BoundedResearchModel implements Model {
                 return Flux.defer(() -> {
                             session.check();
                             if (cache != null) cache.take();
+                            sent.set(System.nanoTime());
                             return delegate.stream(context, tools, effective);
                         }).doOnNext(response -> {
+                            firstChunk.compareAndSet(Long.MIN_VALUE, System.nanoTime());
                             if (response.getUsage() != null) usage.set(response.getUsage());
                             requestId.set(response.getId());
                             if (response.getFinishReason() != null) finishReason.set(response.getFinishReason());

@@ -364,6 +364,14 @@ class ResearchNativeToolsTest {
     }
 
     @Test
+    void argumentFeedbackStaysEnglishOnAChineseHost() throws Exception {
+        var host = java.util.Locale.getDefault();
+        java.util.Locale.setDefault(java.util.Locale.SIMPLIFIED_CHINESE);
+        try { nestedWorkerRequirementsAreValidatedBeforeConstructingTasks(); }
+        finally { java.util.Locale.setDefault(host); }
+    }
+
+    @Test
     void cancellationDuringFinishRepairStopsFurtherRequests() throws Exception {
         response(Map.of("role", "assistant", "content", "Finished."), "stop");
         server.enqueue(new MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE));

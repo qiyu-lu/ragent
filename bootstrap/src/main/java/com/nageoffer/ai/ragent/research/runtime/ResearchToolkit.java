@@ -20,6 +20,7 @@ package com.nageoffer.ai.ragent.research.runtime;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.networknt.schema.InputFormat;
 import com.networknt.schema.SchemaRegistry;
+import com.networknt.schema.SchemaRegistryConfig;
 import com.networknt.schema.SpecificationVersion;
 import io.agentscope.core.agent.Agent;
 import io.agentscope.core.agent.RuntimeContext;
@@ -33,11 +34,14 @@ import io.agentscope.core.tool.ToolkitConfig;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
-/** AgentScope 2.0.1 已在 DTO 转换前校验 schema；为其结束工具错误补充遗漏的字段路径。 */
+/** AgentScope 2.0.1 已在 DTO 转换前校验 schema；为被拒绝的工具参数补充字段路径，并固定用英文反馈。 */
 final class ResearchToolkit extends Toolkit {
-    private static final SchemaRegistry SCHEMAS = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12);
+    // SDK 的校验器随 JVM 默认 Locale 本地化（zh_CN 宿主机上是中文），同一模型会因部署机器不同看到不同语言的反馈。
+    private static final SchemaRegistry SCHEMAS = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12,
+            builder -> builder.schemaRegistryConfig(SchemaRegistryConfig.builder().locale(Locale.ENGLISH).build()));
     private final ObjectMapper json;
 
     ResearchToolkit(ObjectMapper json) {
@@ -58,7 +62,7 @@ final class ResearchToolkit extends Toolkit {
                                                 Agent agent, RuntimeContext context) {
         // 保留 SDK 的执行、取消、工具 ID 和原生错误；只补充已被 schema 拒绝的参数诊断。
         return super.callTools(calls, config, agent, context).map(results -> results.stream().map(result -> {
-            if (result.getState() != ToolResultState.ERROR || !"finish_research".equals(result.getName())) return result;
+            if (result.getState() != ToolResultState.ERROR) return result;
             var call = calls.stream().filter(c -> c.getId().equals(result.getId())).findFirst().orElseThrow();
             try {
                 var schema = SCHEMAS.getSchema(json.writeValueAsString(getTool(call.getName()).getParameters()));

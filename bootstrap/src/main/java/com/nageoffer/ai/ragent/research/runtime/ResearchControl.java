@@ -27,6 +27,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 /** Reactor 取消信号会一直传播到 SDK 的 JDK HTTP future 和响应 socket。 */
 public class ResearchControl {
     private final AtomicBoolean cancelled = new AtomicBoolean();
+    private final AtomicBoolean handover = new AtomicBoolean();
     private final Sinks.One<Boolean> signal = Sinks.one();
     private final CopyOnWriteArrayList<Runnable> interrupts = new CopyOnWriteArrayList<>();
 
@@ -49,6 +50,13 @@ public class ResearchControl {
     }
 
     public boolean cancelled() { return cancelled.get(); }
+
+    /** 停机交还：不打断正在进行的模型调用或工具，主 Agent 在下一步开始前停下，由服务把任务交还队列。 */
+    public void requestHandover() { handover.set(true); }
+    public boolean handoverRequested() { return handover.get(); }
+    public static final class HandoverRequested extends CancellationException {
+        public HandoverRequested() { super("RESEARCH_HANDOVER"); }
+    }
     public Mono<Boolean> signal() { return signal.asMono(); }
     public void check() {
         if (cancelled()) throw new CancellationException("RESEARCH_CANCELLED");

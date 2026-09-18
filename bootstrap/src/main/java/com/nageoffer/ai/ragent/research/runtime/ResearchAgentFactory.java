@@ -187,7 +187,7 @@ public class ResearchAgentFactory implements ResearchRunner, AutoCloseable {
         public Flux<AgentEvent> onActing(Agent agent, RuntimeContext context, ActingInput input,
                                          Function<ActingInput, Flux<AgentEvent>> next) {
             return Flux.fromIterable(input.toolCalls()).concatMap(call -> Flux.defer(() -> {
-                session.check();
+                session.checkStep();
                 session.budget.acquireTool();
                 session.activeToolCallId = call.getId();
                 Map<String, Object> started = new java.util.LinkedHashMap<>();

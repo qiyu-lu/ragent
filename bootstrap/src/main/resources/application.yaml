@@ -1,11 +1,15 @@
 server:
   port: ${RAGENT_SERVER_PORT:9090}
+  # 停机先停止接收新请求并等在途请求结束；研究任务在步边界把租约交还队列（research.shutdown-grace-seconds）。
+  shutdown: graceful
   servlet:
     context-path: /api/ragent
 
 spring:
   application:
     name: ragent${unique-name:}-service
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
 
   servlet:
     multipart:

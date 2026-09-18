@@ -228,6 +228,7 @@ public class ResearchRunService {
         try {
             execution.control.check();
             if (claim == null) {
+                if (!accepting) return;
                 claim = store.claim(id, owner, executorId, lease, properties.getMaxTakeovers()).orElse(null);
                 if (claim == null) return;
                 execution.claim = claim;
@@ -238,10 +239,10 @@ public class ResearchRunService {
                 ResearchSession.Outcome outcome = runner.run(session);
                 completion.complete(session, outcome, null);
             } catch (RuntimeException failure) {
-                completion.researchFailed(session, failure);
+                ended(session, execution, failure);
             }
         } catch (RuntimeException failure) {
-            if (claim != null && session != null) completion.researchFailed(session, failure);
+            if (claim != null && session != null) ended(session, execution, failure);
         } finally {
             if (claim != null && session != null) store.cancelledLocally(claim, session.budget.snapshot());
             executions.remove(id, execution);
@@ -250,6 +251,12 @@ public class ResearchRunService {
             ResearchRun current = store.get(id, owner);
             if (current.status() == Status.QUEUED && !tasks.isShutdown()) schedule(id, owner, user);
         }
+    }
+
+    /** 停机途中在步边界停下的执行把任务交还队列，由其他实例从已持久化的历史续跑；其余失败照常落库。 */
+    private void ended(ResearchSession session, Execution execution, RuntimeException failure) {
+        if (execution.control.handoverRequested() && !execution.control.cancelled()) store.release(session.claim, "SHUTDOWN");
+        else completion.researchFailed(session, failure);
     }
 
     /** 本阶段已有工具历史（接管或停机交还后的再次领取）时，从事件恢复对话与本地状态，而不是从头执行。 */
@@ -295,14 +302,24 @@ public class ResearchRunService {
 
     private String owner() { return UserContext.requireUser().getUserId(); }
 
-    /** 先把本实例持有的租约交还队列，再取消本地执行，被取消的执行因写保护无法把任务写成失败。 */
+    /**
+     * 优雅停机：停止领取；在途任务不打断当前的模型调用或工具，在下一步开始前把租约交还队列，其他实例立即可领；
+     * 宽限期内没走到步边界的直接交还并取消本地执行，被取消的执行因写保护无法把任务写成失败。
+     */
     @PreDestroy
-    public void close() {
+    public synchronized void close() {
+        if (!accepting && tasks.isShutdown()) return;
         accepting = false;
+        executions.values().forEach(execution -> execution.control.requestHandover());
+        long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(properties.getShutdownGraceSeconds());
+        while (executions.values().stream().anyMatch(execution -> execution.claim != null) && System.nanoTime() < until) {
+            try { Thread.sleep(50); }
+            catch (InterruptedException e) { Thread.currentThread().interrupt(); break; }
+        }
         leases.shutdownNow();
         executions.values().forEach(execution -> {
             var claim = execution.claim;
-            try { if (claim != null) store.release(claim, "SHUTDOWN"); }
+            try { if (claim != null) store.release(claim, "SHUTDOWN_GRACE_EXPIRED"); }
             catch (RuntimeException e) { log.warn("Research lease release failed for {}", claim.run().id(), e); }
             execution.control.cancel();
         });

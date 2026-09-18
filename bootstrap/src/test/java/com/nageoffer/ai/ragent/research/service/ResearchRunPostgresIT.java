@@ -543,27 +543,64 @@ class ResearchRunPostgresIT {
     }
 
     @Test
-    void shutdownHandsRunningRunsBackWithoutCountingATakeoverOrFailingThem() throws Exception {
-        var entered = new CountDownLatch(1);
-        ResearchRunner blocking = session -> {
-            entered.countDown();
-            while (true) session.check();
+    void shutdownLetsTheCurrentStepFinishThenHandsTheRunBackWithoutCountingATakeover() throws Exception {
+        var inStep = new CountDownLatch(1);
+        var stepFinished = new java.util.concurrent.atomic.AtomicBoolean();
+        ResearchRunner steps = session -> {
+            while (true) {
+                session.checkStep();
+                inStep.countDown();
+                // 一步进行中（模型调用或工具）：停机不打断它。
+                try { Thread.sleep(600); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+                stepFinished.set(true);
+            }
         };
-        var a = service(blocking, new ResearchProperties());
+        var a = service(steps, new ResearchProperties());
         var b = service(session -> gapOnly(), new ResearchProperties());
         try {
             var run = a.create(request("handover"));
-            assertTrue(entered.await(10, TimeUnit.SECONDS));
+            assertTrue(inStep.await(10, TimeUnit.SECONDS));
+            long started = System.nanoTime();
             a.close();
-            var queued = store.get(run.id(), owner);
-            assertEquals(Status.QUEUED, queued.status());
-            assertTrue(store.events(run.id(), owner, 0, 500).stream().anyMatch(e -> e.type().equals("RUN_RELEASED")));
+            long closeMillis = (System.nanoTime() - started) / 1_000_000;
+            assertTrue(stepFinished.get(), "the step in progress completed before the lease was handed back");
+            assertTrue(closeMillis < 5_000, "handover happens at the step boundary, not at the grace deadline: " + closeMillis);
+            assertEquals(Status.QUEUED, store.get(run.id(), owner).status());
+            var released = store.events(run.id(), owner, 0, 500).stream().filter(e -> e.type().equals("RUN_RELEASED")).toList();
+            assertEquals(1, released.size());
+            assertEquals("SHUTDOWN", released.get(0).payload().get("reason"));
             pollUntilTerminal(b, run.id(), owner);
             assertNotEquals("EXECUTION_CANCELLED", store.get(run.id(), owner).errorSummary());
             assertEquals(0, jdbc.queryForObject("SELECT takeover_count FROM t_research_run WHERE id = ?", Integer.class, run.id()));
             assertFalse(starts(run.id()).get(1).containsKey("takeover"));
             contiguous(run.id());
         } finally { a.close(); b.close(); }
+    }
+
+    @Test
+    void aStepThatOutlastsTheGracePeriodIsHandedBackAndCancelled() throws Exception {
+        var limits = new ResearchProperties();
+        limits.setShutdownGraceSeconds(1);
+        var entered = new CountDownLatch(1);
+        var cancelled = new CountDownLatch(1);
+        ResearchRunner stuck = session -> {
+            entered.countDown();
+            try { while (true) { Thread.sleep(50); session.check(); } }
+            catch (java.util.concurrent.CancellationException e) { cancelled.countDown(); throw e; }
+            catch (InterruptedException e) { Thread.currentThread().interrupt(); cancelled.countDown(); throw new java.util.concurrent.CancellationException(); }
+        };
+        var a = service(stuck, limits);
+        try {
+            var run = a.create(request("grace"));
+            assertTrue(entered.await(10, TimeUnit.SECONDS));
+            long started = System.nanoTime();
+            a.close();
+            assertTrue((System.nanoTime() - started) / 1_000_000 >= 900);
+            assertTrue(cancelled.await(5, TimeUnit.SECONDS));
+            assertEquals(Status.QUEUED, store.get(run.id(), owner).status(), "a cancelled local execution cannot fail a handed-back run");
+            assertEquals("SHUTDOWN_GRACE_EXPIRED", store.events(run.id(), owner, 0, 500).stream()
+                    .filter(e -> e.type().equals("RUN_RELEASED")).findFirst().orElseThrow().payload().get("reason"));
+        } finally { a.close(); }
     }
 
     @Test

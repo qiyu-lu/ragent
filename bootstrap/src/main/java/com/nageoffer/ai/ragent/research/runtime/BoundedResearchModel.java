@@ -108,7 +108,7 @@ public class BoundedResearchModel implements Model {
     }
     private Flux<ChatResponse> attempt(List<Msg> messages, List<ToolSchema> tools, GenerateOptions options) {
         return Flux.defer(() -> {
-            session.check();
+            if (finalization) session.check(); else session.checkStep();
             if (!finalization && session.retrievalBlocked() && !session.requiresRead()) session.requestFinishRepair();
             // 系统消息与历史逐字节不变，供应商前缀缓存才能命中；易变提醒只作为本次请求末尾的临时 user 消息，
             // 不写入 Agent 记忆（兼容端点对第二条 system 不可靠）。生成输入已按证据裁剪，不混入研究工具提示。

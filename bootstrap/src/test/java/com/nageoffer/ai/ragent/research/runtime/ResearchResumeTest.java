@@ -50,7 +50,7 @@ class ResearchResumeTest {
     private int responses;
 
     /** 按序记录 store.event 收到的事件与每次随事件持久化的 usage，等价于数据库里的事件表与 usage 列。 */
-    private static final class Recorder {
+    private static class Recorder {
         final List<ResearchEvent> events = new ArrayList<>();
         final List<Map<String, Object>> usage = new ArrayList<>();
         synchronized boolean add(String task, String type, Map<String, Object> payload, Map<String, Object> snapshot) {
@@ -188,6 +188,29 @@ class ResearchResumeTest {
         var outcome = factory().run(session);
         assertEquals("Parameter is 7 ms.", outcome.result().findings().get(0).statement());
         assertEquals(5, server.getRequestCount());
+    }
+
+    @Test
+    void handoverStopsAtTheNextStepBoundaryWithoutInterruptingTheCurrentOne() throws Exception {
+        script(0);
+        var recorder = new Recorder() {
+            ResearchSession session;
+            @Override synchronized boolean add(String task, String type, Map<String, Object> payload, Map<String, Object> snapshot) {
+                // 第一次检索进行中收到停机：这一步照常结束，下一次模型调用开始前停下。
+                if (type.equals("TOOL_STARTED")) session.control.requestHandover();
+                return super.add(task, type, payload, snapshot);
+            }
+        };
+        var session = session(recorder, Map.of());
+        recorder.session = session;
+        var error = assertThrows(RuntimeException.class, () -> factory().run(session));
+        Throwable root = error;
+        while (!(root instanceof ResearchControl.HandoverRequested) && root.getCause() != null) root = root.getCause();
+        assertInstanceOf(ResearchControl.HandoverRequested.class, root);
+        assertEquals(1, server.getRequestCount());
+        assertEquals(List.of("RESEARCH_STARTED", "MODEL_STARTED", "MODEL_ENDED", "TOOL_STARTED", "RETRIEVAL_PHASE", "TOOL_ENDED"),
+                recorder.events.stream().map(ResearchEvent::type).toList());
+        assertEquals(1, ResearchHistory.from(recorder.events).steps().size(), "the finished step is what the next owner resumes from");
     }
 
     @Test

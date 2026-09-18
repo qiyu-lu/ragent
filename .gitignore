@@ -41,6 +41,7 @@ scripts/logs/
 node_modules/
 dist/
 .vite/
+*.tsbuildinfo
 .env.local
 resources/docker/graphrag/.env
 

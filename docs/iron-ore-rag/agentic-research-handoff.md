@@ -1,5 +1,7 @@
 # 统一研究工作流：运行与交接
 
+2026-09-18 最新停点见[会话状态记录](agentic-research-resume-2026-09-18.md)：R1—R4 已实施，R5 主批 22/1200 因 embedding 连续超时受控停止，复跑和 72 项应用未启动。下方 P0—P8 为历史已交付能力，不能解释为 R5 已完成。
+
 当前用户入口是聊天页的“普通问答 / 深入分析 / 生成计划”。普通问答继续使用现有 RAG；后两者共享研究运行器、证据服务和最终生成，以 REPORT/PLAN 区分产物。送检、工位预约、草稿批准、执行模拟和 ROS 运行代码已退役。
 
 P0—P8 已完成实现与本轮约定验证。实际实现、逐阶段验证和公开数据结果分别见[实施计划](agentic-research-implementation-plan-2026-09-17.md)、[执行日志](agentic-research-execution-log.md)、[验证报告](agentic-research-validation-report.md)、[固定对照](agentic-research-evaluation-report.md)与[应用原文核对](agentic-research-application-review.md)。[最终交接清单](../../eval/agentic-research/manifests/research-p8-handoff-2026-09-18.json)保存配置、源码、日志和演示引用 SHA。程序用例、受控浏览器和真实供应商评测是不同证据。
@@ -40,9 +42,9 @@ npm --prefix frontend run dev
 
 主 Agent 用原生 search/read 工具查证据，观察后可补查。独立比较方向可通过 `conduct_research` 分派 worker；worker 只注册 search/read/finish，有独立上下文，不接收兄弟完整历史。缺少关键用户条件时 `ask_user` 进入 WAITING_INPUT，用户通过带 revision 的 input 请求继续。
 
-最终生成共用 brief、主/子发现和已读证据快照；REPORT 生成引用段落，PLAN 生成结构化草稿。结构、引用错误最多修复一次。引用编号由程序映射，未知参数保持 null/待确认，用户限制保存为 user_input。合法 artifact 与 ARTIFACT/终态事件在同一 epoch/lease 保护的短事务提交。
+当前主/worker/产物提示为 research-main-v4、research-worker-v3、research-artifact-v5。最终生成共用 brief、主/子发现和已读证据快照；REPORT 生成引用段落，PLAN 生成结构化草稿。结构、引用错误最多修复一次。引用编号由程序映射，未知参数保持 null/待确认，用户限制保存为 user_input。合法 artifact 与 ARTIFACT/终态事件在同一 epoch/lease 保护的短事务提交。
 
-GET 查询与 SSE 都只读。SSE 的 after/Last-Event-ID 是事件游标；断线后任务继续，刷新先取快照再订阅，不新增模型任务。来源面板使用实际读过的快照，最终编号以 artifact.citations 为准。
+GET 查询与 SSE 都只读。SSE 的 after/Last-Event-ID 是事件游标；浏览器 15 秒没有收到数据即取消本次读取，按带抖动的退避重取快照、续读持久事件，按 sequence 去重。断线后任务继续，重连不会重新 POST 任务。来源面板使用实际读过的快照，最终编号以 artifact.citations 为准。
 
 ## 4. 额度、取消和失败
 
@@ -50,7 +52,9 @@ GET 查询与 SSE 都只读。SSE 的 after/Last-Event-ID 是事件游标；断�
 
 主动 cancel 先写 CANCELLED 并撤销租约，再传播到父/子 SDK 与 HTTP。旧 epoch 和取消后的迟到结果不能发布产物；本地 HTTP 结束不能证明远端停止计算或计费。单 JVM 重启将失去执行者的任务标为 INTERRUPTED，保留证据；重新发起使用新 clientRequestId，当前不恢复模型中间 token。
 
-部分 worker 失败或预算退出可保留其他成功发现，合法产物落 PARTIAL。最终生成失败落 FAILED，保留研究摘要与失败诊断；非法产物不会公开。COMPLETED 表示正常形成合法产物，不证明资料完整、引用语义正确或计划可执行。
+上游模型没有 token 续取游标。每次请求完整收到结束标记后才交给 Agent；传输断开时丢弃本次未完成文本/工具 JSON，保留前面已完成的工具观察，有限重试同一模型步骤。SDK 隐式重试关闭，每次 HTTP attempt 单独消耗调用额度并保存 usage/unknown。永久权限或参数错误不重试；检索 embedding 每次上限 12 秒、最多两次，PG 查询最多 5 秒，内层期限早于外层工具期限，取消传播到底层句柄。
+
+部分 worker 失败或探索时长退出可保留已读证据，合法产物落 PARTIAL。`executionIssues` 保存运行失败，`gaps` 只保存原文缺口；最终生成保留活动时间和调用额度。最终生成失败落 FAILED，保留研究摘要与失败诊断；非法产物不会公开。COMPLETED 表示正常形成合法产物，不证明资料完整、引用语义正确或计划可执行。
 
 ## 5. 复现与演示
 
@@ -65,13 +69,13 @@ python3 eval/agentic-research/browser_research.py --classpath /tmp/research-brow
 
 # 固定公开样本：不加 --execute 只准备请求
 python3 eval/agentic-research/evaluate_research.py --profile smoke --run-dir local-data/agentic-research/runs/<new-smoke>
-python3 eval/agentic-research/evaluate_research.py --profile regression --run-dir local-data/agentic-research/runs/<new-regression> --execute
+python3 eval/agentic-research/evaluate_research.py --profile regression --config eval/agentic-research/configs/r5.json --run-dir local-data/agentic-research/runs/<new-regression> --execute
 
 # 完整带标注 split 的执行能力；费用和规模更大，不代表本轮已执行
 python3 eval/agentic-research/evaluate_research.py --profile full --run-dir local-data/agentic-research/runs/<new-full>
 
 # 固定 12 比较 / 12 计划；产物引用原文供独立核对
-python3 eval/agentic-research/evaluate_applications.py --run-dir local-data/agentic-research/runs/<new-applications> --execute
+python3 eval/agentic-research/evaluate_applications.py --mode all --config eval/agentic-research/configs/r5.json --run-dir local-data/agentic-research/runs/<new-applications> --execute
 
 # 两道一次检索问题 + 一个双资料比较 REPORT + AMR 摘要 PLAN（要求未披露 batch/window 保持 null/待确认），默认仅生成请求
 bash scripts/demo-agentic-research.sh
@@ -79,7 +83,7 @@ bash scripts/demo-agentic-research.sh
 bash scripts/demo-agentic-research.sh --execute
 ```
 
-每次真实运行外发公开问题、检索片段和已读正文，并消耗配置供应商额度。每题预算与批次生成费用估算上限分别生效；embedding 金额和 unknown usage 需单列，不把估算当账单。`--resume` 仅执行同目录下未记录完成的任务，要求源码、配置和数据指纹一致；已经失败的任务也保留，不自动重刷。需要修复后重测时创建新批次。
+每次真实运行外发公开问题、检索片段和已读正文，并消耗配置供应商额度。按 2026-09-18 用户约定省略价格查询、金额估算和费用确认；默认不启用金额上限。保留每题调用/活动时长限制、实际 token、失败和 unknown usage。`--resume` 仅执行同目录下未记录完成的任务，要求源码、配置和数据指纹一致；已经失败的任务也保留，不自动重刷。需要修复后重测时创建新批次。
 
 A 对照复用项目的一次知识检索和固定命中块，统一生成模型；没有包含生产聊天的改写、意图/MCP、会话历史和回退。B 关闭委派工具，C 按需委派；报告记录实际是否创建 worker。QASPER 使用多标注者最大答案/段落匹配，MuSiQue 答案/支持只评分可回答行，并单列全部行的可回答性；固定抽样不报告完整成对 sufficiency 指标。
 

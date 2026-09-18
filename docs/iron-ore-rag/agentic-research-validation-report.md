@@ -1,5 +1,7 @@
 # 统一研究工作流验证报告
 
+最新 R1—R5 改进状态见[会话交接](agentic-research-resume-2026-09-18.md)和[R5 清单](../../eval/agentic-research/manifests/research-r5-validation-2026-09-18.json)。本轮唯一相关后端 213 项、Python 30 项、前端流恢复 4 项与浏览器夹具 9 项通过；构建通过，app 原有 24 项类型诊断保留。R5 主批仅 22/1200、复跑与应用未开始，程序检查通过不能代替整体质量验收。以下 P0—P8 数字保留为历史快照。
+
 日期：2026-09-18。P0—P8 已完成实现与本轮约定验证。固定 regression 1200 任务全部记录，24 个应用/85 条引用及两例复测保留负结果；P8 真实演示 4 请求/10 引用已核对。当前后端 173/173、Python 28/28、新库/重复升级、前端 build、node 类型与 9 项受控浏览器检查通过；app 24 项既有诊断保留。质量见[固定对照](agentic-research-evaluation-report.md)与[原文核对](agentic-research-application-review.md)，启动及失败边界见[交接](agentic-research-handoff.md)，下方历史批次不改写。
 
 ## P0 基线
@@ -395,3 +397,11 @@ P5 提交 `3507d9e` 后接入聊天三模式、ResearchProgress / PlanDraftCard�
 两道原超时题 × ABC 的 v1 六个任务实际记录为 4 完成/0 部分/2 失败，但其中三个完成任务答案为空；65 次 embedding 请求有 63 次 usage unknown 的网络失败，不能宣称效果改善。A 的一次两次超时发生于 embedding，尚未进入 PG。后续同公开查询的原 30 秒/新设置各四次传输对照均成功，不能据此断定先前是网络、供应商还是超时设置原因。已加入 DNS、TLS、请求写出、响应头和正文阶段记录；同两题 v2 复测进行中，最终结果续记。原始失败批次不覆盖，金额计算关闭。
 
 R2 v2 续记：同两题 × ABC 的 6 个任务全部完成并生成回答。41 次模型请求 usage 全部已知（input 346,822/output 8,709）；16 次 embedding 请求中 2 次失败 usage unknown，14 次成功共 152 tokens。两次失败均已完成 DNS/TLS 并写出 request body，等待响应头约 12 秒后取消，第二次尝试成功；排除这些样本的 DNS、建连与 PG 阶段，但不能区分供应商排队和回程网络。v1/v2 时段差异巨大，不将小样本结果作为整体质量收益。v2 的 MuSiQue B/C 答案命中固定历史金标，但引用仍只覆盖最终实体，未完整覆盖多跳链。后续保留重复对照。
+
+## R3—R5 改进与会话交接检查
+
+R3/R4 真实校准详见执行日志及独立清单，thinking 与重排的质量变化不一致，默认仍关闭。最后修复明确每个模型 HTTP attempt 消耗额度并保存 usage；实际断流文字和半截工具 JSON 不拼接，永久鉴权错误不另起最终生成。
+
+最终相关后端唯一用例计数为 213：主相关套件 128、最后新增服务失败证据收尾 1、共用问答/检索/摄取/取消 73、来源 PostgreSQL IT 11。复跑的 17 项产物测试不重复累计。日志为 `20260918_R5_validation/backend-final.log` / `completion-recovery-final.log` / `shared-path-regression.log` / `p2-database.log`；数据库测试均用临时隔离库并清理。Python 30、前端 4、浏览器 9 与构建记录见 R3/R4；受控浏览器首次编译竞态启动失败已保留，稳定后 v2 通过，app 原有 24 项类型诊断未变。
+
+R5 v2 在连续 embedding 无响应后受控中止，仅记录 22 项，临时运行库已删除，所有失败/usage 保留。随后 66 次连接探针已完成，但不能确定协议或网络根因；会话交接时没有这轮执行进程。新的离线比较脚本 `eval/agentic-research/analysis/compare_runs.py` 用完整 R1/R3 的 36 项配对记录运行通过，不用于不完整 v2 作整体比较。本次记录修改仅做链接/结构/JSON/空白检查，没有再次启动供应商或浏览器。

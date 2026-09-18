@@ -4,7 +4,7 @@
 
 ## 当前接续点
 
-2026-09-18 已完成计划 8.6 的 R1：工具参数契约、原生结束恢复及默认取消金额估算门槛。相关后端 114 项、Python 29 项检查通过；12 个预先固定原题 × A/B/C 的真实诊断复测为 35 COMPLETED / 1 PARTIAL / 0 FAILED，历史同题为 21/4/11。4 个运行真实触发结束修复，使用 6 次调用；语义负例与未读引用错误仍保留，不能宣称整体质量或多 Agent 收益。见文末 R1 记录和[R1 清单](../../eval/agentic-research/manifests/research-r1-reliability-2026-09-18.json)。下一阶段为 R2：检索可恢复性和连接恢复补强；R2—R5 尚未实施。以下 P0—P8 数字保留为此前验收快照。
+2026-09-18 已完成 R1—R4 的实现、故障复测和小样本校准。R5 主回归 `20260918_R5_regression_v2` 因 embedding 连续无响应而受控停止，记录 22/1200 项（17 COMPLETED / 1 WAITING_INPUT / 4 FAILED），1178 未执行，临时任务库已删除。连接探针已结束，当前无本轮评测/探针/串行驱动进程。用户要求切换会话，接续入口为[本次状态记录](agentic-research-resume-2026-09-18.md)：先验证传输恢复，再完成主回归、两轮复跑及 72 项应用同题对照。已有直接调用和 Git 授权继续有效，省略金额估算。R5 未完成，尚不能给出稳定整体质量或多 Agent 收益结论。以下 P0—P8 数字保留为此前验收快照。
 
 P0—P8 已完成实现与本轮约定验证（2026-09-18）。P7 提交 `3381fa9`；P8 通过唯一标题 `docs: finalize research workflow and implementation handoff` 定位。固定 regression 的 QASPER 200 问题与 MuSiQue Full dev 200 行，A/B/C 共 1200 个任务全部记录（932 COMPLETED / 93 PARTIAL / 175 FAILED），没有未执行任务。QASPER Answer F1：A 0.3365/B 0.2338/C 0.2442；MuSiQue Answer F1：A 0.3325/B 0.3269/C 0.3918；MuSiQue 答案/支持只评分 105 行 answerable，非 200 行答案分母。C 实际 2 个运行委派、创建 4 个 worker。结果和费用见[固定对照报告](agentic-research-evaluation-report.md)。
 
@@ -504,3 +504,21 @@ R5 预先固定主对照仍为原 400 题×ABC，逐题轮换 ABC/BCA/CAB；从�
 - R4 真实对照结束：关闭 thinking 的 B 模式 12/12 完成，开启后 10 完成/2 `ARTIFACT_VALIDATION_FAILED`；QASPER F1 0.4051→0.4430，MuSiQue 可回答 3 题 F1 0.8667→0.7500，p50 40.938→78.964 秒。两批分别记录 138/143 模型请求；开启批有 4 次 embedding unknown。样本来自 R1 失败选题，且运行冻结于最后 SDK 重试补丁前，不能作为普遍收益或纯网络因果判断。主回归保持 thinking=false。
 - R4 两项 C 应用均完成，但原文审阅不通过全面支持验收：`plan-06` 步骤 1/3 用目录支撑操作，`comparison-02` 方法段引用没有覆盖权重共享、判别器位置、BERT/copy 等全部细节。支持的数字、数据集与不支持的结论分别记录于 `research-r4-artifacts-2026-09-18.json`；不以结构校验掩盖负例。
 - 最后补齐 5xx/429 重试耗尽后的已读证据收尾，权限错误即使包裹 IOException 仍不重试生成；17 项产物测试通过。当前唯一相关检查合计 140 项（128 项主套件 + 11 项数据库 IT + 新增 1 项服务失败收尾测试）。主回归使用新目录 `20260918_R5_regression_v2`，所有 API attempt 由应用统一记账，旧 v1 仅准备未执行。
+
+## R5：固定回归与应用对照（2026-09-18，未完成，切换会话待接续）
+
+- 运行代码提交 `0b39d31`；R2/R3/R4 提交分别为 `6353eb7` / `6b43e8e` / `0cfc2fb`。
+- 主回归：`20260918_R5_regression_v2`，与历史 P7 相同有序 400 题、语料及生成模型；A/B/C 按题轮转 ABC/BCA/CAB。
+- 复跑：预登记随机种子 20260918，每个数据集 6 题，排除 R1 失败诊断选题；两轮各 36 任务。选择不使用答案与得分。
+- 应用：原 24 个固定比较/PLAN 请求，各执行 A/B/C 共 72 项；按本次已读原文单列语义审阅，不把引用合法作为支持通过。
+- thinking=false、rerank=false、并发 2；关闭金额计算，实际模型/embedding 请求与 unknown 留档。运行期间仅做离线分析和文档维护，使用冻结的源码与 class 防止后续编译污染。
+
+- 普通问答/共用检索/摄取/取消的既有回归额外 73 项通过，日志 `20260918_R5_validation/shared-path-regression.log`。本轮唯一相关后端检查合计 213（研究与 SDK 129 + 共用路径 73 + PostgreSQL 来源 IT 11）；不是将多次复跑用例相加。`validate-agentic-research-p7.sh` 默认列表已包含新增检索操作、embedding/rerank 记账和阅读投影检查。
+
+### R5 受控中止与本次会话交接
+
+- v2 运行源码为 `0b39d31`，执行返回 `JAVA_EXIT_143`；22 项已记录、1178 未执行。4 个失败摘要为 1 `NETWORK_ERROR`、3 `RESEARCH_EXECUTION_FAILED`，后者需结合中止 trace 分析，不统一归为网络。原运行/预测/usage 不覆盖，随机任务库确实删除。
+- 停止前模型 129 请求、input 605,078/output 18,972、usage unknown 0；embedding 89 请求、已知 total_tokens 310、unknown 51。只执行少量 QASPER 前缀，不能将其均分与完整历史批次比较。
+- 66 次连接探针完成：HTTP/2 复用 18/30 成功，HTTP/1.1 复用 26/30，新 HTTP/2 4/6；成功已知 tokens 192，18 次失败 unknown。新连接与两种协议均有失败，时段交错并不消除时间差异，不能证明某协议是根因，尚未调整协议默认值。独立 Python 新连接 60 秒上限请求在 824 ms 成功、4 tokens，不能证明 12 秒期限过短。
+- `run_all.py` 在不完整主批后主动退出，两轮 repeat 和 R5 72 应用未启动；不要原样重跑以覆盖旧目录。当前运行源码指纹仍与 v2 一致；无改动且传输恢复可按原配置 resume 未记录项，改动则新建 v3。
+- 按用户请求结束当前会话，未继续发起真实调用；进程检查未发现本轮任务仍运行。已完成项、负例、授权、未完成项和复现命令均写入[会话状态](agentic-research-resume-2026-09-18.md)及[R5 清单](../../eval/agentic-research/manifests/research-r5-validation-2026-09-18.json)。下一会话从传输诊断接续，最终仍需 1200 主任务、72 复跑和 72 应用/原文检查。

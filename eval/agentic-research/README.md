@@ -1,5 +1,7 @@
 # 统一研究工作流的数据、评测与复测
 
+最新停点与恢复命令见[2026-09-18 会话交接](../../docs/iron-ore-rag/agentic-research-resume-2026-09-18.md)。R1—R4 已实施，R5 因 embedding 连续无响应停止，主批仅 22/1200；两轮 repeat 与 72 项应用对照尚未开始。
+
 这里实现离线转换、真实幂等摄取、原生研究与统一产物，以及 P7 固定 A/B/C 对照和应用原文核对。转换不调用模型；`import_corpus.py --execute` 复用项目分块、向量化和索引落点。真实评测的配置、逐题输出、trace、usage 和失败保存在独立批次，见[执行记录](../../docs/iron-ore-rag/agentic-research-execution-log.md)与[交接说明](../../docs/iron-ore-rag/agentic-research-handoff.md)。
 
 P7 固定 regression 已全部记录 400 问题/1200 任务，MuSiQue 答案/支持的分母为 105 行可回答；完整质量和限制见[对照报告](../../docs/iron-ore-rag/agentic-research-evaluation-report.md)。[P7 机器清单](manifests/research-p7-evaluation-2026-09-17.json)冻结配置、原始产物 SHA、调用资源、作者公式对齐、173/28 程序检查和实际委派案例；full 5839/17517 只准备，未付费执行。
@@ -36,7 +38,7 @@ python3 -m unittest discover -s eval/agentic-research/tests -v
 
 `--phase p3/p4` 联调返回 `state.researchResult` 中的发现、已读证据 ID、缺口和冲突，保留 artifact 为空的历史阶段边界。COMPLETED 在这些联调中只表示研究摘要形成。资料没有提供的要求不能补造。等待输入通过 `state.question` 展示，回复携带当前 `revision` 与 `answer`；原研究范围保持不变，需要更换范围时使用新的请求。
 
-运行器默认最多 16 次模型调用、24 次工具调用、300 秒累计活动时长，预留 2 次最终生成额度；最后两次研究调用限定为原生 finish_research。人工等待不计入活动时长，恢复保留已消耗额度。预算/超时退出时，有已读证据则保留为 PARTIAL，无证据则 FAILED。失败 worker 的 gaps 自动纳入主摘要，状态为 PARTIAL；主 Agent 预算/超时退出仍保留成功 worker 的 findings。取消关闭父子 SDK/HTTP 订阅并阻止迟到写回，供应商是否停止远端计算保持 unknown。运行与模型并发分别限制为 2；本阶段采用单 JVM 执行，重启将失去执行者的 QUEUED/RUNNING 标为 INTERRUPTED，不恢复中间 token。
+运行器默认最多 16 次模型调用、24 次工具调用、300 秒累计活动时长，预留 2 次最终生成额度；最后两次研究调用限定为原生 finish_research。人工等待不计入活动时长，恢复保留已消耗额度。预算/超时退出时，有已读证据则保留为 PARTIAL，无证据则 FAILED。失败 worker 的运行原因写入 executionIssues，原文缺口写入 gaps，状态为 PARTIAL；主 Agent 预算/超时退出仍保留成功 worker 的 findings。取消关闭父子 SDK/HTTP 订阅并阻止迟到写回，供应商是否停止远端计算保持 unknown。运行与模型并发分别限制为 2；本阶段采用单 JVM 执行，重启将失去执行者的 QUEUED/RUNNING 标为 INTERRUPTED，不恢复中间 token。
 
 ```bash
 # 随机 PostgreSQL 隔离库与本地 HTTP 桩，无付费模型调用
@@ -97,7 +99,7 @@ python3 eval/agentic-research/browser_research.py --run-dir local-data/agentic-r
 
 P5/P6 初次交付时付费联调被自动审批拒绝，用户后续已明确授权两条 REPORT/PLAN 开发样例；实际失败、修复和原文核对见 [artifact smoke manifest](manifests/research-p5-artifact-smoke-2026-09-17.json)。
 
-`--phase p5` 的计划样例将 500 条标注上限作为独立用户约束传入；当时生成使用 research-artifact-v3，当前模板为 research-artifact-v4；CLI embedding 读取超时与 30 秒工具配置对齐。产物校验错误包含字段位置，内部最多保存 16000 个 Java 字符的失败生成输出，SSE 不发送该原始草稿；不得把引用身份检查当成语义支持。
+`--phase p5` 的计划样例将 500 条标注上限作为独立用户约束传入；当时生成使用 research-artifact-v3，当前模板为 research-artifact-v5；研究 embedding 单次上限 12 秒、最多两次，内层截止早于 30 秒工具期限。产物校验错误包含字段位置，内部最多保存 16000 个 Java 字符的失败生成输出，SSE 不发送该原始草稿；不得把引用身份检查当成语义支持。
 
 ## 产物与标注隔离
 

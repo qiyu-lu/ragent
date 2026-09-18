@@ -4,11 +4,11 @@
 
 | 项 | 值 |
 | --- | --- |
-| 更新时间 | 2026-09-18（W5 完成；X5 真实上游待用户跑） |
-| 当前工作项 | S6：简历条目、README、面试卡（尚未开始）；先补 X5 真实上游结果 |
+| 更新时间 | 2026-09-19（W5 完成，X5 真实上游结果已补入） |
+| 当前工作项 | S6：简历条目、README、面试卡（尚未开始） |
 | 分支 / 提交 | `feat/llm-backend-hardening`；标签 `career-w1`、`career-w3`、`career-w2`、`career-w4`、`career-w5` |
 | 回归通过数 | `bash scripts/validate-agentic-research-p7.sh`：W5 后 Python 41/41、Java 13 + 260（W4 后 13 + 247），约 40 s；另有 `validate-agentic-research-p2-database.sh` 结构校验 |
-| 最近的运行目录 | X2：`local-data/agentic-research/runs/career_X2_v1/`；X3：`runs/career_X3_v1/`；X1：`runs/career_X1_v1_*`；X5：`runs/career_X5_stub_v1/`（真实上游待跑） |
+| 最近的运行目录 | X2：`local-data/agentic-research/runs/career_X2_v1/`；X3：`runs/career_X3_v1/`；X1：`runs/career_X1_v1_*`；X5：`runs/career_X5_real_v1/`（模拟上游 `career_X5_stub_v1/`） |
 
 ## 进度
 
@@ -17,7 +17,7 @@
 - [x] W3 模拟上游、抖动退避、熔断补缺 + X3（[改动说明](changes/2026-09-18-upstream-fault-injection.md)）
 - [x] W2 心跳租约、跨实例接管、断点续跑、优雅停机 + X2（[改动说明](changes/2026-09-18-durable-research-execution.md)）
 - [x] W4 权限隔离 + 越权矩阵（[改动说明](changes/2026-09-18-knowledge-base-access-control.md)）
-- [x] W5 内容寻址的 embedding 复用 + X5（[改动说明](changes/2026-09-18-content-addressed-embedding-reuse.md)；X5 真实上游待跑）
+- [x] W5 内容寻址的 embedding 复用 + X5（[改动说明](changes/2026-09-18-content-addressed-embedding-reuse.md)）
 - [ ] S6 简历条目、README、面试卡
 
 ## 结果摘要（引用数字时连同条件一起说）
@@ -27,11 +27,11 @@
 - W2（模拟上游，独立 JVM 共享运行库，租约 6 s）：kill -9 恢复 4.94 s、SIGSTOP 4.97 s、SIGTERM 0.95 s；每个被接管任务重复 1 次模型调用（在途那次）；5 类故障下不变量全部成立；毒任务 4 次失联后 EXECUTOR_LOST。
 - W1 复核（MuSiQue C，80 道新题，可答 45）：命中率 0.05%→80.1%、单任务计费输入 −72% 复现；答案 F1 0.443→0.352，配对差 −0.09，区间 [−0.21, +0.02] 含 0，“资料中没有”式回答 12→16，未处理。
 - W4（JUnit + 真实 PostgreSQL/pgvector）：越权矩阵 299 项全部符合（173 允许、126 拒绝，拒绝时业务服务未被调用）；私有库放最佳匹配时，其他用户 TopK=1 仍得到公开库的块（召回前过滤）。
-- W5（模拟上游，调研表 V1.2/V1.3 各 79 块）：原样重新入库、回退旧版上游调用 0；V1.2→V1.3 重嵌入 2/79 块（2.5%），模拟 token 为全量的 3.0%；块表与 pgvector 的先删后插已由集成测试证明同事务。真实上游数字待补。限制：表格按行累加分组，表中插一行会使该表后续块全部失效；ES/LightRAG/Milvus 的先删后插不在事务内。
+- W5（调研表 V1.2/V1.3 各 79 块；真实上游 SiliconFlow 单次运行，模拟上游复现同样的块数与命中）：原样重新入库、回退旧版上游调用 0；V1.2→V1.3 重嵌入 2/79 块，计费 token 45,722→1,368（2.99%）；块表与 pgvector 同事务先删后插已由集成测试证明。限制：表格按行累加分组，表中插一行会使该表后续块全部失效；ES/LightRAG/Milvus 的先删后插不在事务内。
 
 ## 下一步（下个会话）
 
-先读 `runs/career_X5_real_v1/x5-report.md`（用户跑 `X5_UPSTREAM=real X5_STAMP=career_X5_real_v1 bash scripts/career-x5.sh`），把真实调用数、token、耗时补进 W5 改动说明与 `manifests/career-x5-2026-09-18.json`，单独提交 `docs:`；再按计划 §10 做 S6。
+按计划 §10 做 S6：汇总简历条目（只填结果摘要里的实测值并注明条件）、更新 `README.md` 工程能力表、按 Obsidian 既有格式整理面试卡，打 `career-done`。
 
 ## 已知事实与遗留问题
 

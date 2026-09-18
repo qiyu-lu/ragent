@@ -97,5 +97,109 @@
     ],
     "rowsConsistent": true
   },
-  "real": "pending: X5_UPSTREAM=real X5_STAMP=career_X5_real_v1 bash scripts/career-x5.sh"
+  "real": {
+    "date": "2026-09-19",
+    "commit": "77adabc (code identical to 2355966)",
+    "upstream": "https://api.siliconflow.cn",
+    "model": "siliconflow:Qwen/Qwen3-Embedding-8B",
+    "runDir": "local-data/agentic-research/runs/career_X5_real_v1",
+    "tokens": "provider usage.total_tokens",
+    "runs": 1,
+    "note": "an earlier attempt stopped at step 1 with HTTP 401 (wrong key) and wrote no step records; this is the complete rerun on a fresh database",
+    "steps": [
+      {
+        "step": "v13_uncached",
+        "file": "铁矿石人工检测流程调研V1.3-demo.xlsx",
+        "cache": false,
+        "chunks": 79,
+        "cacheHits": 0,
+        "cacheMisses": 79,
+        "upstreamTexts": 79,
+        "upstreamCalls": 3,
+        "upstreamFailures": 0,
+        "upstreamTokens": 45722,
+        "embedMillis": 34658,
+        "totalMillis": 35504,
+        "chunkRows": 79,
+        "vectorRows": 79
+      },
+      {
+        "step": "v12_cold",
+        "file": "铁矿石人工检测流程调研V1.2.xlsx",
+        "cache": true,
+        "chunks": 79,
+        "cacheHits": 0,
+        "cacheMisses": 79,
+        "upstreamTexts": 79,
+        "upstreamCalls": 3,
+        "upstreamFailures": 0,
+        "upstreamTokens": 45645,
+        "embedMillis": 9225,
+        "totalMillis": 9544,
+        "chunkRows": 79,
+        "vectorRows": 79
+      },
+      {
+        "step": "v12_repeat",
+        "file": "铁矿石人工检测流程调研V1.2.xlsx",
+        "cache": true,
+        "chunks": 79,
+        "cacheHits": 79,
+        "cacheMisses": 0,
+        "upstreamTexts": 0,
+        "upstreamCalls": 0,
+        "upstreamFailures": 0,
+        "upstreamTokens": 0,
+        "embedMillis": 68,
+        "totalMillis": 280,
+        "chunkRows": 79,
+        "vectorRows": 79
+      },
+      {
+        "step": "v13_upgrade",
+        "file": "铁矿石人工检测流程调研V1.3-demo.xlsx",
+        "cache": true,
+        "chunks": 79,
+        "cacheHits": 77,
+        "cacheMisses": 2,
+        "upstreamTexts": 2,
+        "upstreamCalls": 1,
+        "upstreamFailures": 0,
+        "upstreamTokens": 1368,
+        "embedMillis": 293,
+        "totalMillis": 435,
+        "chunkRows": 79,
+        "vectorRows": 79
+      },
+      {
+        "step": "v12_rollback",
+        "file": "铁矿石人工检测流程调研V1.2.xlsx",
+        "cache": true,
+        "chunks": 79,
+        "cacheHits": 79,
+        "cacheMisses": 0,
+        "upstreamTexts": 0,
+        "upstreamCalls": 0,
+        "upstreamFailures": 0,
+        "upstreamTokens": 0,
+        "embedMillis": 30,
+        "totalMillis": 187,
+        "chunkRows": 79,
+        "vectorRows": 79
+      }
+    ],
+    "derived": {
+      "repeatUpstreamCalls": 0,
+      "rollbackUpstreamCalls": 0,
+      "upgradeReembedChunkRatio": 0.0253,
+      "upgradeUpstreamTextRatioVsUncached": 0.0253,
+      "upgradeTokenRatioVsUncached": 0.0299,
+      "upgradeTokensSaved": 44354,
+      "upgradeEmbedMillisVsUncached": [
+        293,
+        34658
+      ],
+      "rowsConsistent": true
+    }
+  }
 }

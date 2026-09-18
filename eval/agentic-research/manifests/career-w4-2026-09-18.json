@@ -1,0 +1,34 @@
+{
+  "experiment": "W4 knowledge-base access control: cross-user matrix and pre-recall filtering",
+  "date": "2026-09-18",
+  "basis": "JUnit against a random local PostgreSQL + pgvector database built from schema_pg.sql; no model or embedding calls",
+  "commits": {"visibilityAndGrants": "cd20e6b", "retrievalScope": "71c4389", "researchScope": "35552f5", "stopOwnership": "785a7de", "adminConsole": "412ec2b", "tests": "a21beb5"},
+  "command": "bash scripts/validate-agentic-research-p7.sh",
+  "regression": {"python": "41/41", "java": "13 + 247, 0 failures", "schemaUpgradeCheck": "scripts/validate-agentic-research-p2-database.sh passed (fresh == upgraded catalog; legacy rows PUBLIC with owner; new rows PRIVATE)"},
+  "matrix": {
+    "test": "KnowledgeAccessMatrixPostgresIT.crossUserAccessMatrix",
+    "actors": ["owner A", "other user B", "admin"],
+    "visibilities": ["PUBLIC", "PRIVATE", "RESTRICTED"],
+    "operations": 23,
+    "operationGroups": {"knowledgeBase": ["get", "rename", "delete", "visibility", "grants.list", "grants.add", "grants.revoke"],
+                        "document": ["upload", "page", "get", "update", "delete", "enable", "chunk", "chunk-logs", "preview", "file"],
+                        "chunk": ["page", "create", "update", "delete", "enable", "batch-enable"]},
+    "phases": ["no grants: 3 actors x 3 visibilities", "B READ on RESTRICTED + MANAGE on PRIVATE (ignored)", "ROLE user MANAGE on RESTRICTED", "both RESTRICTED grants revoked"],
+    "cases": 299, "passed": 299, "expectedAllow": 173, "expectedDeny": 126,
+    "denialRule": "ClientException and the mocked business service was never invoked"
+  },
+  "otherChecks": {
+    "listFiltering": "kb page and document search scopes for A, B, admin (6 checks)",
+    "identity": "no login user, unknown user, deleted user, deleted kb -> no access (4 checks)",
+    "stop": "owner allowed, other user denied, admin allowed, unknown task denied (4 cases)",
+    "research": "creation rejects an unreadable kb with the not-found message and accepts it once PUBLIC; a queued run whose owner lost access fails KB_ACCESS_REVOKED at claim with 0 model calls (ResearchRunPostgresIT)",
+    "unit": "RetrievalScopeResolverTest +4, GraphSearchChannelTest +1, EsKeywordRetrieverServiceTest +1, WorkbookDiffServiceTest +1"
+  },
+  "preRecallProof": {
+    "test": "KnowledgeRetrievalIsolationPostgresIT",
+    "setup": "query vector e0; PRIVATE kb chunk = e0 (cosine 1.0); PUBLIC kb chunk = 0.6 e0 + 0.8 e1 (cosine 0.6)",
+    "ownerTop1": {"collection": "private", "score": 1.0},
+    "otherUserTop1": {"collection": "public", "score": 0.6},
+    "argument": "TopK=1 still returns the public chunk for the other user; a post-recall filter would have spent the single slot on the private chunk and returned nothing"
+  }
+}

@@ -37,6 +37,7 @@ import com.nageoffer.ai.ragent.rag.core.vector.PgVectorRetrieverService;
 import com.nageoffer.ai.ragent.rag.core.retrieval.channel.KbCollectionProvider;
 import com.nageoffer.ai.ragent.research.config.ResearchProperties;
 import com.nageoffer.ai.ragent.research.model.ResearchBrief;
+import com.nageoffer.ai.ragent.research.model.ResearchModelRole;
 import com.nageoffer.ai.ragent.research.model.ResearchRun;
 import com.nageoffer.ai.ragent.research.model.SubtaskResult;
 import com.nageoffer.ai.ragent.research.runtime.*;
@@ -69,11 +70,40 @@ public class ResearchRunCommand {
                         List<String> constraints, String mode) { }
     public record Job(String runDir, List<Case> cases, Boolean generateArtifacts,
                       String evaluationMode, Integer concurrency, Double maxCostCny, String generationInstruction,
-                      String expectedModel, Map<String, Integer> expectedBudget, Boolean thinking, Boolean rerank) { }
+                      String expectedModel, Map<String, Integer> expectedBudget, Boolean thinking, Boolean rerank,
+                      Map<String, String> expectedModels) { }
     @Configuration(proxyBeanMethods = false)
     @EnableTransactionManagement
     static class Transactions { }
     private static final ObjectMapper JSON = new ObjectMapper().findAndRegisterModules();
+
+    /** 历史单模型实验也显式绑定三个角色，避免继承新的在线默认配置。 */
+    static void configureEvaluationModels(Job job, AIModelProperties models, ResearchProperties properties) {
+        String actualModel = models.getChat().getCandidates().stream().filter(c -> properties.getModelId().equals(c.getId()))
+                .findFirst().orElseThrow().getModel();
+        if (job.expectedModel() == null || !job.expectedModel().equals(actualModel)) {
+            throw new IllegalArgumentException("EVALUATION_MODEL_MISMATCH");
+        }
+        Map<String, String> requested = job.expectedModels() == null ? Map.of() : job.expectedModels();
+        if (!Set.of("main", "worker", "finalization").containsAll(requested.keySet())) {
+            throw new IllegalArgumentException("EVALUATION_MODEL_ROLE_INVALID");
+        }
+        Map<ResearchModelRole, String> selected = new EnumMap<>(ResearchModelRole.class);
+        for (var role : ResearchModelRole.values()) {
+            String expected = requested.getOrDefault(role.key(), job.expectedModel());
+            if (expected == null || expected.isBlank()) throw new IllegalArgumentException("EVALUATION_ROLE_MODEL_MISMATCH: " + role.key());
+            var candidate = models.getChat().getCandidates().stream().filter(c -> expected.equals(c.getModel())
+                    && Boolean.TRUE.equals(c.getEnabled()) && Boolean.TRUE.equals(c.getSupportsToolCalling()))
+                    .findFirst().orElseThrow(() -> new IllegalArgumentException("EVALUATION_ROLE_MODEL_MISMATCH: " + role.key()));
+            selected.put(role, candidate.getId());
+        }
+        if (job.maxCostCny() != null && selected.values().stream().distinct().count() > 1) {
+            throw new IllegalArgumentException("EVALUATION_MIXED_MODEL_COST_ESTIMATION_UNSUPPORTED");
+        }
+        properties.setMainModelId(selected.get(ResearchModelRole.MAIN));
+        properties.setWorkerModelId(selected.get(ResearchModelRole.WORKER));
+        properties.setFinalizationModelId(selected.get(ResearchModelRole.FINALIZATION));
+    }
 
     public static void main(String[] args) throws Exception {
         Job job = JSON.readValue(Path.of(args[0]).toFile(), Job.class);
@@ -107,9 +137,7 @@ public class ResearchRunCommand {
         var models = Binder.get(environment).bind("ai", Bindable.of(AIModelProperties.class)).orElseThrow(IllegalStateException::new);
         var properties = Binder.get(environment).bind("research", Bindable.of(ResearchProperties.class)).orElseThrow(IllegalStateException::new);
         if (evaluation) {
-            String actualModel = models.getChat().getCandidates().stream().filter(c -> properties.getModelId().equals(c.getId()))
-                    .findFirst().orElseThrow().getModel();
-            if (job.expectedModel() == null || !job.expectedModel().equals(actualModel)) throw new IllegalArgumentException("EVALUATION_MODEL_MISMATCH");
+            configureEvaluationModels(job, models, properties);
             var actualBudget = JSON.valueToTree(properties);
             if (job.expectedBudget() == null || job.expectedBudget().entrySet().stream()
                     .anyMatch(e -> !actualBudget.has(e.getKey()) || actualBudget.get(e.getKey()).asInt() != e.getValue())) {
@@ -184,7 +212,8 @@ public class ResearchRunCommand {
             var modelFactory = new ResearchModelFactory(models, properties);
             modelFactory.setThinkingForEvaluation(Boolean.TRUE.equals(job.thinking()));
             if (evaluation) Files.writeString(directory.resolve("runtime.json"), JSON.writeValueAsString(Map.of(
-                    "research", properties, "mode", job.evaluationMode(), "thinking", Boolean.TRUE.equals(job.thinking()), "retrieval", Map.of("channel", "PGVector", "rerank", Boolean.TRUE.equals(job.rerank()),
+                    "research", properties, "modelsByRole", modelFactory.modelsByRole(), "mode", job.evaluationMode(),
+                    "thinking", Boolean.TRUE.equals(job.thinking()), "retrieval", Map.of("channel", "PGVector", "rerank", Boolean.TRUE.equals(job.rerank()),
                     "recallBudget", 20, "candidateLimit", 40, "oneShotTopK", 10))));
             var finalization = Boolean.TRUE.equals(job.generateArtifacts()) ? new ResearchCompletionService(store,
                     new ResearchArtifactGenerator(modelFactory, properties, evidence, new PlanDraftValidator(), JSON, new HeuristicTokenCounterService(),

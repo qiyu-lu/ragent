@@ -1,6 +1,6 @@
 # 统一研究工作流的数据、评测与复测
 
-最新停点与恢复命令见[2026-09-18 会话交接](../../docs/iron-ore-rag/agentic-research-resume-2026-09-18.md)。R1—R4 已实施，R5 因 embedding 连续无响应停止，主批仅 22/1200；两轮 repeat 与 72 项应用对照尚未开始。
+最新停点与恢复命令见[2026-09-18 会话交接](../../docs/iron-ore-rag/agentic-research-resume-2026-09-18.md)。R1—R4 已实施，历史 R5 因 embedding 连续无响应停止，主批仅 22/1200；两轮 repeat 与 72 项应用对照尚未开始。当前按计划 8.7 成组实现秋招版本，再集中验收；角色模型改动使用新批次。
 
 这里实现离线转换、真实幂等摄取、原生研究与统一产物，以及 P7 固定 A/B/C 对照和应用原文核对。转换不调用模型；`import_corpus.py --execute` 复用项目分块、向量化和索引落点。真实评测的配置、逐题输出、trace、usage 和失败保存在独立批次，见[执行记录](../../docs/iron-ore-rag/agentic-research-execution-log.md)与[交接说明](../../docs/iron-ore-rag/agentic-research-handoff.md)。
 
@@ -33,6 +33,18 @@ python3 -m unittest discover -s eval/agentic-research/tests -v
 默认种子为 `20260917`；smoke 为 20 题，regression 为 200 题，可通过 `--seed`、`--smoke`、`--regression` 调整。对全部问题按 SHA256(seed, question ID) 排序抽样，与源文件行序无关；smoke 是 regression 的前缀，不是独立数据集。小型夹具不足指定题数时取全部并记录实际数。QASPER test 和 MuSiQue test 需要显式 `--allow-test`，仅在最终配置确定后转换；MuSiQue 无答案字段的行保留 `gold=null`，不伪造不可回答标签。本批没有转换真实 test。
 
 ## 原生研究运行联调（P3/P4）
+
+当前在线研究通过 `research.main-model-id`、`worker-model-id`、`finalization-model-id` 选择已注册模型，默认主/最终为 `research-max`（`qwen3.7-max-2026-05-20`），worker 为 `research-flash`（`qwen3.7-flash-2026-07-15`）。可通过 `RESEARCH_MAIN_MODEL_ID`、`RESEARCH_WORKER_MODEL_ID`、`RESEARCH_FINALIZATION_MODEL_ID` 覆盖注册别名；角色配置为空时沿用 `research.model-id`。三个角色共享原有限额和取消机制，错误注册项不会静默换模型。
+
+固定评测使用配置中的 `models_by_role`，填写实际供应商模型 ID，运行时严格绑定注册项并保存到 `runtime.json/modelsByRole`。没有此字段的 p7/r5 配置会把所有角色明确固定为旧 `model_id`，不继承在线默认值。新增 [career.json](configs/career.json) 保持旧预算、thinking=false、rerank=false，使用 Max/Flash/Max；A/B/C 的最终生成统一为 Max，C 的 worker 为 Flash，混合模型下的 B/C 差异同时包含模型分配差异，不能作为纯架构因果结论。`summary.json/resources/model_usage_by_role` 按实际角色、模型汇总请求、已知 token、失败和 unknown；混合模型不套用旧单模型价格表，默认金额估算关闭。
+
+```bash
+# 独立秋招批次；少量流程联调不代表正式效果提升
+python3 eval/agentic-research/evaluate_applications.py --config eval/agentic-research/configs/career.json --case comparison-02 --case plan-06 --run-dir local-data/agentic-research/runs/<new-career-id> --execute
+
+# 首批固定 32 题/96 ABC 项；集中验收使用同一角色配置，禁止混入旧 R5 v2
+python3 eval/agentic-research/evaluate_research.py --profile regression --config eval/agentic-research/configs/career.json --case-ids eval/agentic-research/manifests/research-career-case-ids-2026-09-18.json --run-dir local-data/agentic-research/runs/<new-career-regression-id> --execute
+```
 
 研究运行器接入 AgentScope Java 2.0.1，主 Agent 使用原生 `search_knowledge`、`read_source`、`conduct_research`、`ask_user` 和 `finish_research`，worker 只注册检索、阅读、结束三个工具。创建、查询、补充输入、取消接口位于 `/rag/research/runs`。P3/P4 当时提供 `after`/`limit` 分页 JSON 和必填 conversationId；当前 P5/P6 已增加 SSE、可选会话与完整产物，契约见下节。知识库仍采用项目现有全局共享规则，运行和会话按用户归属隔离。
 

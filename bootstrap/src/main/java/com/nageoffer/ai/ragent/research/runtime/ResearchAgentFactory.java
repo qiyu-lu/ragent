@@ -20,6 +20,7 @@ package com.nageoffer.ai.ragent.research.runtime;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nageoffer.ai.ragent.infra.token.TokenCounterService;
 import com.nageoffer.ai.ragent.research.config.ResearchProperties;
+import com.nageoffer.ai.ragent.research.model.ResearchModelRole;
 import com.nageoffer.ai.ragent.research.service.KnowledgeSearchService;
 import com.nageoffer.ai.ragent.research.service.SourceReader;
 import io.agentscope.core.ReActAgent;
@@ -99,7 +100,8 @@ public class ResearchAgentFactory implements ResearchRunner, AutoCloseable {
         } else tools.registerTool(new ResearchWorkerTools(session, search, reader));
         var context = RuntimeContext.builder().userId(session.claim.owner())
                 .sessionId(session.claim.run().id() + ":" + session.claim.run().epoch() + ":" + session.taskId).build();
-        var model = new BoundedResearchModel(models.create(), session, properties, modelQuota, json, tokens);
+        var role = session.main() ? ResearchModelRole.MAIN : ResearchModelRole.WORKER;
+        var model = new BoundedResearchModel(models.create(role), session, properties, modelQuota, json, tokens);
         try (ReActAgent agent = ReActAgent.builder().name("research-" + session.taskId).sysPrompt(session.main() ? prompt : workerPrompt)
                 .model(model).toolkit(tools).enableMetaTool(false).enablePendingToolRecovery(false)
                 .maxRetries(1).maxIters(properties.getMaxModelCalls())
@@ -110,7 +112,8 @@ public class ResearchAgentFactory implements ResearchRunner, AutoCloseable {
                                 : properties.getToolTimeoutSeconds())).build())
                 .middleware(new ToolProgress(session, properties)).build();
              var cancellation = session.control.bindInterrupt(() -> agent.interrupt(context))) {
-            session.event("RESEARCH_STARTED", "正在按目标检索和阅读", Map.of("promptVersion", session.main() ? PROMPT_VERSION : WORKER_PROMPT_VERSION, "model", model.getModelName()));
+            session.event("RESEARCH_STARTED", "正在按目标检索和阅读", Map.of("promptVersion", session.main() ? PROMPT_VERSION : WORKER_PROMPT_VERSION,
+                    "model", model.getModelName(), "role", role.key()));
             Map<String, Object> saved = new java.util.HashMap<>(session.claim.run().state());
             saved.remove("requestHash");
             String request = session.main()

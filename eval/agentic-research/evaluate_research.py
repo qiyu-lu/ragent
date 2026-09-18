@@ -111,6 +111,21 @@ def expected_budget(config):
     return {names[key]: value for key, value in config["runtime_budget"].items()}
 
 
+def expected_models(config):
+    """Freeze provider model IDs for every role, including legacy single-model runs."""
+    fallback = config["model_id"]
+    requested = config.get("models_by_role", {})
+    roles = ("main", "worker", "finalization")
+    if not isinstance(fallback, str) or not fallback.strip() or not isinstance(requested, dict) or set(requested) - set(roles):
+        raise ValueError("Invalid evaluation model configuration")
+    resolved = {role: requested.get(role, fallback) for role in roles}
+    if any(not isinstance(model, str) or not model.strip() for model in resolved.values()):
+        raise ValueError("Role model IDs must be nonempty provider model names")
+    if config.get("estimate_generation_cost", False) and len(set(resolved.values())) > 1:
+        raise ValueError("The legacy single-model price table cannot estimate mixed-model costs")
+    return resolved
+
+
 def resource_summary(directory, config):
     calls, embeddings, reranks = {}, {}, {}
     for path in sorted(directory.glob("attempts/*/usage.jsonl")):
@@ -124,14 +139,26 @@ def resource_summary(directory, config):
         for row in rows(path):
             reranks[row["call_id"]] = row
     estimate_cost = config.get("estimate_generation_cost", False)
+    if estimate_cost and len({c["model"] for c in calls.values()}) > 1:
+        raise ValueError("The legacy single-model price table cannot estimate mixed-model costs")
     known_cost = sum(call_cost(c, config) or 0 for c in calls.values()) if estimate_cost else None
     unknown = sum(c.get("usageStatus") != "provider" for c in calls.values())
+    grouped = defaultdict(list)
+    for call in calls.values():
+        grouped[(call.get("role") or "unknown", call["model"])].append(call)
+    by_role = [{"role": role, "model": model, "requests": len(items),
+                "known_input_tokens": sum(c.get("inputTokens", 0) for c in items),
+                "known_output_tokens": sum(c.get("outputTokens", 0) for c in items),
+                "usage_unknown": sum(c.get("usageStatus") != "provider" for c in items),
+                "statuses": dict(Counter(c.get("status", "unknown") for c in items))}
+               for (role, model), items in sorted(grouped.items())]
     return {"model_requests": len(calls), "known_input_tokens": sum(c.get("inputTokens", 0) for c in calls.values()),
             "known_output_tokens": sum(c.get("outputTokens", 0) for c in calls.values()), "model_usage_unknown": unknown,
             "known_generation_cost_estimate_cny": known_cost,
             "budget_reserve_cny": known_cost + unknown * 0.03 if estimate_cost else None,
             "cost_estimation_enabled": estimate_cost,
             "actual_models": sorted({c["model"] for c in calls.values()}),
+            "model_usage_by_role": by_role,
             "rerank_requests": len(reranks),
             "rerank_usage_unknown": sum(c.get("usage_status") != "provider" for c in reranks.values()),
             "rerank_known_total_tokens": sum((c.get("usage") or {}).get("total_tokens", 0) for c in reranks.values()),
@@ -292,6 +319,7 @@ def main():
         raise ValueError("Sample limit must be positive")
     args.run_dir, args.prepared = args.run_dir.resolve(), args.prepared.resolve()
     config = json.loads(args.config.read_text())
+    role_models = expected_models(config)
     cases, queries = prepare_cases(args.prepared, args.profile, config, args.limit)
     if args.case_ids is not None:
         cases, queries = select_cases(cases, queries, json.loads(args.case_ids.read_text()))
@@ -343,7 +371,7 @@ def main():
             job = {"runDir": str(attempt), "cases": pending, "generateArtifacts": True, "evaluationMode": mode,
                    "concurrency": config["concurrency"], "maxCostCny": remaining,
                    "generationInstruction": config["generation_instruction"],
-                   "expectedModel": config["model_id"], "expectedBudget": expected_budget(config),
+                   "expectedModel": config["model_id"], "expectedModels": role_models, "expectedBudget": expected_budget(config),
                    "thinking": config.get("thinking", False), "rerank": config["retrieval"].get("rerank", False)}
             write_json(attempt / "job.json", job)
             print("Running mode {}: {} fixed tasks; monetary cap {}.".format(mode, len(pending), "disabled" if remaining is None else remaining), flush=True)

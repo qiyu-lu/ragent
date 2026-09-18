@@ -68,6 +68,7 @@ public class ResearchSession {
     private int localModelCalls;
     private int finishRepairCallsRemaining = -1;
     private volatile Outcome outcome;
+    private String retrievalIssue;
     volatile String activeToolCallId;
 
     public <T> T retrieve(java.util.function.Supplier<T> action) {
@@ -78,7 +79,12 @@ public class ResearchSession {
                 event -> event("RETRIEVAL_PHASE", "检索阶段状态", event), budget.embeddingCache);
              var cancellation = control.bindInterrupt(operation::cancel);
              var binding = operation.bind()) {
-            return operation.measure("search_knowledge", action);
+            T result = operation.measure("search_knowledge", action);
+            synchronized (this) { retrievalIssue = null; }
+            return result;
+        } catch (com.nageoffer.ai.ragent.infra.operation.RequestOperation.Failure failure) {
+            synchronized (this) { retrievalIssue = "RETRIEVAL_FAILED:" + failure.code + "@" + failure.phase; }
+            throw failure;
         } catch (RuntimeException error) { throw error; }
         catch (Exception error) { throw new IllegalStateException(error); }
     }
@@ -212,7 +218,10 @@ public class ResearchSession {
         return results.values().stream().anyMatch(r -> r.status() != SubtaskResult.Status.COMPLETED);
     }
     public synchronized List<String> executionIssues() {
-        return results.values().stream().flatMap(r -> r.executionIssues().stream()).distinct().toList();
+        Set<String> issues = new LinkedHashSet<>();
+        if (retrievalIssue != null) issues.add(retrievalIssue);
+        results.values().stream().flatMap(r -> r.executionIssues().stream()).forEach(issues::add);
+        return List.copyOf(issues);
     }
     public synchronized List<String> workerGaps() {
         return results.values().stream().filter(r -> r.status() != SubtaskResult.Status.COMPLETED)

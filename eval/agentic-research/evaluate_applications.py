@@ -7,7 +7,7 @@ from pathlib import Path
 import subprocess
 
 from datasetkit import sha256_file
-from evaluate_research import REPO, expected_budget, fingerprints, resource_summary, rows, run_job, write_json, interleaved_cases
+from evaluate_research import REPO, expected_budget, expected_models, fingerprints, resource_summary, rows, run_job, write_json, interleaved_cases
 from scoring import source_ids
 
 
@@ -29,6 +29,7 @@ def main():
     args.run_dir.mkdir(parents=True, exist_ok=False)
     application = json.loads(args.cases.read_text())
     config = json.loads(args.config.read_text())
+    role_models = expected_models(config)
     if application["gold_used"] or len(application["cases"]) != 24:
         raise ValueError("24 frozen gold-free cases required")
     cases = application["cases"]
@@ -55,7 +56,7 @@ def main():
            "evaluationMode": "MIXED", "concurrency": config["concurrency"],
            "maxCostCny": config.get("max_generation_cost_cny") if config.get("estimate_generation_cost", False) else None,
            "generationInstruction": "Write in English. Address each requested dimension with actual evidence; missing dimensions remain gaps. A plan is a draft, not an executable or approved procedure.",
-           "expectedModel": config["model_id"], "expectedBudget": expected_budget(config),
+           "expectedModel": config["model_id"], "expectedModels": role_models, "expectedBudget": expected_budget(config),
            "thinking": config.get("thinking", False), "rerank": config["retrieval"].get("rerank", False)}
     write_json(attempt / "job.json", job)
     if not args.execute:

@@ -184,6 +184,9 @@ rag:
 
 research:
   model-id: research-flash
+  main-model-id: ${RESEARCH_MAIN_MODEL_ID:research-max}
+  worker-model-id: ${RESEARCH_WORKER_MODEL_ID:research-flash}
+  finalization-model-id: ${RESEARCH_FINALIZATION_MODEL_ID:research-max}
   max-concurrent-runs: 2
   queue-capacity: 32
   max-concurrent-model-calls: 2
@@ -244,6 +247,10 @@ ai:
       - id: research-flash
         provider: bailian
         model: qwen3.7-flash-2026-07-15
+        supports-tool-calling: true
+      - id: research-max
+        provider: bailian
+        model: qwen3.7-max-2026-05-20
         supports-tool-calling: true
       - id: qwen3-local
         provider: ollama

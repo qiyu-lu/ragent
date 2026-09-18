@@ -1,5 +1,7 @@
 # P7 应用产物原文核对
 
+秋招 S1 兼容性批次 `20260918_S1_applications_v1` 的 `comparison-02/C` 与 `plan-06/C` 均在旧状态判定下标为 COMPLETED，但 28 次 embedding 全失败，两个产物均零章节/零引用，PLAN 无来源支持的步骤；实际是检索阻塞，不能算比较或计划质量通过。S2 已修复此类无证据执行失败的终态判定，目前经本地回归验证，未用当前源码做真实复测。强模型仍出现一次 PLAN 缺少 gaps 字段并经唯一修复恢复；不能认为换模型后无需结构校验。见[本轮清单](../../eval/agentic-research/manifests/research-s1-model-roles-2026-09-18.json)。下方 P7/R4 原文核对仍为各自历史批次。
+
 24 个冻结任务均已真实执行：5 COMPLETED、15 PARTIAL、4 FAILED。20 个已发布产物的 85 条引用快照已由 Codex 对照正文检查；这不是独立人工盲评，也没有调用裁判模型。运行状态、引用身份合法和语义支持是不同结论。完整固定 A/B/C 结果见[对照报告](agentic-research-evaluation-report.md)，程序验证见[验证报告](agentic-research-validation-report.md)。
 
 任务按固定 QASPER validation regression 范围中的前 24 篇不同论文选取，排除历史开发论文；比较每次允许两篇，PLAN 只允许相应首篇。查询/语料用于冻结请求，gold 不用于选任务或生成。12 个比较与 12 个计划覆盖条件、补查、缺资料、适用性、用户输入、参数缺失，每种类别两个。参考 abstract 段落 ID 是资料锚点，不能当标准答案。

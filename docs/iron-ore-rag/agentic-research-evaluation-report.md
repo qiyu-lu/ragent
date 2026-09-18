@@ -1,5 +1,7 @@
 # P7 固定公开数据对照结果
 
+秋招版本（计划 8.7）已新增 Max/Flash/Max 角色配置及检索失败状态修复。当前只有供应商/SDK 兼容性记录，32 题/96 ABC 项的新固定开发验收尚未执行；两条真实应用零引用且检索失败，不能据此更新答案 F1、证据质量或多 Agent 收益。下方及 R1—R5 数字仍属于各自全 Flash 历史配置，详见[最新交接](agentic-research-resume-2026-09-18.md#6-秋招版本本轮实施与下一步)与[本轮清单](../../eval/agentic-research/manifests/research-s1-model-roles-2026-09-18.json)。
+
 固定 regression：QASPER validation 200 个问题与 MuSiQue Full dev 200 行，A/B/C 共 1200 个任务均已记录；失败和超时保留在相应分母。主/worker 为 research-main-v3/research-worker-v2，最终生成 v4，模型 qwen3.7-flash-2026-07-15、temperature=0、thinking=false；并发 2、PGVector、rerank 关闭、recall 20/candidate 40，A 固定 top 10。每运行共享 16 模型/24 工具/300 秒活动预算并预留 2 次最终生成。
 
 本批共 932 COMPLETED、93 PARTIAL、175 FAILED，未执行 0。QASPER 的答案、证据与可回答性均以 A 较高；MuSiQue 的 C 答案 F1 较高，但证据与全部行可回答性仍低于 A。B/C 的 P50 约 35 秒，A 约 5 秒；已知生成费估算分别为 A 0.4662、B 9.6053、C 11.4266 元。当前结果不支持统一的效果提升或成本收益结论，优先处理原生结束、有效正文选择和已记录的语义错误。

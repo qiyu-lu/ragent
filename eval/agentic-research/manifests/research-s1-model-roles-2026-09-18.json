@@ -1,0 +1,503 @@
+{
+  "applications": {
+    "completion_status_boundary": "old logic reported COMPLETED despite 28 failed embedding requests; preserved as motivating negative example",
+    "finalization_repair": "plan-06 first response omitted gaps; one repair succeeded",
+    "run": "20260918_S1_applications_v1",
+    "runtime_frozen_before_failure_status_fix": true,
+    "selection": "two existing diagnostic application IDs, C mode; no broad quality claim",
+    "semantic_review": "two empty artifacts, no comparison or source-supported plan; zero citations",
+    "summary": {
+      "cases": {
+        "comparison-02/C": {
+          "citations": 0,
+          "elapsedMillis": 125702,
+          "gaps": [
+            "Paper A (2100510684147306677): Unable to retrieve any content. Methods, inputs/supervision, experimental evaluation, and limitations all remain completely uncovered due to search infrastructure failures.",
+            "Paper B (2100510684147306618): Unable to retrieve any content. Methods, inputs/supervision, experimental evaluation, and limitations all remain completely uncovered due to search infrastructure failures.",
+            "No evidence IDs were obtained from either paper; no comparison can be performed without successful document access.",
+            "Unable to retrieve any content from Paper A (2100510684147306677) due to persistent search infrastructure failures. All four dimensions—methods, inputs/supervision, experimental evaluation, and limitations—remain completely uncovered.",
+            "No evidence IDs available for citation; no read_source calls could be executed.",
+            "Unable to access Paper B (2100510684147306618) due to persistent search_knowledge NETWORK_ERROR failures. Cannot retrieve method description, inputs/supervision details, experimental evaluation (datasets, metrics, results), or stated limitations without successful document retrieval.",
+            "Paper A (2100510684147306677): Unable to retrieve any content due to persistent search infrastructure failures. Methods, inputs/supervision, experimental evaluation, and limitations remain completely uncovered.",
+            "Paper B (2100510684147306618): Unable to retrieve any content due to persistent search infrastructure failures. Methods, inputs/supervision, experimental evaluation, and limitations remain completely uncovered.",
+            "Direct read_source attempts using document IDs were rejected by the system, confirming that only server-returned evidence IDs are valid for citation."
+          ],
+          "output_type": "REPORT",
+          "referenced_documents": 0,
+          "semantic_review": "pending independent review",
+          "status": "COMPLETED",
+          "waiting_input_seen": false
+        },
+        "plan-06/C": {
+          "citations": 0,
+          "elapsedMillis": 195799,
+          "gaps": [
+            "Unable to retrieve any content from the allowed document (2100509686855061504) due to repeated SEARCH_FAILED NETWORK_ERROR and evidence-not-found on direct read; no experimental prerequisites, procedures, data/resources, evaluation metrics, limitations, batch_size, or window_size could be verified from source.",
+            "No source-supported actions could be extracted for a reproduction plan draft; all plan dimensions remain pendingItems until the document becomes accessible."
+          ],
+          "output_type": "PLAN",
+          "referenced_documents": 0,
+          "semantic_review": "pending independent review",
+          "status": "COMPLETED",
+          "waiting_input_seen": false
+        }
+      },
+      "fixed_tasks": 2,
+      "full_production_e2e": false,
+      "java_exit": 0,
+      "recorded_tasks": 2,
+      "resources": {
+        "actual_models": [
+          "qwen3.7-flash-2026-07-15",
+          "qwen3.7-max-2026-05-20"
+        ],
+        "budget_reserve_cny": null,
+        "cost_estimation_enabled": false,
+        "embedding_currency_cost": null,
+        "embedding_known_total_tokens": 0,
+        "embedding_requests": 28,
+        "embedding_usage_unknown": 28,
+        "invoice_verified": false,
+        "known_generation_cost_estimate_cny": null,
+        "known_input_tokens": 60065,
+        "known_output_tokens": 2868,
+        "model_requests": 26,
+        "model_usage_by_role": [
+          {
+            "known_input_tokens": 4786,
+            "known_output_tokens": 638,
+            "model": "qwen3.7-max-2026-05-20",
+            "requests": 3,
+            "role": "finalization",
+            "statuses": {
+              "COMPLETED": 3
+            },
+            "usage_unknown": 0
+          },
+          {
+            "known_input_tokens": 35567,
+            "known_output_tokens": 1432,
+            "model": "qwen3.7-max-2026-05-20",
+            "requests": 13,
+            "role": "main",
+            "statuses": {
+              "COMPLETED": 13
+            },
+            "usage_unknown": 0
+          },
+          {
+            "known_input_tokens": 19712,
+            "known_output_tokens": 798,
+            "model": "qwen3.7-flash-2026-07-15",
+            "requests": 10,
+            "role": "worker",
+            "statuses": {
+              "COMPLETED": 10
+            },
+            "usage_unknown": 0
+          }
+        ],
+        "model_usage_unknown": 0,
+        "prices": null,
+        "rerank_known_total_tokens": 0,
+        "rerank_requests": 0,
+        "rerank_usage_unknown": 0
+      },
+      "semantic_support_proven": false,
+      "unexecuted_tasks": 0
+    },
+    "temporary_database_removed": true
+  },
+  "artifacts": [
+    {
+      "bytes": 131411,
+      "file": "local-data/agentic-research/runs/20260918_S1_validation/backend-tests.log",
+      "sha256": "f675d08515e71e477c09e5b608324e684c2060869883370688ae4c335c628888"
+    },
+    {
+      "bytes": 132538,
+      "file": "local-data/agentic-research/runs/20260918_S1_validation/backend-tests-v2.log",
+      "sha256": "e032bdd525919025d67994406085b9e8ea545e5aafd241f94701f90877aed5a9"
+    },
+    {
+      "bytes": 8382,
+      "file": "local-data/agentic-research/runs/20260918_S1_validation/validation.json",
+      "sha256": "b331bd047bb78952ac33a91794b6da834471438fdbab901be21acf87ba2e9a4c"
+    },
+    {
+      "bytes": 8437,
+      "file": "local-data/agentic-research/runs/20260918_S1_validation/validation-v2.json",
+      "sha256": "7f2969d52e5be43fc586974e271fd75738c028faea57c5f474af23f01ac98287"
+    },
+    {
+      "bytes": 5484,
+      "file": "local-data/agentic-research/runs/20260918_S1_validation/python-tests.log",
+      "sha256": "8053aca68f4e486645ef7cf926f63366b607c2517a7b3d34cb1aee7b8ba9de00"
+    },
+    {
+      "bytes": 3014,
+      "file": "local-data/agentic-research/runs/20260918_S1_validation/career-selection.json",
+      "sha256": "9e4f0650bae197c96fca7719ecf9a1a4cb16fbb18c37fbf26fc2238244e2a5dd"
+    },
+    {
+      "bytes": 15581,
+      "file": "local-data/agentic-research/runs/20260918_S1_applications_v1/run.json",
+      "sha256": "1ad56346ff244a2216ae6e1b3809cacf5e7f0528635ab50f79ccbb329518e8cf"
+    },
+    {
+      "bytes": 4525,
+      "file": "local-data/agentic-research/runs/20260918_S1_applications_v1/summary.json",
+      "sha256": "e42be1c694dd45ba8069bbee063b3666db983e8c58d179cc683ea7b49e162b5c"
+    },
+    {
+      "bytes": 156198,
+      "file": "local-data/agentic-research/runs/20260918_S1_applications_v1/runtime-sha256.json",
+      "sha256": "0c5776dad57d54ca14d720c5d0fd73a998a746a7bbe418cd9b53d4cb21004f80"
+    },
+    {
+      "bytes": 8172,
+      "file": "local-data/agentic-research/runs/20260918_S1_applications_v1/source-review.md",
+      "sha256": "482eb4c2eeffe2d315926475f0110d65f71fad56aa2331abedf4747999fa9b49"
+    },
+    {
+      "bytes": 2377,
+      "file": "local-data/agentic-research/runs/20260918_S1_applications_v1/attempts/0000_MIXED/job.json",
+      "sha256": "49bb70dd3b759b6234d6e96751ec677fa277d7646a2515a54755c17a515cdae9"
+    },
+    {
+      "bytes": 763,
+      "file": "local-data/agentic-research/runs/20260918_S1_applications_v1/attempts/0000_MIXED/runtime.json",
+      "sha256": "6c5b66ac1ae6f7276d74dd7be73461c99c2c3012a74ae9befbced5628992dc29"
+    },
+    {
+      "bytes": 259,
+      "file": "local-data/agentic-research/runs/20260918_S1_applications_v1/attempts/0000_MIXED/execution.json",
+      "sha256": "7cce54d3dabd0895c3c7e1f79e7c3021384518cb16f3ab7b97a40a61a0fbabc4"
+    },
+    {
+      "bytes": 22071,
+      "file": "local-data/agentic-research/runs/20260918_S1_applications_v1/attempts/0000_MIXED/predictions.jsonl",
+      "sha256": "a1a7477d751c0b2f657a938dfb9f18033fb0c970c5aa22e4d9a5dde8d8062070"
+    },
+    {
+      "bytes": 117747,
+      "file": "local-data/agentic-research/runs/20260918_S1_applications_v1/attempts/0000_MIXED/traces.jsonl",
+      "sha256": "c40a9b71552ffcdf47b32bf1ab27cf7dc1a7237ef30c9ad48a1e70bdc5ed91e4"
+    },
+    {
+      "bytes": 10293,
+      "file": "local-data/agentic-research/runs/20260918_S1_applications_v1/attempts/0000_MIXED/usage.jsonl",
+      "sha256": "8bfdf1b4f98d705f3426fd0ddde5238d2cca2b1538c40431b698e0a6ec911daf"
+    },
+    {
+      "bytes": 27866,
+      "file": "local-data/agentic-research/runs/20260918_S1_applications_v1/attempts/0000_MIXED/embedding-usage.jsonl",
+      "sha256": "764339a3de86174d30b5dc7d8d28e328fbb8a2de1883ca0dc12852f1a14b46b8"
+    },
+    {
+      "bytes": 4392,
+      "file": "local-data/agentic-research/runs/20260918_S1_applications_v1/attempts/0000_MIXED/java.log",
+      "sha256": "67a07c33e0dd9854285d15761d03cebe865ea8e1375e8863f76a1b5a296859ab"
+    },
+    {
+      "bytes": 13783,
+      "file": "local-data/agentic-research/runs/20260918_S1_generation_probe_v1/run.json",
+      "sha256": "7a92f43661953ad266afa1eeaa0481ca60e9fcfb8d0e3b4dd04f13a700f2de9d"
+    },
+    {
+      "bytes": 4243,
+      "file": "local-data/agentic-research/runs/20260918_S1_generation_probe_v1/RoleGenerationProbe.java",
+      "sha256": "d7ade814f7cc35dca51c47bc83026018036f83fd180bed2d97aa4a7afbbde000"
+    },
+    {
+      "bytes": 13632,
+      "file": "local-data/agentic-research/runs/20260918_S1_generation_probe_v2/run.json",
+      "sha256": "d55c1ffa64bc2e4fe19f5b02a29828cca639c9d5676f3f2aca1984f834141fdd"
+    },
+    {
+      "bytes": 1484,
+      "file": "local-data/agentic-research/runs/20260918_S1_generation_probe_v2/calls.jsonl",
+      "sha256": "ff825bf63a8746ebd168c766a6867b267082a4d18f384828857e05c99879f068"
+    },
+    {
+      "bytes": 1180,
+      "file": "local-data/agentic-research/runs/20260918_S1_generation_probe_v2/responses.json",
+      "sha256": "2b592d4082cf8a60528dcee6fc786d3c23d45e97ada402566d671407c525a437"
+    },
+    {
+      "bytes": 792,
+      "file": "local-data/agentic-research/runs/20260918_S1_generation_probe_v2/java.log",
+      "sha256": "9c9bf81879919f64474f60b0baf0af017ec0400729b961c5c5f49fa9a0c23ebd"
+    },
+    {
+      "bytes": 4295,
+      "file": "local-data/agentic-research/runs/20260918_S1_generation_probe_v2/RoleGenerationProbe.java",
+      "sha256": "3a550424415aada9d3ec99b1ea641d59d3f7413bbdb9ad6a4082e89e65b3d0f3"
+    },
+    {
+      "bytes": 363,
+      "file": "local-data/agentic-research/runs/20260918_S2_transport_v1/run.json",
+      "sha256": "fcfd3a887f47ae1373264b15061c28bddda1d39884278a9eb301ffedd40f7362"
+    },
+    {
+      "bytes": 304,
+      "file": "local-data/agentic-research/runs/20260918_S2_transport_v1/summary.json",
+      "sha256": "ba151a14ea5c9430a9d2762a84727bf49e88a975961bccb7381abf24fc2fb370"
+    },
+    {
+      "bytes": 924,
+      "file": "local-data/agentic-research/runs/20260918_S2_transport_v1/connection-probe.jsonl",
+      "sha256": "49114dcad2d7c742fd09cd26a8aee2e7ed805cea44e29ffbd8cc31cd4aa5306b"
+    },
+    {
+      "bytes": 2653,
+      "file": "local-data/agentic-research/runs/20260918_S2_transport_v1/EmbeddingConnectionProbe.java",
+      "sha256": "cb2b311e41628e9612286d0795be38866d55e572f7b68cca91c346740465b7a9"
+    },
+    {
+      "bytes": 1636,
+      "file": "local-data/agentic-research/runs/20260918_S2_transport_v1/run_probe.py",
+      "sha256": "7d54e75bd1ddab12be9775a56a0c242ac2f61c4b760e590cbdc9380d33adbb77"
+    },
+    {
+      "bytes": 66,
+      "file": "local-data/agentic-research/runs/20260918_S1_validation/career-preparation.log",
+      "sha256": "e5ddfccb562ec10adf5f4b4b1d31429e1afa425bf9f193bc10f7542e05dbb300"
+    },
+    {
+      "bytes": 19415,
+      "file": "local-data/agentic-research/runs/20260918_S3_prepared_v1/run.json",
+      "sha256": "5b24588956c55989ab350fd041d6f32236fb0f9e68422f6f34b33649afcfb1c5"
+    },
+    {
+      "bytes": 37557,
+      "file": "local-data/agentic-research/runs/20260918_S3_prepared_v1/requests.json",
+      "sha256": "d83691c939b6b4b154f33f30fe678fcb7248574b88c58d5cd7644a6a4f80943c"
+    }
+  ],
+  "authorization": "current user asked to write plan and implement; prior provider and scoped Git authorization retained; no price checks or amount estimates",
+  "boundaries": {
+    "answer_f1_improvement_proven": false,
+    "business_demo_accepted": false,
+    "credentials_in_artifacts": false,
+    "currency_cost_estimated": false,
+    "multi_agent_gain_proven": false,
+    "old_R5_v2_retained": true,
+    "production_deployment": false,
+    "strong_model_quality_gain_proven": false,
+    "user_untracked_notes_preserved": true
+  },
+  "commit_title": "feat: select research models by role and preserve retrieval failures",
+  "config": "eval/agentic-research/configs/career.json",
+  "created_at": "2026-09-18T05:07:40.124617+00:00",
+  "current_source_sha256": {
+    "bootstrap/pom.xml": "7a18e56ee4245538c95c2717f00b2e601266036ed35900249a45ba62ffdfd38a",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/rag/config/SearchChannelProperties.java": "71bc3fd44d9ecc60c5d2d9582339f63ef9ef5e2655e15bd45a21d401d0c9b874",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/rag/core/retrieval/MultiChannelRetrievalEngine.java": "10f2087df07daaa017a635b4e5ba7661bfcf0aef5be8f48b27d2a549235037d7",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/rag/core/retrieval/channel/RetrievalScopeResolver.java": "4a11460c9f02439e9b1b84dbfcec24f06568f864e033c4016f1846a8cebd64d6",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/rag/core/retrieval/channel/VectorSearchChannel.java": "0ad6bf15de2f7bf9add4f5fd8bde1e896682b14d19eff91d6f190727deb25e97",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/rag/core/retrieval/postprocessor/RerankPostProcessor.java": "2f1d5c5b8805f0c2d605e53d3cc49a910c7e1b4d1dcd54465ba67edc7845aeaf",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/rag/core/vector/PgVectorRetrieverService.java": "aab4109da10d7e4b555bf4f440c7e0a3878b6dd75bbd0433ad08f877eecd3823",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/config/ResearchProperties.java": "0d580ca83eefdcfca6a64b47cfd7c3b70b1f4574b487c14158995c360fa61466",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/controller/ResearchRunController.java": "594b3ec2da0fe0e401e3800cc6ca5d89930c4f8e87573000a5ff5efc8a310e47",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/eval/OneShotResearchRunner.java": "8f5a35774871cd3afe8e5462fe9658b5a1ce8e169b077c50c5979434f242b123",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/eval/ResearchCorpusCommand.java": "1ccc9a22fca3ae6c0696fc692e71cddb22711a805c20acb35b43103fd97088a6",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/eval/ResearchRunCommand.java": "84a1fc7a66cb95e97c2bbe56f4b10a2e81b46cfab08a536a1894adf5d52d79ba",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/model/EvidenceRecord.java": "a93fc7f4d654a048c3e633dd77c8c8f05a3af1f689661486ed4491f8fb87d225",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/model/EvidenceSnapshot.java": "5b8b7f836aaf887a2bd474320dd37541271c1d00a4eb247345a75f083ead3ebd",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/model/KnowledgeSearchHit.java": "34f146c5189d80f7c286a8ea7513af4ca9fac5de28b20625a4ee769fbaf28ab8",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/model/PlanDraft.java": "7ebb20a80fcef344afb0ab3c557dc166d862e564ea049d7172a2d231b4de4f9f",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/model/ResearchArtifact.java": "1cc5fefda6c9d38d665168e041c244eb07e1e58a24d49e36c22b0bc327341ae1",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/model/ResearchBrief.java": "8b71d80fbcdb3cb9de28a55a524d04e7e5a1d51e68245bb4f27a292cff2571a6",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/model/ResearchEvent.java": "3d9008afbefb6c1d7504ce9d4226ee8f79d9fe573978970fe076486bfdce8f2c",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/model/ResearchModelRole.java": "5b8d2783e5481081fc3367b1f688aa30b2c27c39c348e4a72bc0e1d55f7c738d",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/model/ResearchRun.java": "dc383bca9bceef817de4fd0fa1c676b7efb31a98e3a0760d51697c71612719df",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/model/SourceReadResult.java": "2d08afd1fa2b9ee433fd3e5cc3f969f59322318b42c0fa13437852a314a5e5be",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/model/SubtaskResult.java": "bb31c2e1fe43d333a05ba1b444439370a8273d24e6d7d63120f687dae20d80cb",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/runtime/BoundedResearchModel.java": "3a3754ea6e8a55e28efdb5a8f9ac5c6b12c568f838828278df15f221d161917b",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/runtime/ResearchAgentFactory.java": "3b801272789de6df2b3673c2aa7f6e6cc0af5e442353e8df889829b463ee3d91",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/runtime/ResearchBudget.java": "4632b948dd77d6b4769a44b9f0e3558826f364ed9f31e62c605b8cb7872e68f7",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/runtime/ResearchControl.java": "ba2158517848fb4059925f98b3dd9cf1c5757bef3b8ce09caf3a9095390434d5",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/runtime/ResearchModelFactory.java": "db8a554249527ac17d37533398732cb16e698d8779615894e1dcf820d7e21bb6",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/runtime/ResearchRunner.java": "4bca1e74778e62ecaf5f93cb115879d68d10ff5c332045c741d4205eeac32c6b",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/runtime/ResearchSession.java": "8922b765c07edee94941e12a770ba44f68e922b76b891077e6b9bce095ff99a5",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/runtime/ResearchSourceView.java": "a494bdf5c01b94235b5cec03b421ce66ff2439e07a1a23de6922debcb6624ced",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/runtime/ResearchTask.java": "481d1dbde8d8c46ae99a69e053a079131386b056e7bada5aa546c13ea2a3eefa",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/runtime/ResearchToolkit.java": "dcc0387b6ae2d9adb169d67211cb4550d86d25f5498e8d84a1e12573e37bead3",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/runtime/ResearchTools.java": "19b37886859a19e42899d6a6305d2e5c2319e0712f1c51d99717a71fbfbfd8ec",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/runtime/ResearchWorkerCoordinator.java": "90aa16412be95f366a0ce3459016c13915f414c80651051894795c43f194ccb5",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/runtime/ResearchWorkerTools.java": "3f8feeefcbe72ab1e23d5601c380581710f0b48241535a6b0b1449b328fb99f2",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/EvidenceSnapshotFactory.java": "f2fe6131ccec9f857fcf39b362e84a361c9e29fc9f82f419f024afe7a270e55c",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/EvidenceText.java": "f4ec0a84dc72defc415d0ea4165a359e6f3692d42df44f7e9645e68af13e3d0b",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/KnowledgeSearchService.java": "25c0866cb45655127d0d539504636e0fbf34e8d34e189039909300d10fef19a7",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/PlanDraftValidator.java": "ea27519cb8017f6b62d14bde6d6a38f7dbd1d785a9112fd6e32630051c27e789",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/ResearchArtifactGenerator.java": "385d668c83134936d84c5ad35c5bfe681ad3ba4c56fc1c753f25a1a72fec13c9",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/ResearchCompletionService.java": "31b580a1dc643628c3477e67bb196c5171928c18f6d1ab53a79cb310c0937a51",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/ResearchCorpusImporter.java": "dc9f0d0120a9dd6c0d5138ffb22acd675c5d7b7ae87ea6a673a07b64cb36c247",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/ResearchEventStreamService.java": "33dc0ac2b7fdfe11fc5950ee0fd4255e418730c5bae5979ea13250cb271b9924",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/ResearchEvidenceStore.java": "34f08661d659ae1a4b665d74c2e78b6ef7325d0c89b23e179ef871c0b6e7c391",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/ResearchRunService.java": "26978192634d5b3778d7fc747a854666ca841aad5a447db2632d9e787f2dc521",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/ResearchRunStore.java": "12a99fcfc6a622bae6fcceec67219d77fb60490db1c6b15ca98e1028d4520334",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/ResearchSourceCatalog.java": "17945f78d4f835b7f61aa70c6d1e0244d1613af2493196b2ffc2724fc41746db",
+    "bootstrap/src/main/java/com/nageoffer/ai/ragent/research/service/SourceReader.java": "7d68efa5390554b0a6d7de4e0dbb5b6d2300e0c25788895434f25a3cb3b2eaeb",
+    "bootstrap/src/main/resources/application.yaml": "282ba5e1bcae4eb6952a1117bc012c8c36dbdfaaec28fe452a6e1fb56afd05ba",
+    "bootstrap/src/main/resources/prompts/research-artifact-v4.txt": "42c74f7f3cb22016df412bbd35a49b421e0081a23c621a729adae6493e699eae",
+    "bootstrap/src/main/resources/prompts/research-artifact-v5.txt": "256fa731a691aa66d90720b9ccd70fe6fa14c37a5b5cdedc57663b1e418e6154",
+    "bootstrap/src/main/resources/prompts/research-main-v1.txt": "36a6bd192820879341495bfad853dbb7047c189d93195bf992ad6e54f6fbaf7a",
+    "bootstrap/src/main/resources/prompts/research-main-v2.txt": "6847423d8aecb314241fed00cd73b712371cd42cf07df1b1874d4373a395b134",
+    "bootstrap/src/main/resources/prompts/research-main-v3.txt": "c8c357159eab53fa9804fdd9882fb62c66adda852ef584bafb2a3b77f5916c23",
+    "bootstrap/src/main/resources/prompts/research-main-v4.txt": "4d04c5fe318e39b64292eb50a2131353bd4af3f80c1ab9ba38ecd2383d60f48b",
+    "bootstrap/src/main/resources/prompts/research-worker-v1.txt": "0dd42bd127660b5e3a2c27ccb877a6161034cda49ab96307f1f1b05735fddbdf",
+    "bootstrap/src/main/resources/prompts/research-worker-v2.txt": "4db159e701b3e99b532d03d252c7472e9c8f275281327d4464395ba78d0f4611",
+    "bootstrap/src/main/resources/prompts/research-worker-v3.txt": "e1031e27a29502d9d798fd7d7cc702d63dfd44f96f4375ecfb113ecf70ac9d2a",
+    "eval/agentic-research/browser_research.py": "550522880c9e6338677afa044f033b3d01a3de619a02e0e314177ea3ce3b4599",
+    "eval/agentic-research/check_scorer_alignment.py": "fe51de2378042b4020a44305282d57621c3ab8764f316e4cab8eefee9c19498a",
+    "eval/agentic-research/datasetkit.py": "4a6dd9e336f4e73e3c17393f9ceab07fafa1373cc8e32271f19b311ed7594d47",
+    "eval/agentic-research/diagnose_research.py": "a10f0e4571ad4bcae34b9232427f2a7855c6685d7e96818ae8e91df879ad228d",
+    "eval/agentic-research/evaluate_applications.py": "830dcb210e021038f7481f173855dfbed18e850df36f0d60b4fce27d7086df03",
+    "eval/agentic-research/evaluate_research.py": "ca68b32e84ccabda6bde4c0f275447d5a9a6592c2c38d162b5c5ced356ee2dfd",
+    "eval/agentic-research/import_corpus.py": "8f0d8951e2ed9528e42302c2d124fb28b76917a1b8951dfefcb24c7f5c3d79ce",
+    "eval/agentic-research/prepare_applications.py": "86cbf335c2fb7a3330c3c35e8999300dce2fa0e8ca15606f941afce8f0661566",
+    "eval/agentic-research/prepare_dataset.py": "c9a49619defb41ae8a28240c9705f597fbd85d02c8543ead6012b83c1d3ce391",
+    "eval/agentic-research/scoring.py": "86abd09693596ce02fdf50f8bf26de30a780b4dfa36cddb90ac6ca988f75c3bf",
+    "eval/agentic-research/smoke_research.py": "d4a88c89286f3513b2dd931a04b37b66d882a003a0b55d9397c09b86563060da",
+    "eval/agentic-research/verify_prepared.py": "640da8c068192f4d59b77bd8c2d16a48b63b2e034d59aeddd505e202b326dbe2",
+    "framework/pom.xml": "08cb5a48e57186103eb6356c804cfc57c4bb22f2eb8e2d2dc24f7db77642cb78",
+    "infra-ai/pom.xml": "640813176971c42702e46b314c43cdc53b3ff6ffbcfeb8a4b271565d228432df",
+    "infra-ai/src/main/java/com/nageoffer/ai/ragent/infra/config/AIModelProperties.java": "0ced8c3b32a9a52078448de6c11e2857280e07fbe9b522ba38e03630611e3552",
+    "infra-ai/src/main/java/com/nageoffer/ai/ragent/infra/embedding/AbstractOpenAIStyleEmbeddingClient.java": "ebb6fce273880144f021090eb0d96e7cdc5e20283fffdbecd2bd45bb3bd0317f",
+    "infra-ai/src/main/java/com/nageoffer/ai/ragent/infra/embedding/EmbeddingUsageCapture.java": "0957b1a07461a18a4d661e6113ccce3b9f9b6c0875f079189cdd6c4cf688af1c",
+    "infra-ai/src/main/java/com/nageoffer/ai/ragent/infra/embedding/SiliconFlowEmbeddingClient.java": "586c13d0c4e92e471498c0a3487a964221da1861db6fd65ac51dd7d6b22071c1",
+    "infra-ai/src/main/java/com/nageoffer/ai/ragent/infra/model/ModelRoutingExecutor.java": "84fe86ca691900e90f8feb7539dae7422d3fadefffccca20f35049d9d110114d",
+    "infra-ai/src/main/java/com/nageoffer/ai/ragent/infra/operation/HttpPhaseTrace.java": "119c87ea2e1b59564f369059907c745cffab0aea6c783bf993cdc0531ad370c2",
+    "infra-ai/src/main/java/com/nageoffer/ai/ragent/infra/operation/RequestOperation.java": "6c4ccc236a6d13ddda26df73265f9a0215e2bb2a7ec55da839887eeea02305d8",
+    "infra-ai/src/main/java/com/nageoffer/ai/ragent/infra/rerank/BaiLianRerankClient.java": "3c0c6a6a929821f4b1da8cde1a4e45004adf76caae671b96649b3d610413e320",
+    "infra-ai/src/main/java/com/nageoffer/ai/ragent/infra/rerank/NoopRerankClient.java": "0b543e1011fa8858bf61621f160e95978a46b8a800f0417007c08241bae1292e",
+    "infra-ai/src/main/java/com/nageoffer/ai/ragent/infra/rerank/RerankClient.java": "71f3318773c7cdee94a76dfb9d268ecb99b7476764b42f7f691217b5bb0c0e46",
+    "infra-ai/src/main/java/com/nageoffer/ai/ragent/infra/rerank/RerankService.java": "88001db995de5d35639ef8a08ee4be76d1f2bad8f8a1b3b629b0e676a1902af2",
+    "infra-ai/src/main/java/com/nageoffer/ai/ragent/infra/rerank/RerankUsageCapture.java": "92ac7ace50b43b47f79e515bf721e703becda1f77a7032331e5ac2a273140398",
+    "infra-ai/src/main/java/com/nageoffer/ai/ragent/infra/rerank/RoutingRerankService.java": "b6cc523cb733cb21ff5fa7637ab6c191b35fcab2a3a734bbbe754f3d52718bfc",
+    "infra-ai/src/main/java/com/nageoffer/ai/ragent/infra/token/HeuristicTokenCounterService.java": "12229c6a77ba675abee4276bf7d2fa0e9a7a8e2dce451e41a9dea8ae7c154329",
+    "pom.xml": "eb412af66327da88a529b4f31bcdad8140044e95b8b88597bd55b9d803a2287c",
+    "resources/database/schema_pg.sql": "1742bbf5e4d46c409f69f65f6557ea1d24b25bf9ef9cfd32b13374b726d72b56"
+  },
+  "failure_status_fix": {
+    "actual_live_replay_after_fix": false,
+    "successful_retrieval": "clears this Agent unresolved retrieval issue; recovered failures are not permanent status failures",
+    "unresolved_retrieval_failure": "executionIssues and PARTIAL result",
+    "without_citable_evidence": "FAILED / RESEARCH_FAILED_WITHOUT_EVIDENCE; preserve state, skip finalization"
+  },
+  "fallback": "empty role alias uses legacy research.model-id; p7/r5 evaluation explicitly binds all roles to legacy physical model",
+  "git_base": "f5604ec7081b9e568ef9427e0f95c8d195b9c891",
+  "independent_json_probe": {
+    "call": {
+      "cachedTokens": 0,
+      "callId": "f4892ac5-f111-43c5-af2c-4971d4f4b5d9",
+      "elapsedMillis": 1189,
+      "inputTokens": 53,
+      "jsonFixtureValid": true,
+      "model": "qwen3.7-max-2026-05-20",
+      "modelsByRole": {
+        "finalization": "qwen3.7-max-2026-05-20",
+        "main": "qwen3.7-max-2026-05-20",
+        "worker": "qwen3.7-flash-2026-07-15"
+      },
+      "outputTokens": 14,
+      "role": "finalization",
+      "startedAt": "2026-09-18T05:00:47.506341213Z",
+      "status": "COMPLETED",
+      "usageStatus": "provider"
+    },
+    "quality_evaluation": false,
+    "retrieval_calls": 0,
+    "run": "20260918_S1_generation_probe_v2",
+    "setup_failure_v1": "javac failed; 0 API calls, original artifacts retained",
+    "synthetic_non_sensitive_fixture": true
+  },
+  "models_by_role": {
+    "finalization": "qwen3.7-max-2026-05-20",
+    "main": "qwen3.7-max-2026-05-20",
+    "worker": "qwen3.7-flash-2026-07-15"
+  },
+  "next_fixed_selection": {
+    "executed": false,
+    "full_400_ABC_is_first_career_delivery_prerequisite": false,
+    "holdout": false,
+    "ids": "eval/agentic-research/manifests/research-career-case-ids-2026-09-18.json",
+    "input_sha256": {
+      "local-data/agentic-research/prepared/research-data-v1/musique-dev/queries.regression.jsonl": "3b8ee2d25095347b1c6b546abf068e121427ab36d0f0bf55d63038f28cffeb48",
+      "local-data/agentic-research/prepared/research-data-v1/qasper-validation/queries.regression.jsonl": "27cd0d5227b43024a8a4dc0b3f0a3bec69c6d8b3c95d15331e7548775cf70ed8"
+    },
+    "per_dataset": 16,
+    "questions": 32,
+    "seed": "20260918-career-v1",
+    "selection": "lowest sha256(seed + colon + ID), 16 per dataset from existing 200-question fixed development profiles; no labels or outputs read",
+    "tasks_ABC": 96
+  },
+  "offline_preparation": {
+    "database_calls": 0,
+    "executed": false,
+    "external_calls": 0,
+    "future_execution": "Use a new S3 run directory after transport recovery; this preparation is separate",
+    "questions": 32,
+    "run": "20260918_S3_prepared_v1",
+    "tasks_ABC": 96
+  },
+  "phase": "S1 and bounded S2 failure-status fix",
+  "shared_limits": {
+    "concurrent_model_requests": 2,
+    "duration_seconds": 300,
+    "finalization_reserve": 2,
+    "model_calls": 16,
+    "tool_calls": 24,
+    "worker_concurrency": 2,
+    "worker_total": 4
+  },
+  "status": {
+    "S1": "implemented and compatibility checked",
+    "S2": "partial; failure state fixed, embedding transport remains unstable",
+    "S3": "32-question fixed development subset selected; not executed",
+    "S4": "not started"
+  },
+  "transport_check": {
+    "call_timeout_seconds": 12,
+    "concurrency": 2,
+    "protocol_default_changed": false,
+    "root_cause_proven": false,
+    "run": "20260918_S2_transport_v1",
+    "summary": {
+      "errors": {
+        "InterruptedIOException": 2
+      },
+      "groups": {
+        "shared_h1": {
+          "requests": 2,
+          "successes": 1
+        },
+        "shared_h2": {
+          "requests": 2,
+          "successes": 1
+        }
+      },
+      "known_total_tokens": 8,
+      "requests": 4,
+      "root_cause_proven": false,
+      "usage_unknown": 2
+    }
+  },
+  "validation": {
+    "backend": {
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "tests": 211
+    },
+    "classes": 30,
+    "log": "local-data/agentic-research/runs/20260918_S1_validation/backend-tests-v2.log",
+    "new_browser_e2e": false,
+    "new_frontend_checks": false,
+    "python_result": "passed",
+    "python_tests": 33,
+    "random_test_database_removed": true
+  }
+}

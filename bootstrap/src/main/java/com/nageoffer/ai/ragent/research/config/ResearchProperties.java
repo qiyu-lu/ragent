@@ -17,6 +17,7 @@
 
 package com.nageoffer.ai.ragent.research.config;
 
+import com.nageoffer.ai.ragent.research.model.ResearchModelRole;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
@@ -26,6 +27,9 @@ import org.springframework.context.annotation.Configuration;
 @ConfigurationProperties(prefix = "research")
 public class ResearchProperties {
     private String modelId = "research-flash";
+    private String mainModelId;
+    private String workerModelId;
+    private String finalizationModelId;
     private int maxConcurrentRuns = 2;
     private int queueCapacity = 32;
     private int maxConcurrentModelCalls = 2;
@@ -41,6 +45,16 @@ public class ResearchProperties {
     private int toolTimeoutSeconds = 30;
     private int maxInputTokens = 28000;
     private int maxOutputTokens = 4096;
+
+    /** 空角色配置沿用旧单模型设置；注册项错误由工厂明确拒绝。 */
+    public String modelId(ResearchModelRole role) {
+        String selected = switch (role) {
+            case MAIN -> mainModelId;
+            case WORKER -> workerModelId;
+            case FINALIZATION -> finalizationModelId;
+        };
+        return selected == null || selected.isBlank() ? modelId : selected;
+    }
 
     public void validate() {
         if (modelId == null || modelId.isBlank() || maxConcurrentRuns < 1 || queueCapacity < 1

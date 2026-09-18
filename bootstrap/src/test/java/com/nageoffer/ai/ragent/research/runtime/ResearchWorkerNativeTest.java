@@ -74,7 +74,11 @@ class ResearchWorkerNativeTest {
         provider.setUrl(server.url("/").toString()); provider.setApiKey("fixture-key");
         provider.setEndpoints(Map.of("chat", "/v1/chat/completions")); config.getProviders().put("fixture", provider);
         var candidate = new AIModelProperties.ModelCandidate(); candidate.setId("research-flash"); candidate.setModel("fixture-native");
-        candidate.setProvider("fixture"); candidate.setSupportsToolCalling(true); config.getChat().setCandidates(List.of(candidate));
+        candidate.setProvider("fixture"); candidate.setSupportsToolCalling(true);
+        var main = new AIModelProperties.ModelCandidate(); main.setId("fixture-main"); main.setModel("fixture-main-native");
+        main.setProvider("fixture"); main.setSupportsToolCalling(true);
+        limits.setMainModelId(main.getId());
+        config.getChat().setCandidates(List.of(candidate, main));
         factory = new ResearchAgentFactory(new ResearchModelFactory(config, limits), limits, search, reader, json, new HeuristicTokenCounterService());
         workerEntered = new CountDownLatch(2);
         server.setDispatcher(new Dispatcher() {
@@ -137,9 +141,11 @@ class ResearchWorkerNativeTest {
             Set<String> names = new HashSet<>(); request.path("tools").forEach(t -> names.add(t.path("function").path("name").asText()));
             String all = request.toString();
             if (names.contains("conduct_research")) {
+                assertEquals("fixture-main-native", request.path("model").asText());
                 assertEquals(5, names.size());
                 assertFalse(all.contains("PRIVATE_ALPHA_HISTORY")); assertFalse(all.contains("PRIVATE_BETA_HISTORY"));
             } else {
+                assertEquals("fixture-native", request.path("model").asText());
                 if (request.path("tool_choice").path("function").path("name").asText().equals("read_source")) forcedReads++;
                 assertEquals(Set.of("search_knowledge", "read_source", "finish_research"), names);
                 assertFalse(all.contains("PRIVATE_ALPHA_HISTORY") && all.contains("PRIVATE_BETA_HISTORY"));
@@ -150,6 +156,8 @@ class ResearchWorkerNativeTest {
         verify(search).search("run", "owner", "worker-2", "beta dependent entity parameter", List.of(), List.of("doc"), 1);
         var calls = (List<Map<String, Object>>) session.budget.snapshot().get("calls");
         assertEquals(10, calls.stream().filter(c -> c.get("role").equals("worker")).count());
+        assertTrue(calls.stream().filter(c -> c.get("role").equals("worker")).allMatch(c -> c.get("model").equals("fixture-native")));
+        assertTrue(calls.stream().filter(c -> c.get("role").equals("main")).allMatch(c -> c.get("model").equals("fixture-main-native")));
         assertTrue(calls.stream().allMatch(c -> c.get("taskId") != null));
     }
 

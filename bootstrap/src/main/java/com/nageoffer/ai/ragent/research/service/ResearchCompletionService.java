@@ -49,6 +49,11 @@ public class ResearchCompletionService {
         }
         state.put("researchResult", json.convertValue(outcome.result(), Map.class));
         state.put("executionIssues", outcome.result().executionIssues());
+        if (session.citableIds().isEmpty() && !outcome.result().executionIssues().isEmpty()) {
+            // 明确执行失败且没有已读证据时，保留原因；空草稿不能掩盖检索不可用。
+            store.finish(session.claim, Status.FAILED, state, session.budget.snapshot(), "RESEARCH_FAILED_WITHOUT_EVIDENCE");
+            return;
+        }
         try {
             var artifact = generator.generate(session, outcome.result());
             session.check();

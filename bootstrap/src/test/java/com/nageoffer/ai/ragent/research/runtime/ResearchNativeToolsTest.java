@@ -183,6 +183,28 @@ class ResearchNativeToolsTest {
         verifyNoInteractions(search, reader);
     }
 
+    @Test void unresolvedRetrievalFailureCannotBeReportedAsCompletedSourceResearch() throws Exception {
+        when(search.search(anyString(), anyString(), anyString(), anyString(), anyList(), any(), anyInt()))
+                .thenThrow(new com.nageoffer.ai.ragent.infra.operation.RequestOperation.Failure("embedding", "NETWORK_ERROR", true, null));
+        tool("search-failed", "search_knowledge", Map.of("query", "latency"));
+        tool("finish-after-failure", "finish_research", Map.of("findings", List.of(), "gaps", List.of("No retrieved content"), "conflicts", List.of()));
+        var result = factory().run(session).result();
+        assertEquals(SubtaskResult.Status.PARTIAL, result.status());
+        assertEquals(List.of("RETRIEVAL_FAILED:NETWORK_ERROR@embedding"), result.executionIssues());
+        assertEquals(List.of("No retrieved content"), result.gaps());
+    }
+
+    @Test void successfulRetrievalAfterTransientFailureClearsTheUnresolvedExecutionIssue() {
+        assertThrows(com.nageoffer.ai.ragent.infra.operation.RequestOperation.Failure.class, () -> session.retrieve(() -> {
+            throw new com.nageoffer.ai.ragent.infra.operation.RequestOperation.Failure("embedding", "NETWORK_ERROR", true, null);
+        }));
+        assertFalse(session.executionIssues().isEmpty());
+        assertEquals(List.of(), session.retrieve(List::of));
+        assertTrue(session.executionIssues().isEmpty(), "A recovered API failure must not force a later legitimate source gap to fail");
+        var result = (SubtaskResult) new ResearchTools(session, search, reader).finish(List.of(), List.of("The source lacks this parameter"), List.of());
+        assertEquals(SubtaskResult.Status.COMPLETED, result.status());
+    }
+
     @Test
     void textualJsonCannotPretendToBeANativeToolCall() throws Exception {
         for (int i = 0; i < 3; i++) response(Map.of("role", "assistant", "content", "{\"tool\":\"ask_user\",\"question\":\"Which?\"}"), "stop");

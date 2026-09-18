@@ -81,8 +81,9 @@ public class ResearchArtifactGenerator {
             evidence.put(id, item);
         }
         List<Msg> messages = input(session, result, evidence);
-        var model = new BoundedResearchModel(models.create(), session, properties, models.quota(), json, tokens, true);
-        session.event("FINALIZATION_STARTED", "正在整理并校验研究产物", Map.of("promptVersion", PROMPT_VERSION, "outputType", session.claim.run().brief().outputType()));
+        var model = new BoundedResearchModel(models.create(ResearchModelRole.FINALIZATION), session, properties, models.quota(), json, tokens, true);
+        session.event("FINALIZATION_STARTED", "正在整理并校验研究产物", Map.of("promptVersion", PROMPT_VERSION,
+                "outputType", session.claim.run().brief().outputType(), "model", model.getModelName(), "role", ResearchModelRole.FINALIZATION.key()));
         for (int attempt = 0; attempt < 2; attempt++) {
             session.check();
             StringBuilder raw = new StringBuilder();

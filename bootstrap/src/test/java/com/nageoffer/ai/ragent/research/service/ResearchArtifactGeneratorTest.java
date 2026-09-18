@@ -56,7 +56,11 @@ class ResearchArtifactGeneratorTest {
         provider.setEndpoints(Map.of("chat", "/v1/chat/completions")); config.getProviders().put("fixture", provider);
         var candidate = new AIModelProperties.ModelCandidate();
         candidate.setId("research-flash"); candidate.setModel("fixture-artifact"); candidate.setProvider("fixture"); candidate.setSupportsToolCalling(true);
-        config.getChat().setCandidates(List.of(candidate)); models = new ResearchModelFactory(config, limits);
+        var finalization = new AIModelProperties.ModelCandidate();
+        finalization.setId("fixture-finalization"); finalization.setModel("fixture-finalization-native");
+        finalization.setProvider("fixture"); finalization.setSupportsToolCalling(true);
+        limits.setFinalizationModelId(finalization.getId());
+        config.getChat().setCandidates(List.of(candidate, finalization)); models = new ResearchModelFactory(config, limits);
         store = mock(ResearchRunStore.class); when(store.current(any())).thenReturn(true);
         evidence = mock(ResearchEvidenceStore.class);
         when(evidence.find(eq("run"), eq("owner"), anyString())).thenAnswer(i -> new EvidenceSnapshot(item(i.getArgument(2)), "snapshot", "metadata"));
@@ -101,6 +105,16 @@ class ResearchArtifactGeneratorTest {
         new ResearchCompletionService(store, generator, json).researchFailed(session, new ServiceFailure());
         verify(store).finish(any(), eq(ResearchRun.Status.PARTIAL), anyMap(), anyMap(), anyMap(), anyString());
         assertEquals(1, server.getRequestCount());
+    }
+
+    @Test void executionFailureWithoutReadEvidenceDoesNotGenerateOrPublishAnEmptyCompletedArtifact() {
+        var empty = session(ResearchBrief.OutputType.REPORT, Map.of());
+        var finalizer = mock(ResearchArtifactGenerator.class);
+        var failed = new SubtaskResult("main", List.of(), List.of(), List.of(), SubtaskResult.Status.PARTIAL,
+                List.of("RETRIEVAL_FAILED:NETWORK_ERROR@embedding"));
+        new ResearchCompletionService(store, finalizer, json).complete(empty, new ResearchSession.Outcome(null, failed), null);
+        verifyNoInteractions(finalizer);
+        verify(store).finish(any(), eq(ResearchRun.Status.FAILED), anyMap(), anyMap(), eq("RESEARCH_FAILED_WITHOUT_EVIDENCE"));
     }
 
     @Test void disconnectedTextIsNeverConcatenatedWithTheRetriedArtifact() throws Exception {
@@ -172,10 +186,12 @@ class ResearchArtifactGeneratorTest {
         assertEquals("user_input", artifact.userConstraints().get(0).source());
         assertEquals(result().gaps(), artifact.gaps()); assertEquals(result().conflicts(), artifact.conflicts());
         var request = json.readTree(server.takeRequest().getBody().readUtf8());
+        assertEquals("fixture-finalization-native", request.path("model").asText());
         assertFalse(request.has("tools"));
         assertFalse(request.toString().contains("Server budget reminder"));
         var call = ((List<Map<String, Object>>) session.budget.snapshot().get("calls")).get(0);
         assertEquals("finalization", call.get("role")); assertEquals("provider", call.get("usageStatus"));
+        assertEquals("fixture-finalization-native", call.get("model"));
     }
 
     @Test void finalInputOmitsCorpusMetadataWhilePublicationKeepsSourceIdentity() throws Exception {

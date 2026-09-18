@@ -1,17 +1,17 @@
-# 研究改进 R1—R5：会话交接（2026-09-18）
+# 研究改进与秋招版本：会话交接（2026-09-18）
 
-核对时间：2026-09-18 11:53，Asia/Shanghai。用户为避免上下文过长要求记录后切换会话。本次在交接处结束工作；计划没有整体完成。
+最新核对时间：2026-09-18 13:05，Asia/Shanghai。下方 1—5 节保留 11:53 的 R1—R5 历史交接，当前按主计划 8.7 推进秋招版本；本轮实际结果和接续命令见第 6 节。计划没有整体完成。
 
-**接续点：R1—R4 已实现和校准；先处理 R5 暴露的 embedding 连续超时，再完成固定主回归、复跑和应用原文核对。** 不要重新实施 P0—P8 或覆盖历史失败记录。
+**当前接续点：S1 角色模型配置已实现并验证；S2 已修复检索失败后 COMPLETED 空产物，检索端点仍不稳定；S3 首批 32 题已固定、尚未执行。** 用户要求成组实现、集中验收，允许收益有限；不要重新实施 P0—P8 或覆盖旧 R5 的 22 条记录。优先阅读第 6 节；第 5 节的完整 R5 路线不再作为首版秋招前置条件。
 
-主计划：[实施计划 8.6](agentic-research-implementation-plan-2026-09-17.md#86-失败诊断与后续改进2026-09-18)。逐阶段记录：[执行日志](agentic-research-execution-log.md)。机器状态：[R5 清单](../../eval/agentic-research/manifests/research-r5-validation-2026-09-18.json)。运行和启动：[通用交接](agentic-research-handoff.md)。
+主计划：[实施计划 8.7](agentic-research-implementation-plan-2026-09-17.md#87-秋招版本实施与集中验收2026-09-18)。逐阶段记录：[执行日志](agentic-research-execution-log.md)。机器状态：[本轮清单](../../eval/agentic-research/manifests/research-s1-model-roles-2026-09-18.json)及[旧 R5 清单](../../eval/agentic-research/manifests/research-r5-validation-2026-09-18.json)。运行和启动：[通用交接](agentic-research-handoff.md)。
 
 ## 1. 授权、Git 和工作区
 
 - 用户已授权直接执行完毕改进计划、真实供应商调用及 Git 记录。切换会话前暂时停止推进，新会话收到“继续”后接续原目标。
 - **不再查询价格、估算金额或请求费用确认。** 主计划 8.5 优先于历史报告/预算文档中的旧要求。实际请求、token、耗时、失败、重试和 unknown usage 必须保存；技术超时、取消、并发和有限调用次数继续生效。
 - 仓库：`/home/sd101t/IdeaProjects/ragent-iron-ore-rag`；分支：`feat/agentic-research`。
-- 最新运行代码提交：`0b39d31`。本交接会另作记录提交，届时用 `git log -6 --oneline` 核对。
+- 历史 R4 运行代码提交：`0b39d31`，上一轮交接提交 `f5604ec`。本轮阶段提交按唯一标题 `feat: select research models by role and preserve retrieval failures` 定位，用 Git 核对实际 SHA。
 - 关联 worktree 的 Git 公共目录在 `/home/sd101t/IdeaProjects/ragent-new/.git`，Git 写操作需要沙箱升级；用户已授权提交，没有要求 push、merge 或改写历史。
 - 用户已有未跟踪目录 `docs/current-code-notes-2026-09-18/`，本轮未编辑、暂存或提交。不要使用 `git add .` 带入它。
 - 交接前核实没有本轮 `ResearchRunCommand`、连接探针或串行驱动进程仍在运行。R5 临时任务库已清理；保留只读语料库及所有产物。
@@ -129,4 +129,40 @@ python3 eval/agentic-research/analysis/compare_runs.py --before local-data/agent
 
 新会话可粘贴：
 
-> 阅读 docs/iron-ore-rag/agentic-research-resume-2026-09-18.md 以及其中链接的计划和执行记录，从 R5 embedding 连续超时诊断接续，完成主回归、复跑、应用原文核对与文档/Git 记录。已有真实调用授权，省略金额估算和费用确认；保留历史失败及用户未跟踪笔记，先核对进程和运行目录再执行。
+> 历史 R5 路线已由下方第 6 节的秋招接续范围调整；新会话优先按第 6 节执行，保留本节旧批次证据。
+
+## 6. 秋招版本本轮实施与下一步
+
+用户于当前会话授权写入计划并开始实施，采用“成组实现、集中验收”，允许收益有限；旧的真实调用和 Git 授权继续有效。阶段提交标题为 `feat: select research models by role and preserve retrieval failures`。
+
+S1 已实现主/worker/最终生成独立模型选择。在线默认注册别名为 research-max/research-flash/research-max，对应 `qwen3.7-max-2026-05-20` / `qwen3.7-flash-2026-07-15` / Max；角色配置为空时沿用旧 model-id。继续共享预算、请求配额和取消。评测配置 [career.json](../../eval/agentic-research/configs/career.json) 冻结实际模型 ID；p7/r5 未声明角色的配置会明确固定所有角色为 Flash。新批保存 runtime.json/modelsByRole，并按实际角色/模型汇总 usage。模型差异与架构差异不混作单一因果结论。
+
+S2 已补齐失败状态：尚未恢复的检索错误进入 executionIssues，finish 保留为 PARTIAL；没有已读/合法 worker 证据且有执行错误时，运行直接 FAILED，保留研究状态并跳过空产物生成。之后一次成功检索清除本 Agent 当前未恢复的检索错误，不把已恢复故障永久算作失败。该规则判断执行状态，不证明其余章节语义完整；S2 尚未解决外部检索不稳定，也未完成全部问题清单。
+
+| 本轮检查 | 实际结果 / 边界 |
+| --- | --- |
+| 集中程序回归 | 初批 208 项后端/33 Python 通过；加入失败状态修复后 30 类 211 项后端/33 Python 全通过，0 失败/错误/跳过。日志及逐类统计位于 `20260918_S1_validation`；随机测试库删除。没有新增前端/浏览器检查 |
+| 真实应用 `20260918_S1_applications_v1` | 2 个 C 请求，26 次模型正常返回（main Max 13、worker Flash 10、finalization Max 3），已知 input 60065/output 2868，模型 unknown 0；comparison 创建 2 worker，plan 未委派。PLAN 首次缺少 gaps 后修复 |
+| 该应用的业务结果 | 28 次 embedding 全部失败、usage unknown 28；两产物零章节/零引用，PLAN 没有来源支持的步骤。旧逻辑标成 COMPLETED，但实际检索阻塞。已保留该负例，不能算完成比较、计划质量或多 Agent 收益 |
+| 独立 JSON 探针 `20260918_S1_generation_probe_v2` | 不依赖检索，合成非敏感 7 ms 文本，Max 最终角色 JSON 符合用例；单请求 1189 ms、53 input/14 output tokens。只证明 SDK/JSON 兼容，不是业务或答案质量。v1 本地编译失败，0 API 调用，原记录保留 |
+| 短 transport `20260918_S2_transport_v1` | 固定公开查询、并发 2、12 秒单次；HTTP/2 与 HTTP/1.1 各 1/2 成功，合计 4 请求、2 成功/2 InterruptedIOException，成功已知 total_tokens 8，失败 unknown 2。不能证明协议根因，未改协议默认值 |
+
+真实应用及 JSON 探针的运行代码冻结在 S2 状态修复前；角色模型创建参数之后没有再修改，当前失败状态修复已经程序回归，但未做当前源码的真实业务复测。真实应用临时库 `research_p3_20260918045532_b6098df3` 已删除。原始请求、预测、事件、每次 usage、失败、源码快照和 hash 全部留在 Git 忽略目录；[机器清单](../../eval/agentic-research/manifests/research-s1-model-roles-2026-09-18.json)引用这些文件，不覆盖旧 R5。
+
+接下来先解决或确认检索端点恢复，只做与明确阻塞有关的有限检查，继续成组实现；不要把每个改动都拆为收益预验证，也不要在检索明显不可用时启动大量无意义质量请求。当前没有证据需要下载新数据集或继续更换主模型。S3 首批从现有固定开发集按 hash 选取 QASPER/MuSiQue 各 16 题，ABC 共 96 项，[ID 题单](../../eval/agentic-research/manifests/research-career-case-ids-2026-09-18.json)与 seed/输入 SHA 保留；未读取 gold 或历史输出选题，不是独立 holdout。
+
+检索稳定后，新建批次执行这些同题对照，再做代表性复跑和比较/PLAN 原文核对。已经有大规模历史基线，不再把完整 R5 400×ABC 或 full 17517 作为首版秋招前置条件。先记录当前版本实际适用任务、失效样例、资源与语义支持，再写简历数字；S3/S4 尚未完成。
+
+```bash
+# 首批秋招验收，32 题/96 项；run-dir 必须是新的目录
+python3 eval/agentic-research/evaluate_research.py --profile regression --config eval/agentic-research/configs/career.json --case-ids eval/agentic-research/manifests/research-career-case-ids-2026-09-18.json --run-dir local-data/agentic-research/runs/20260918_S3_regression_v1 --execute
+
+# 检索恢复后用当前源码复测两条应用；旧 v1 留档
+python3 eval/agentic-research/evaluate_applications.py --mode C --config eval/agentic-research/configs/career.json --case comparison-02 --case plan-06 --run-dir local-data/agentic-research/runs/20260918_S2_applications_v1 --execute
+```
+
+现有源码/评测 Python 已改变，禁止在旧 R5 v2 追加或使用 resume 混入新版本。之后若再次改指纹，继续使用新目录。本轮尚未启动上述 S3/S2 应用命令，不需要终止任何其他服务。
+
+新会话可粘贴：
+
+> 阅读本交接第 6 节、主计划 8.7 和本轮清单，从未完成的 S2 检索稳定性接续。按秋招约定成组实现、集中验收，检索稳定后执行首批固定 32 题/96 项及应用原文核对；允许收益有限，禁止宣称未测得的质量或多 Agent 收益。保留所有历史失败和用户未跟踪笔记，真实调用/Git 已授权，省略价格查询与金额确认。

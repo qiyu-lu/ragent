@@ -4,6 +4,8 @@
 
 ## 当前接续点
 
+2026-09-18 13:05，用户授权按秋招目标“成组实现、集中验收”。计划 8.7 已更新，S1 新增主/worker/最终角色模型配置，默认 Max/Flash/Max，历史 p7/r5 仍显式固定所有角色为 Flash；测评冻结实际角色模型并分别汇总 usage。S2 修复本轮发现的检索未恢复却生成 COMPLETED 空产物：未恢复错误进入 executionIssues，无已读证据时 FAILED 并跳过最终生成，恢复成功可正常结束。当前集中回归 211 项后端、33 项 Python 通过。两条真实应用及独立 Max JSON 探针证明模型调用兼容，但应用 28 次 embedding 全失败、零引用；随后 4 次 transport 检查 2 成功/2 失败，未证明协议根因。S2 仍未完成；S3 首批固定 32 题/96 ABC 项尚未执行。详情见[最新交接第 6 节](agentic-research-resume-2026-09-18.md#6-秋招版本本轮实施与下一步)与[本轮清单](../../eval/agentic-research/manifests/research-s1-model-roles-2026-09-18.json)。下段及后续 R5 数字为历史结果，不代表新角色模型质量。
+
 2026-09-18 已完成 R1—R4 的实现、故障复测和小样本校准。R5 主回归 `20260918_R5_regression_v2` 因 embedding 连续无响应而受控停止，记录 22/1200 项（17 COMPLETED / 1 WAITING_INPUT / 4 FAILED），1178 未执行，临时任务库已删除。连接探针已结束，当前无本轮评测/探针/串行驱动进程。用户要求切换会话，接续入口为[本次状态记录](agentic-research-resume-2026-09-18.md)：先验证传输恢复，再完成主回归、两轮复跑及 72 项应用同题对照。已有直接调用和 Git 授权继续有效，省略金额估算。R5 未完成，尚不能给出稳定整体质量或多 Agent 收益结论。以下 P0—P8 数字保留为此前验收快照。
 
 P0—P8 已完成实现与本轮约定验证（2026-09-18）。P7 提交 `3381fa9`；P8 通过唯一标题 `docs: finalize research workflow and implementation handoff` 定位。固定 regression 的 QASPER 200 问题与 MuSiQue Full dev 200 行，A/B/C 共 1200 个任务全部记录（932 COMPLETED / 93 PARTIAL / 175 FAILED），没有未执行任务。QASPER Answer F1：A 0.3365/B 0.2338/C 0.2442；MuSiQue Answer F1：A 0.3325/B 0.3269/C 0.3918；MuSiQue 答案/支持只评分 105 行 answerable，非 200 行答案分母。C 实际 2 个运行委派、创建 4 个 worker。结果和费用见[固定对照报告](agentic-research-evaluation-report.md)。

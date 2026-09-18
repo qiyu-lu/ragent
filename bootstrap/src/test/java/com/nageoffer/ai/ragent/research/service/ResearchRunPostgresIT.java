@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nageoffer.ai.ragent.framework.context.LoginUser;
 import com.nageoffer.ai.ragent.framework.context.UserContext;
 import com.nageoffer.ai.ragent.framework.exception.ClientException;
+import com.nageoffer.ai.ragent.knowledge.service.KnowledgeAccessService;
 import com.nageoffer.ai.ragent.research.config.ResearchProperties;
 import com.nageoffer.ai.ragent.research.model.ResearchBrief;
 import com.nageoffer.ai.ragent.research.model.ResearchRun;
@@ -69,8 +70,9 @@ class ResearchRunPostgresIT {
         kb = "kb-" + suffix;
         conversation = "conv-" + suffix;
         jdbc.update("INSERT INTO t_conversation (id, conversation_id, user_id, title) VALUES (?, ?, ?, 'P3 fixture')", conversation, conversation, owner);
-        jdbc.update("INSERT INTO t_knowledge_base (id, name, embedding_model, collection_name, created_by) VALUES (?, 'P3 fixture', 'fixture', ?, ?)", kb, kb, owner);
-        UserContext.set(LoginUser.builder().userId(owner).username("p3-test").build());
+        jdbc.update("INSERT INTO t_user (id, username, password, role) VALUES (?, ?, 'fixture', 'user')", owner, owner);
+        jdbc.update("INSERT INTO t_knowledge_base (id, name, embedding_model, collection_name, created_by, owner_user_id) VALUES (?, 'P3 fixture', 'fixture', ?, ?, ?)", kb, kb, owner, owner);
+        UserContext.set(LoginUser.builder().userId(owner).username("p3-test").role("user").build());
     }
 
     @AfterEach void clearUser() { UserContext.clear(); }
@@ -197,13 +199,13 @@ class ResearchRunPostgresIT {
             catch (InterruptedException e) { throw new RuntimeException(e); }
             return new ResearchSession.Outcome(null, new SubtaskResult("main", List.of(), List.of("unavailable"), List.of(), SubtaskResult.Status.COMPLETED));
         };
-        var instanceA = new ResearchRunService(store, blocking, new ResearchProperties(), jdbc, json, completion(), new ResearchEvidenceStore(jdbc, json));
+        var instanceA = new ResearchRunService(store, blocking, new ResearchProperties(), jdbc, json, completion(), new ResearchEvidenceStore(jdbc, json), new KnowledgeAccessService(jdbc));
         try {
             var running = instanceA.create(new ResearchRunService.CreateRequest(conversation, "instance-a", "compare", ResearchBrief.OutputType.REPORT, List.of(), List.of(kb), List.of()));
             assertTrue(entered.await(10, TimeUnit.SECONDS));
             long epoch = store.get(running.id(), owner).epoch();
             // 实例 B 启动再停止：此前两者都会把全库 QUEUED / RUNNING 标为 INTERRUPTED。
-            new ResearchRunService(store, blocking, new ResearchProperties(), jdbc, json, completion(), new ResearchEvidenceStore(jdbc, json)).close();
+            new ResearchRunService(store, blocking, new ResearchProperties(), jdbc, json, completion(), new ResearchEvidenceStore(jdbc, json), new KnowledgeAccessService(jdbc)).close();
             assertEquals(Status.RUNNING, store.get(running.id(), owner).status());
             assertEquals(epoch, store.get(running.id(), owner).epoch());
             assertEquals(Status.QUEUED, store.get(queued.id(), owner).status());
@@ -274,7 +276,7 @@ class ResearchRunPostgresIT {
             catch (InterruptedException e) { throw new RuntimeException(e); }
             return new ResearchSession.Outcome(null, new SubtaskResult("main", List.of(), List.of("unavailable"), List.of(), SubtaskResult.Status.COMPLETED));
         };
-        var service = new ResearchRunService(store, runner, new ResearchProperties(), jdbc, json, completion(), new ResearchEvidenceStore(jdbc, json));
+        var service = new ResearchRunService(store, runner, new ResearchProperties(), jdbc, json, completion(), new ResearchEvidenceStore(jdbc, json), new KnowledgeAccessService(jdbc));
         try {
             var request = new ResearchRunService.CreateRequest(conversation, "same", "compare", ResearchBrief.OutputType.REPORT, List.of(), List.of(kb), List.of());
             var created = service.create(request);
@@ -293,7 +295,7 @@ class ResearchRunPostgresIT {
 
     @Test
     void servicePersistsModelFailureAndRejectsForeignConversationOrScope() throws Exception {
-        var service = new ResearchRunService(store, session -> { throw new IllegalStateException("provider failed"); }, new ResearchProperties(), jdbc, json, completion(), new ResearchEvidenceStore(jdbc, json));
+        var service = new ResearchRunService(store, session -> { throw new IllegalStateException("provider failed"); }, new ResearchProperties(), jdbc, json, completion(), new ResearchEvidenceStore(jdbc, json), new KnowledgeAccessService(jdbc));
         try {
             var created = service.create(new ResearchRunService.CreateRequest(conversation, "failed", "compare", ResearchBrief.OutputType.REPORT, List.of(), List.of(kb), List.of()));
             await(() -> store.get(created.id(), owner).status().terminal());
@@ -390,7 +392,7 @@ class ResearchRunPostgresIT {
     }
 
     private ResearchRunService service(ResearchRunner runner, ResearchProperties properties) {
-        return new ResearchRunService(store, runner, properties, jdbc, json, completion(), new ResearchEvidenceStore(jdbc, json));
+        return new ResearchRunService(store, runner, properties, jdbc, json, completion(), new ResearchEvidenceStore(jdbc, json), new KnowledgeAccessService(jdbc));
     }
     private ResearchRunService.CreateRequest request(String id) {
         return new ResearchRunService.CreateRequest(conversation, id, "compare", ResearchBrief.OutputType.REPORT, List.of(), List.of(kb), List.of());
@@ -411,6 +413,39 @@ class ResearchRunPostgresIT {
     private void contiguous(String id) {
         var events = store.events(id, owner, 0, 500);
         for (int i = 0; i < events.size(); i++) assertEquals(i + 1, events.get(i).sequence());
+    }
+
+    @Test
+    void creationRejectsKnowledgeBasesTheOwnerCannotRead() throws Exception {
+        String foreignKb = "kb-foreign-" + UUID.randomUUID().toString().substring(0, 8);
+        jdbc.update("INSERT INTO t_knowledge_base (id, name, embedding_model, collection_name, created_by, owner_user_id, visibility) VALUES (?, 'foreign', 'fixture', ?, 'someone', 'someone', 'PRIVATE')", foreignKb, foreignKb);
+        var service = service(session -> gapOnly(), new ResearchProperties());
+        try {
+            var denied = assertThrows(ClientException.class, () -> service.create(new ResearchRunService.CreateRequest(conversation, "foreign-kb", "compare",
+                    ResearchBrief.OutputType.REPORT, List.of(), List.of(foreignKb), List.of())));
+            assertEquals("研究知识库不可用", denied.getMessage(), "不可读与不存在同一提示");
+            jdbc.update("UPDATE t_knowledge_base SET visibility = 'PUBLIC' WHERE id = ?", foreignKb);
+            var created = service.create(new ResearchRunService.CreateRequest(conversation, "public-kb", "compare",
+                    ResearchBrief.OutputType.REPORT, List.of(), List.of(foreignKb), List.of()));
+            await(() -> store.get(created.id(), owner).status().terminal());
+        } finally { service.close(); }
+    }
+
+    @Test
+    void revokedAccessFailsTheRunAtItsNextClaimWithoutCallingTheModel() throws Exception {
+        var run = run();
+        jdbc.update("UPDATE t_knowledge_base SET owner_user_id = NULL WHERE id = ?", kb);
+        var calls = new AtomicInteger();
+        var service = service(session -> {
+            if (session.claim.run().id().equals(run.id())) calls.incrementAndGet();
+            return gapOnly();
+        }, new ResearchProperties());
+        try {
+            pollUntilTerminal(service, run.id(), owner);
+            assertEquals(Status.FAILED, store.get(run.id(), owner).status());
+            assertEquals("KB_ACCESS_REVOKED", store.get(run.id(), owner).errorSummary());
+            assertEquals(0, calls.get());
+        } finally { service.close(); }
     }
 
     @Test
@@ -634,6 +669,8 @@ class ResearchRunPostgresIT {
         String userId = String.valueOf(Math.abs(UUID.randomUUID().getMostSignificantBits()) % 1_000_000_000_000L);
         jdbc.update("INSERT INTO t_user (id, username, password, role) VALUES (?, ?, 'x', 'user')", userId, "u" + userId);
         jdbc.update("INSERT INTO t_conversation (id, conversation_id, user_id, title) VALUES (?, ?, ?, 'fixture')", "c" + userId, "c" + userId, userId);
+        // 该用户不是夹具库的所有者；库公开后领取时的权限重验才会放行
+        jdbc.update("UPDATE t_knowledge_base SET visibility = 'PUBLIC' WHERE id = ?", kb);
         var seen = new java.util.concurrent.atomic.AtomicReference<com.nageoffer.ai.ragent.framework.context.LoginUser>();
         var b = service(session -> { if (session.claim.owner().equals(userId)) seen.set(UserContext.get()); return gapOnly(); }, new ResearchProperties());
         try {

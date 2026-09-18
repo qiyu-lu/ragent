@@ -137,15 +137,19 @@ public final class ResearchExecutorCommand {
         var searchProperties = new SearchChannelProperties();
         searchProperties.getChannels().setTimeoutMs(properties.getToolTimeoutSeconds() * 1000L);
         var vector = new VectorSearchChannel(new PgVectorRetrieverService(corpusJdbc, embedding), searchProperties, retrieval);
+        // 评测进程没有用户表：任务所有者按普通用户对待，仍受语料库可见性约束（导入的公开语料为 PUBLIC）
+        var access = new com.nageoffer.ai.ragent.knowledge.service.KnowledgeAccessService(corpusJdbc) {
+            @Override public Subject ofUser(String userId) { return new Subject(userId, "user"); }
+        };
         var engine = new MultiChannelRetrievalEngine(List.of(vector), List.of(),
-                new RetrievalScopeResolver(searchProperties, new KbCollectionProvider(bases), new com.nageoffer.ai.ragent.knowledge.service.KnowledgeAccessService(corpusJdbc)), retrieval, searchProperties);
+                new RetrievalScopeResolver(searchProperties, new KbCollectionProvider(bases), access), retrieval, searchProperties);
         var search = new KnowledgeSearchService(engine, bases, docs, catalog, evidence, JSON);
         var reader = new SourceReader(evidence, catalog, new EvidenceSnapshotFactory(JSON));
         var modelFactory = new ResearchModelFactory(models, properties);
         var completion = new ResearchCompletionService(store, new ResearchArtifactGenerator(modelFactory, properties, evidence,
                 new PlanDraftValidator(), JSON, new HeuristicTokenCounterService(), ""), JSON);
         var agents = new ResearchAgentFactory(modelFactory, properties, search, reader, JSON, new HeuristicTokenCounterService(), false);
-        var service = new ResearchRunService(store, agents, properties, runJdbc, JSON, completion, evidence);
+        var service = new ResearchRunService(store, agents, properties, runJdbc, JSON, completion, evidence, access);
         var stopped = new CountDownLatch(1);
         // SIGTERM 触发 JVM 关闭钩子：与 Spring 的 @PreDestroy 走同一个 close()，即步边界交还。
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {

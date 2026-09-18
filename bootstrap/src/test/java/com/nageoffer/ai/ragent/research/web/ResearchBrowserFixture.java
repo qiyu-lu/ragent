@@ -20,6 +20,7 @@ package com.nageoffer.ai.ragent.research.web;
 import com.fasterxml.jackson.databind.*;
 import com.nageoffer.ai.ragent.framework.context.*;
 import com.nageoffer.ai.ragent.framework.web.*;
+import com.nageoffer.ai.ragent.knowledge.service.KnowledgeAccessService;
 import com.nageoffer.ai.ragent.infra.config.AIModelProperties;
 import com.nageoffer.ai.ragent.infra.token.HeuristicTokenCounterService;
 import com.nageoffer.ai.ragent.research.config.ResearchProperties;
@@ -116,7 +117,7 @@ public class ResearchBrowserFixture {
     @Bean ResearchAgentFactory runner(ResearchModelFactory models, ResearchProperties limits, KnowledgeSearchService search, SourceReader reader) { return new ResearchAgentFactory(models, limits, search, reader, JSON, new HeuristicTokenCounterService()); }
     @Bean ResearchArtifactGenerator generator(ResearchModelFactory models, ResearchProperties limits, ResearchEvidenceStore evidence) { return new ResearchArtifactGenerator(models, limits, evidence, new PlanDraftValidator(), JSON, new HeuristicTokenCounterService()); }
     @Bean ResearchCompletionService completion(ResearchRunStore store, ResearchArtifactGenerator generator) { return new ResearchCompletionService(store, generator, JSON); }
-    @Bean ResearchRunService service(ResearchRunStore store, ResearchAgentFactory runner, ResearchProperties limits, JdbcTemplate jdbc, ResearchCompletionService completion, ResearchEvidenceStore evidence) { return new ResearchRunService(store, runner, limits, jdbc, JSON, completion, evidence); }
+    @Bean ResearchRunService service(ResearchRunStore store, ResearchAgentFactory runner, ResearchProperties limits, JdbcTemplate jdbc, ResearchCompletionService completion, ResearchEvidenceStore evidence) { return new ResearchRunService(store, runner, limits, jdbc, JSON, completion, evidence, new KnowledgeAccessService(jdbc)); }
     @Bean ResearchEventStreamService streams(ResearchRunStore store) { return new ResearchEventStreamService(store); }
     @Bean ResearchRunController controller(ResearchRunService service, ResearchEventStreamService streams) { return new ResearchRunController(service, streams); }
     @Bean FilterRegistrationBean<OncePerRequestFilter> userFilter() {
@@ -169,7 +170,8 @@ public class ResearchBrowserFixture {
 
     @RestController static class FixtureController {
         final JdbcTemplate jdbc;
-        FixtureController(JdbcTemplate jdbc) { this.jdbc = jdbc; jdbc.update("INSERT INTO t_knowledge_base(id,name,embedding_model,collection_name,created_by) VALUES ('fixture-kb','双文档测试资料','fixture','fixture','fixture')");
+        FixtureController(JdbcTemplate jdbc) { this.jdbc = jdbc; jdbc.update("INSERT INTO t_user(id,username,password,role) VALUES (?,'browser fixture','fixture','user')", OWNER);
+            jdbc.update("INSERT INTO t_knowledge_base(id,name,embedding_model,collection_name,created_by,visibility) VALUES ('fixture-kb','双文档测试资料','fixture','fixture','fixture','PUBLIC')");
             for (String doc : List.of("doc-a", "doc-b")) jdbc.update("INSERT INTO t_knowledge_document(id,kb_id,doc_name,document_key,file_url,file_type,created_by) VALUES (?,'fixture-kb',?,?,?,'md','fixture')", doc, doc + ".md", doc, "fixture:" + doc);
         }
         @GetMapping("/user/me") Object user() { return Results.success(Map.of("userId", OWNER, "username", "browser fixture", "role", "user")); }

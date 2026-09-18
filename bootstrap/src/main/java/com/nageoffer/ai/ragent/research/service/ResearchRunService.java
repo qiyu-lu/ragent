@@ -21,6 +21,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nageoffer.ai.ragent.framework.context.LoginUser;
 import com.nageoffer.ai.ragent.framework.context.UserContext;
 import com.nageoffer.ai.ragent.framework.exception.ClientException;
+import com.nageoffer.ai.ragent.knowledge.enums.KbPermission;
+import com.nageoffer.ai.ragent.knowledge.service.KnowledgeAccessService;
 import com.nageoffer.ai.ragent.research.config.ResearchProperties;
 import com.nageoffer.ai.ragent.research.model.ResearchBrief;
 import com.nageoffer.ai.ragent.research.model.ResearchEvent;
@@ -81,6 +83,7 @@ public class ResearchRunService {
     private final ResearchEvidenceStore evidenceStore;
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
+    private final KnowledgeAccessService accessService;
     private final ThreadPoolExecutor tasks;
     private final ScheduledExecutorService leases;
     private final Map<String, Execution> executions = new ConcurrentHashMap<>();
@@ -89,8 +92,10 @@ public class ResearchRunService {
     private volatile boolean accepting = true;
 
     public ResearchRunService(ResearchRunStore store, ResearchRunner runner, ResearchProperties properties,
-                               JdbcTemplate jdbc, ObjectMapper json, ResearchCompletionService completion, ResearchEvidenceStore evidenceStore) {
+                               JdbcTemplate jdbc, ObjectMapper json, ResearchCompletionService completion, ResearchEvidenceStore evidenceStore,
+                               KnowledgeAccessService accessService) {
         properties.validate();
+        this.accessService = accessService;
         this.store = store;
         this.runner = runner;
         this.properties = properties;
@@ -236,6 +241,12 @@ public class ResearchRunService {
                 if (claim == null) return;
                 execution.claim = claim;
             }
+            // 每次领取（含接管与恢复）都按所有者当前的权限重验范围：授权撤销后不再用旧范围继续检索、成文
+            if (!accessService.accessibleKbIds(accessService.ofUser(owner), KbPermission.READ)
+                    .containsAll(claim.run().brief().allowedKbIds())) {
+                store.finish(claim, Status.FAILED, Map.of(), claim.run().usage(), "KB_ACCESS_REVOKED");
+                return;
+            }
             session = new ResearchSession(store, claim, new ResearchBudget(properties, claim.run().usage()), execution.control);
             resume(session);
             try {
@@ -288,11 +299,13 @@ public class ResearchRunService {
 
     private void validateScope(String owner, String conversation, ResearchBrief brief) {
         if (conversation != null && !conversation.isBlank()) validateConversation(owner, conversation);
+        // 不可读与不存在同一提示，不泄露库是否存在
+        var subject = accessService.current();
         for (String kb : brief.allowedKbIds()) {
-            if (!Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM t_knowledge_base WHERE id = ? AND deleted = 0 AND collection_name IS NOT NULL AND collection_name <> '')",
+            if (!accessService.can(subject, kb, KbPermission.READ)
+                    || !Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM t_knowledge_base WHERE id = ? AND deleted = 0 AND collection_name IS NOT NULL AND collection_name <> '')",
                     Boolean.class, kb))) throw new ClientException("研究知识库不可用");
         }
-        // 当前知识库是全局共享；归属保护针对研究运行与会话，不虚构文档租户 ACL。
         for (String doc : brief.allowedDocIds()) {
             List<String> bases = jdbc.query("SELECT kb_id FROM t_knowledge_document WHERE id = ? AND deleted = 0 AND enabled = 1",
                     (rs, row) -> rs.getString(1), doc);

@@ -41,7 +41,7 @@ def main():
                             "category": category, "answer_f1": score["answer_f1"], "read_evidence_recall": score["read_evidence_recall"],
                             "last_model_event": ended[-1] if ended else None,
                             "tool_failures": sum(e["type"] == "TOOL_FAILED" for e in trace),
-                            "context_trims": sum(e["type"] == "CONTEXT_TRIMMED" for e in trace),
+                            "context_trims": sum(e["type"] in ("CONTEXT_TRIMMED", "CONTEXT_COMPACTED") for e in trace),
                             "workers_created": p["usage"].get("workersCreated", 0)})
     result = {"run_directory": str(args.run_dir), "recorded_tasks": len(diagnostics),
               "categories": {k: dict(v) for k, v in sorted(counts.items())}, "tasks": diagnostics,

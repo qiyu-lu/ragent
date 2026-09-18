@@ -398,16 +398,113 @@ class ResearchNativeToolsTest {
     }
 
     @Test
-    void contextTrimmingRetainsGoalAndWholeToolResultPairs() {
+    void compactionStubsOldestResultsOnceAndKeepsThePrefixStable() throws Exception {
         limits.setMaxInputTokens(1024);
         var bounded = new BoundedResearchModel(models.create(), session, limits, new Semaphore(1), json, new HeuristicTokenCounterService());
         var system = Msg.builder().role(MsgRole.SYSTEM).textContent("rules").build();
         var goal = Msg.builder().role(MsgRole.USER).textContent("goal").build();
         var old = Msg.builder().role(MsgRole.ASSISTANT).content(ToolUseBlock.builder().id("old").name("search_knowledge").input(Map.of("query", "old")).build()).build();
-        var oldResult = Msg.builder().role(MsgRole.TOOL).content(ToolResultBlock.of("old", "search_knowledge", TextBlock.builder().text("x ".repeat(8000)).build())).build();
+        var oldResult = Msg.builder().role(MsgRole.TOOL).content(ToolResultBlock.of("old", "search_knowledge", TextBlock.builder()
+                .text("[{\"evidenceId\":\"ev-old\",\"text\":\"" + "x ".repeat(8000) + "\"}]").build())).build();
         var latest = Msg.builder().role(MsgRole.ASSISTANT).content(ToolUseBlock.builder().id("latest").name("read_source").input(Map.of("evidence_id", "ev-one")).build()).build();
         var latestResult = Msg.builder().role(MsgRole.TOOL).content(ToolResultBlock.of("latest", "read_source", TextBlock.builder().text("7 ms").build())).build();
-        assertEquals(List.of(system, goal, latest, latestResult), bounded.trim(List.of(system, goal, old, oldResult, latest, latestResult), List.of()));
+        var compacted = bounded.compact(List.of(system, goal, old, oldResult, latest, latestResult), List.of(), null);
+        assertEquals(List.of(system, goal, old), compacted.subList(0, 3));
+        assertEquals(List.of(latest, latestResult), compacted.subList(4, 6));
+        var stub = compacted.get(3).getFirstContentBlock(ToolResultBlock.class);
+        assertEquals("old", stub.getId(), "The stub must keep the tool_call pairing");
+        String stubText = ((TextBlock) stub.getOutput().get(0)).getText();
+        assertTrue(stubText.contains("ev-old") && stubText.contains("read_source"), stubText);
+        var next = Msg.builder().role(MsgRole.ASSISTANT).content(ToolUseBlock.builder().id("next").name("search_knowledge").input(Map.of("query", "next")).build()).build();
+        var nextResult = Msg.builder().role(MsgRole.TOOL).content(ToolResultBlock.of("next", "search_knowledge", TextBlock.builder().text("none").build())).build();
+        var reminder = Msg.builder().role(MsgRole.USER).textContent("Server budget reminder: later").build();
+        var later = bounded.compact(List.of(system, goal, old, oldResult, latest, latestResult, next, nextResult), List.of(), reminder);
+        assertEquals(json.writeValueAsString(compacted), json.writeValueAsString(later.subList(0, 6)), "Later calls must reuse the compacted prefix");
+        assertEquals(reminder, later.get(later.size() - 1));
+        verify(store, times(1)).event(any(), eq("CONTEXT_COMPACTED"), anyString(), anyMap(), anyMap());
+    }
+
+    @Test
+    void compactionDropsWholeOldestRoundsWhenStubsAreNotEnough() {
+        limits.setMaxInputTokens(1024);
+        var bounded = new BoundedResearchModel(models.create(), session, limits, new Semaphore(1), json, new HeuristicTokenCounterService());
+        List<Msg> messages = new java.util.ArrayList<>(List.of(Msg.builder().role(MsgRole.SYSTEM).textContent("rules").build(),
+                Msg.builder().role(MsgRole.USER).textContent("goal").build()));
+        for (int i = 0; i < 6; i++) {
+            messages.add(Msg.builder().role(MsgRole.ASSISTANT).content(ToolUseBlock.builder().id("call-" + i).name("search_knowledge")
+                    .input(Map.of("query", "q" + i + " " + "long query ".repeat(60))).build()).build());
+            messages.add(Msg.builder().role(MsgRole.TOOL).content(ToolResultBlock.of("call-" + i, "search_knowledge", TextBlock.builder().text("none").build())).build());
+        }
+        var compacted = bounded.compact(messages, List.of(), null);
+        assertTrue(compacted.size() < messages.size());
+        assertEquals(messages.subList(0, 2), compacted.subList(0, 2));
+        assertEquals(messages.subList(messages.size() - 2, messages.size()), compacted.subList(compacted.size() - 2, compacted.size()));
+        for (int i = 2; i < compacted.size(); i += 2) {
+            String call = compacted.get(i).getFirstContentBlock(ToolUseBlock.class).getId();
+            assertEquals(call, compacted.get(i + 1).getFirstContentBlock(ToolResultBlock.class).getId(), "Whole rounds only");
+        }
+        messages.set(messages.size() - 2, Msg.builder().role(MsgRole.ASSISTANT).content(ToolUseBlock.builder().id("call-5").name("search_knowledge")
+                .input(Map.of("query", "huge ".repeat(4000))).build()).build());
+        var fresh = new BoundedResearchModel(models.create(), session, limits, new Semaphore(1), json, new HeuristicTokenCounterService());
+        var error = assertThrows(ResearchBudget.Exhausted.class, () -> fresh.compact(messages, List.of(), null));
+        assertEquals("MODEL_CONTEXT_BUDGET", error.getMessage());
+    }
+
+    @Test
+    void systemPrefixIsByteStableAndTheReminderOnlyTrailsEachRequest() throws Exception {
+        tool("search-1", "search_knowledge", Map.of("query", "X", "limit", 1));
+        tool("read-1", "read_source", Map.of("evidence_id", "ev-one"));
+        tool("search-2", "search_knowledge", Map.of("query", "Mercury parameter", "limit", 1));
+        tool("read-2", "read_source", Map.of("evidence_id", "ev-two"));
+        tool("finish", "finish_research", Map.of("findings", List.of(Map.of("statement", "Parameter is 7 ms.", "evidenceIds", List.of("ev-one", "ev-two"))), "gaps", List.of(), "conflicts", List.of()));
+        assertNotNull(factory().run(session).result());
+        List<JsonNode> bodies = new java.util.ArrayList<>();
+        for (int i = 0; i < 5; i++) bodies.add(json.readTree(server.takeRequest(5, TimeUnit.SECONDS).getBody().readUtf8()));
+        for (int i = 0; i < bodies.size(); i++) {
+            var messages = bodies.get(i).path("messages");
+            assertEquals("system", messages.get(0).path("role").asText());
+            assertFalse(messages.get(0).toString().contains("Server budget reminder"), "Volatile state must stay out of the system message");
+            assertEquals(bodies.get(0).path("messages").get(0).toString(), messages.get(0).toString());
+            assertEquals(bodies.get(0).path("tools").toString(), bodies.get(i).path("tools").toString());
+            var last = messages.get(messages.size() - 1);
+            assertEquals("user", last.path("role").asText());
+            assertTrue(last.path("content").asText().startsWith("Server budget reminder:"));
+            assertEquals(1, bodies.get(i).toString().split("Server budget reminder", -1).length - 1, "Old reminders must not enter memory");
+            if (i == 0) continue;
+            var previous = bodies.get(i - 1).path("messages");
+            for (int m = 0; m < previous.size() - 1; m++) {
+                assertEquals(previous.get(m).toString(), messages.get(m).toString(), "Call " + i + " must extend call " + (i - 1) + " byte for byte");
+            }
+        }
+    }
+
+    @Test
+    void explicitCacheMarksSystemAndNewestHistoryAsContentBlocksAndRecordsWrites() throws Exception {
+        limits.setExplicitPromptCache(true);
+        cached(Map.of("role", "assistant", "tool_calls", List.of(Map.of("index", 0, "id", "search-1", "type", "function",
+                "function", Map.of("name", "search_knowledge", "arguments", "{\"query\":\"X\",\"limit\":1}")))), 0, 1949);
+        cached(Map.of("role", "assistant", "tool_calls", List.of(Map.of("index", 0, "id", "read-1", "type", "function",
+                "function", Map.of("name", "read_source", "arguments", "{\"evidence_id\":\"ev-one\"}")))), 1949, 323);
+        tool("finish", "finish_research", Map.of("findings", List.of(Map.of("statement", "Parameter is 7 ms.", "evidenceIds", List.of("ev-one"))), "gaps", List.of(), "conflicts", List.of()));
+        assertNotNull(factory().run(session).result());
+        for (int i = 0; i < 3; i++) {
+            var messages = json.readTree(server.takeRequest(5, TimeUnit.SECONDS).getBody().readUtf8()).path("messages");
+            int newest = messages.size() - 2;
+            for (int m = 0; m < messages.size(); m++) {
+                var message = messages.get(m);
+                assertFalse(message.has("cache_control"), "Bailian ignores message-level markers");
+                boolean marked = message.path("content").isArray() && message.path("content").get(0).has("cache_control");
+                assertEquals(m == 0 || m == newest, marked, "call " + i + " message " + m);
+                if (marked) assertEquals("ephemeral", message.path("content").get(0).path("cache_control").path("type").asText());
+            }
+            assertTrue(messages.get(messages.size() - 1).path("content").isTextual(), "The volatile reminder is never cached");
+        }
+        var calls = (List<Map<String, Object>>) session.budget.snapshot().get("calls");
+        assertEquals(1949, calls.get(0).get("cacheCreationTokens"));
+        assertEquals("ephemeral", calls.get(0).get("cacheType"));
+        assertEquals(323, calls.get(1).get("cacheCreationTokens"));
+        assertEquals(1949, calls.get(1).get("cachedTokens"));
+        assertFalse(calls.get(2).containsKey("cacheCreationTokens"));
     }
 
     @Test
@@ -519,6 +616,14 @@ class ResearchNativeToolsTest {
 
     private void tool(String id, String name, Map<String, Object> arguments) throws Exception {
         response(Map.of("role", "assistant", "tool_calls", List.of(Map.of("index", 0, "id", id, "type", "function", "function", Map.of("name", name, "arguments", json.writeValueAsString(arguments))))), "tool_calls");
+    }
+
+    private void cached(Map<String, Object> delta, int cachedTokens, int createdTokens) throws Exception {
+        String body = json.writeValueAsString(Map.of("id", "provider-" + responses.incrementAndGet(), "object", "chat.completion.chunk", "created", 1,
+                "model", "fixture-native", "choices", List.of(Map.of("index", 0, "delta", delta, "finish_reason", "tool_calls")),
+                "usage", Map.of("prompt_tokens", 2436, "completion_tokens", 20, "total_tokens", 2456, "prompt_tokens_details",
+                        Map.of("cached_tokens", cachedTokens, "cache_creation_input_tokens", createdTokens, "cache_type", "ephemeral"))));
+        server.enqueue(new MockResponse().setHeader("Content-Type", "text/event-stream").setBody("data: " + body + "\n\ndata: [DONE]\n\n"));
     }
 
     private void response(Map<String, Object> delta, String finish) throws Exception {

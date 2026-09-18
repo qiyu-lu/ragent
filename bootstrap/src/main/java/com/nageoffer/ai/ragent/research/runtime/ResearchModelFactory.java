@@ -24,6 +24,7 @@ import com.nageoffer.ai.ragent.research.config.ResearchProperties;
 import com.nageoffer.ai.ragent.research.model.ResearchModelRole;
 import io.agentscope.core.model.GenerateOptions;
 import io.agentscope.core.model.Model;
+import io.agentscope.core.model.transport.HttpTransportFactory;
 import io.agentscope.extensions.model.openai.OpenAIChatModel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -87,12 +88,16 @@ public class ResearchModelFactory {
                 || url.getHost() == null || url.getUserInfo() != null || url.getQuery() != null) {
             throw new IllegalStateException("研究模型端点无效");
         }
-        return OpenAIChatModel.builder().apiKey(provider.getApiKey()).modelName(candidate.getModel())
+        var builder = OpenAIChatModel.builder().apiKey(provider.getApiKey()).modelName(candidate.getModel())
                 .baseUrl(url.getScheme() + "://" + url.getRawAuthority()).endpointPath(url.getRawPath())
                 // SDK 流取消会关闭 HTTP；关闭 thinking，usage 独立记录供应商返回值。
                 .stream(true).generateOptions(GenerateOptions.builder()
                         .executionConfig(io.agentscope.core.model.ExecutionConfig.builder().maxAttempts(1).build()).temperature(0.0)
                         .maxTokens(research.getMaxOutputTokens()).parallelToolCalls(false)
-                        .additionalBodyParams(Map.of("enable_thinking", thinking)).build()).build();
+                        .additionalBodyParams(Map.of("enable_thinking", thinking)).build());
+        if (!research.isExplicitPromptCache()) return builder.build();
+        // 每个模型实例一个适配器，缓存写入量才能对应到本 Agent 的调用；底层连接池仍是 SDK 共享的默认传输。
+        var cache = new PromptCacheTransport(HttpTransportFactory.getDefault());
+        return new PromptCacheTransport.TrackedModel(builder.formatter(new PromptCacheFormatter()).httpTransport(cache).build(), cache);
     }
 }

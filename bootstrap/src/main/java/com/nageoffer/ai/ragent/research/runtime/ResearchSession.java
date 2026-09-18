@@ -63,7 +63,10 @@ public class ResearchSession {
         var docs = delivered.values().stream().map(EvidenceRecord::docId).distinct().sorted().toList();
         var unreadDocs = latestCandidates.stream().map(candidateDocuments::get).filter(Objects::nonNull)
                 .filter(id -> !docs.contains(id)).distinct().sorted().toList();
-        return Map.of("directlyReadDocumentIds", docs, "latestCandidateDocumentsNotRead", unreadDocs);
+        Map<String, Object> coverage = new LinkedHashMap<>();
+        coverage.put("directlyReadDocumentIds", docs);
+        coverage.put("latestCandidateDocumentsNotRead", unreadDocs);
+        return coverage;
     }
     private final Map<String, SubtaskResult> results = new LinkedHashMap<>();
     private final Set<String> acceptedIds = new LinkedHashSet<>();

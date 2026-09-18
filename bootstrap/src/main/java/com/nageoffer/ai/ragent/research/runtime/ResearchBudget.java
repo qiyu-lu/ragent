@@ -102,8 +102,16 @@ public class ResearchBudget {
         calls.add(call);
     }
 
+    /** 显式缓存写入量按创建价计费，台账必须单独记录；缺失的值不写，不以 0 冒充。 */
+    public record CallMetrics(Integer cacheCreationTokens, String cacheType) { }
+
     public synchronized void finishCall(String callId, String status, String requestId,
                                         Integer inputTokens, Integer outputTokens, Integer cachedTokens) {
+        finishCall(callId, status, requestId, inputTokens, outputTokens, cachedTokens, new CallMetrics(null, null));
+    }
+
+    public synchronized void finishCall(String callId, String status, String requestId, Integer inputTokens,
+                                        Integer outputTokens, Integer cachedTokens, CallMetrics metrics) {
         Map<String, Object> call = calls.stream().filter(c -> callId.equals(c.get("callId")))
                 .findFirst().orElseThrow();
         call.put("status", status);
@@ -113,6 +121,8 @@ public class ResearchBudget {
             call.put("inputTokens", inputTokens);
             call.put("outputTokens", outputTokens);
             call.put("cachedTokens", cachedTokens);
+            if (metrics.cacheCreationTokens() != null) call.put("cacheCreationTokens", metrics.cacheCreationTokens());
+            if (metrics.cacheType() != null) call.put("cacheType", metrics.cacheType());
         }
     }
 

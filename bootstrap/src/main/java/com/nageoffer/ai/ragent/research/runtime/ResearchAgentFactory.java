@@ -116,9 +116,11 @@ public class ResearchAgentFactory implements ResearchRunner, AutoCloseable {
                     "model", model.getModelName(), "role", role.key()));
             Map<String, Object> saved = new java.util.HashMap<>(session.claim.run().state());
             saved.remove("requestHash");
+            // 按键排序：同一任务在任何进程里重建的首条消息逐字节一致，缓存前缀才能跨实例、跨续跑复用。
+            var stable = json.writer().with(com.fasterxml.jackson.databind.SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
             String request = session.main()
-                    ? json.writeValueAsString(Map.of("brief", session.claim.run().brief(), "savedResearchState", saved))
-                    : json.writeValueAsString(Map.of("task", session.task, "outputType", session.claim.run().brief().outputType(),
+                    ? stable.writeValueAsString(Map.of("brief", session.claim.run().brief(), "savedResearchState", saved))
+                    : stable.writeValueAsString(Map.of("task", session.task, "outputType", session.claim.run().brief().outputType(),
                             "constraints", session.claim.run().brief().constraints(),
                             "allowedKbIds", session.claim.run().brief().allowedKbIds()));
             var message = Msg.builder().role(MsgRole.USER).textContent(request).build();

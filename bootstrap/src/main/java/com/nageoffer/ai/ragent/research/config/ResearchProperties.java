@@ -45,6 +45,8 @@ public class ResearchProperties {
     private int toolTimeoutSeconds = 30;
     private int maxInputTokens = 28000;
     private int maxOutputTokens = 4096;
+    /** 百炼显式上下文缓存：研究调用在稳定前缀末端打标记；关闭时只能依赖不保证命中的隐式缓存。 */
+    private boolean explicitPromptCache;
 
     /** 空角色配置沿用旧单模型设置；注册项错误由工厂明确拒绝。 */
     public String modelId(ResearchModelRole role) {

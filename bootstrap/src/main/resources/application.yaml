@@ -202,6 +202,7 @@ research:
   reserved-finalization-model-calls: 2
   max-input-tokens: 28000
   max-output-tokens: 4096
+  explicit-prompt-cache: true
 
 ai:
   providers:

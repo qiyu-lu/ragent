@@ -93,7 +93,9 @@ class ResearchWorkerNativeTest {
     private MockResponse respond(JsonNode body) throws Exception {
         requests.add(body);
         String task = "main";
-        for (JsonNode message : body.path("messages")) if (message.path("role").asText().equals("user")) {
+        // 首条 user 是任务 JSON；末尾 user 是服务端临时提醒，不参与路由。
+        for (JsonNode message : body.path("messages")) if (message.path("role").asText().equals("user")
+                && message.path("content").asText().startsWith("{")) {
             JsonNode value = json.readTree(message.path("content").asText());
             if (value.has("task")) task = value.path("task").path("goal").asText();
         }

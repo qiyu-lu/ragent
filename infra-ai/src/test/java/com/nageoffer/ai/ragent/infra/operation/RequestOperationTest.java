@@ -48,4 +48,16 @@ class RequestOperationTest {
             assertNull(RequestOperation.current());
         } finally { executor.shutdownNow(); }
     }
+    @Test void jitteredDelayKeepsAFloorGrowsExponentiallyAndStopsAtTheCap() {
+        assertEquals(150, RequestOperation.jitteredDelay(1, 300, 2000, () -> 0.0));
+        assertEquals(299, RequestOperation.jitteredDelay(1, 300, 2000, () -> 0.999));
+        assertEquals(300, RequestOperation.jitteredDelay(2, 300, 2000, () -> 0.0));
+        assertEquals(1000, RequestOperation.jitteredDelay(40, 300, 2000, () -> 0.0));
+        assertTrue(RequestOperation.jitteredDelay(40, 300, 2000, () -> 0.999) < 2000);
+        var delays = new HashSet<Long>();
+        var random = new Random(7);
+        for (int i = 0; i < 20; i++) delays.add(RequestOperation.jitteredDelay(1, 300, 2000, random::nextDouble));
+        assertTrue(delays.size() > 10, "concurrent retries must not share one delay");
+        assertThrows(IllegalArgumentException.class, () -> RequestOperation.jitteredDelay(0, 300, 2000, () -> 0.0));
+    }
 }

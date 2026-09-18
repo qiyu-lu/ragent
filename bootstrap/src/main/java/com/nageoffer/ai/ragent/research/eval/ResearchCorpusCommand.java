@@ -177,7 +177,9 @@ public class ResearchCorpusCommand {
                                         append(trace, Map.of("batch", batchNumber, "attempt", attempt, "status", "failed", "error", failure.toString(),
                                                 "source_document_ids", batch.stream().map(ResearchCorpusImporter.Document::sourceDocumentId).toList()));
                                         if (attempt == job.maxRetries() || failure instanceof IllegalArgumentException) throw failure;
-                                        Thread.sleep(Math.min(5000, 500L << attempt));
+                                        // 并行批次常因同一次上游抖动一起失败，抖动让它们错开重试。
+                                        Thread.sleep(com.nageoffer.ai.ragent.infra.operation.RequestOperation.jitteredDelay(
+                                                attempt + 1, 500, 5000, ThreadLocalRandom.current()::nextDouble));
                                     }
                                 }
                             } finally { UserContext.clear(); phase.remove(); }

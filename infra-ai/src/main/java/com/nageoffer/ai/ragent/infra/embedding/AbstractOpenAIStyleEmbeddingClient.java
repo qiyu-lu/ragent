@@ -136,8 +136,9 @@ public abstract class AbstractOpenAIStyleEmbeddingClient implements EmbeddingCli
                 return result;
             } catch (RequestOperation.Failure error) {
                 if (!error.retryable || attempt >= 2 || operation.remainingMillis() < 1500) throw error;
-                operation.record("embedding.retry", "SCHEDULED", 0, Map.of("attempt", attempt + 1, "code", error.code));
-                operation.backoff(300);
+                long delay = RequestOperation.jitteredDelay(attempt, 300, 2000, java.util.concurrent.ThreadLocalRandom.current()::nextDouble);
+                operation.record("embedding.retry", "SCHEDULED", 0, Map.of("attempt", attempt + 1, "code", error.code, "delayMs", delay));
+                operation.backoff(delay);
             }
         }
     }

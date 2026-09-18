@@ -126,6 +126,16 @@ public final class RequestOperation implements AutoCloseable {
         remainingMillis();
         if (cache.size() < 128) cache.putIfAbsent(key, value.stream().map(List::copyOf).toList());
     }
+    /**
+     * Exponential backoff with equal jitter (AWS Builders' Library, "Timeouts, retries, and backoff with jitter"):
+     * half of the ceiling is fixed so a retry never fires immediately, half is random so callers that failed
+     * together do not retry together. {@code retry} counts from 1; {@code random} returns [0, 1).
+     */
+    public static long jitteredDelay(int retry, long baseMillis, long capMillis, java.util.function.DoubleSupplier random) {
+        if (retry < 1 || baseMillis < 1 || capMillis < baseMillis) throw new IllegalArgumentException("invalid backoff");
+        long ceiling = Math.min(capMillis, baseMillis << Math.min(retry - 1, 30));
+        return ceiling / 2 + (long) (random.getAsDouble() * (ceiling - ceiling / 2));
+    }
     public void backoff(long millis) {
         long until = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(millis);
         while (System.nanoTime() < until) {

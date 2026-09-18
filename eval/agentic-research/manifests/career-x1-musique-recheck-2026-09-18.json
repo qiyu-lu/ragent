@@ -1,0 +1,36 @@
+{
+  "experiment": "X1 MuSiQue C answer-quality recheck (career sprint W1 guardrail)",
+  "date": "2026-09-18",
+  "finished": "2026-09-18 22:43:14",
+  "upstream": "real Bailian qwen3.7-flash-2026-07-15 (all roles) + SiliconFlow Qwen3-Embedding-8B; not a simulated upstream",
+  "before": {"commit": "65c99c7", "tag": "career-v0-baseline"},
+  "after": {"commit": "73deab5", "explicitPromptCache": true},
+  "workload": {
+    "caseIds": "eval/agentic-research/manifests/career-x1-musique-recheck-case-ids.json",
+    "caseIdsSha256": "9796b7b503bfb2716d56f6be46e40c58f7df23d703c232d9c45c2acb9b2a9796",
+    "questions": "80 MuSiQue dev regression queries not used in X1 (45 answerable)",
+    "modes": ["C"],
+    "config": "eval/agentic-research/configs/career-x1.json",
+    "order": "after C (21:47) then before C (22:09); one run per arm, not interleaved; concurrency 2; corpus research_corpus_v1"
+  },
+  "derivation": "cache_report.py over both run directories; guardrails from summary.json; paired bootstrap of per-question answer F1 over the 45 answerable questions (seed 20260918, 10000 resamples); 'abstained' = answer text matching do not/does not/cannot/not found/unanswerable",
+  "arms": {
+    "before_C": {
+      "runDir": "local-data/agentic-research/runs/career_X1_mq80_before_C",
+      "cache": {"tasks": 80, "modelCalls": 907, "inputTokens": 6353794, "cachedTokens": 3200, "hitRatio": 0.0005, "billedToInputRatio": 0.9996, "billedInputPerTask": 79390, "callMs": {"p50": 2021, "p95": 5101}, "taskSeconds": {"p50": 48, "p95": 100}},
+      "guardrails": {"statuses": {"COMPLETED": 78, "FAILED": 1, "PARTIAL": 1}, "answerScored": 45, "answerF1": 0.4427, "answerEM": 0.2889, "evidenceF1": 0.5779, "answerabilityAccuracy": 0.6875, "mainCallsPerTask": 10.18, "abstainedOnAnswerable": 12}
+    },
+    "after_C": {
+      "runDir": "local-data/agentic-research/runs/career_X1_mq80_after_C",
+      "cache": {"tasks": 80, "modelCalls": 852, "inputTokens": 5719382, "cachedTokens": 4578678, "cacheWriteTokens": 591865, "hitRatio": 0.8006, "billedToInputRatio": 0.3055, "billedInputPerTask": 21838, "callMs": {"p50": 2069, "p95": 5684}, "firstTokenMs": {"p50": 729, "p95": 1481}, "taskSeconds": {"p50": 34, "p95": 56}},
+      "guardrails": {"statuses": {"COMPLETED": 80}, "answerScored": 45, "answerF1": 0.3522, "answerEM": 0.1556, "evidenceF1": 0.5879, "answerabilityAccuracy": 0.725, "mainCallsPerTask": 9.49, "abstainedOnAnswerable": 16}
+    }
+  },
+  "pairedAnswerF1": {"musique/C": {"n": 45, "meanDiff": -0.0905, "bootstrap95": [-0.2073, 0.0215], "up": 10, "down": 15, "emUp": 1, "emDown": 7}},
+  "observations": [
+    "Cache result reproduces on unseen questions: hit ratio 0.05% -> 80.1%, billed input per task 79,390 -> 21,838 (-72%).",
+    "Answer F1 0.443 -> 0.352 (paired mean -0.09, 95% CI [-0.207, +0.021] includes 0); the n=6 X1 signal of -0.24 shrank on 45 answerable questions but the direction is still negative.",
+    "Of 15 drops, 5 are questions before answered exactly and after abstained ('sources do not contain ...'); abstain-like answers on answerable questions 12 -> 16; main calls per task 10.18 -> 9.49. Others are format changes (100 vs 100th, 1642 vs December 13, 1642).",
+    "Answerability accuracy 0.688 -> 0.725 and evidence F1 0.578 -> 0.588 moved the other way; one run per arm, not interleaved."
+  ]
+}

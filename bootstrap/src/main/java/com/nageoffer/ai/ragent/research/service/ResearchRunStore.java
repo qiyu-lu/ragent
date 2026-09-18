@@ -256,24 +256,6 @@ public class ResearchRunStore {
                 rs.getTimestamp("create_time").toInstant()), id, owner, after, limit);
     }
 
-    /** 单 JVM 运行器重启时不恢复模型中间状态；保留已存证据、摘要和调用记录。 */
-    public void interruptOrphans() {
-        List<Map<String, Object>> lost = jdbc.queryForList(
-                "SELECT id, owner_user_id FROM t_research_run WHERE status IN ('QUEUED', 'RUNNING')");
-        for (Map<String, Object> row : lost) {
-            transactions.executeWithoutResult(tx -> {
-                ResearchRun run = lock((String) row.get("id"), (String) row.get("owner_user_id"));
-                if (run.status() != Status.QUEUED && run.status() != Status.RUNNING) return;
-                jdbc.update("""
-                        UPDATE t_research_run SET status = 'INTERRUPTED', epoch = epoch + 1, revision = revision + 1,
-                            lease_token = NULL, lease_until = NULL, error_summary = 'EXECUTOR_LOST',
-                            completed_at = CURRENT_TIMESTAMP, state = state || ?::jsonb, update_time = CURRENT_TIMESTAMP WHERE id = ?
-                        """, encode(closeSubtasks(run, "INTERRUPTED")), run.id());
-                appendLocked(run.id(), "main", "INTERRUPTED", "执行者已退出，可重新发起研究", Map.of());
-            });
-        }
-    }
-
     private Map<String, Object> closeSubtasks(ResearchRun run, String status) {
         Map<String, Object> closed = new java.util.LinkedHashMap<>();
         if (run.state().get("subtasks") instanceof Map<?, ?> tasks) tasks.forEach((id, value) -> {

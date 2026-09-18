@@ -36,8 +36,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -94,9 +92,6 @@ public class ResearchRunService {
                     return worker;
                 }, new ThreadPoolExecutor.AbortPolicy());
     }
-
-    @EventListener(ApplicationReadyEvent.class)
-    public void onStartup() { store.interruptOrphans(); }
 
     public ResearchRun create(CreateRequest request) {
         String owner = owner();
@@ -208,7 +203,7 @@ public class ResearchRunService {
 
     @PreDestroy
     public void close() {
-        store.interruptOrphans();
+        // 只停止本实例的执行；不改其他实例持有的任务，也不改本实例留在库里的任务。
         executions.values().forEach(execution -> execution.control.cancel());
         tasks.shutdownNow();
     }

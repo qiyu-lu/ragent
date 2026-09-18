@@ -185,19 +185,34 @@ class ResearchRunPostgresIT {
     }
 
     @Test
-    void restartMarksLostExecutorsInterruptedAndRetainsWaitingInputAndEvidenceState() {
+    void anotherInstanceStartingAndStoppingLeavesThisInstancesRunsAlone() throws Exception {
         var queued = run();
-        var running = run();
-        var active = claim(running);
-        store.event(active, "SOURCE_READ", "saved", Map.of(), Map.of("modelCalls", 1));
         var waiting = run();
         store.finish(claim(waiting), Status.WAITING_INPUT, Map.of("question", "Which?"), Map.of(), null);
-        store.interruptOrphans();
-        assertEquals(Status.INTERRUPTED, store.get(queued.id(), owner).status());
-        assertEquals(Status.INTERRUPTED, store.get(running.id(), owner).status());
-        assertEquals(1, store.get(running.id(), owner).usage().get("modelCalls"));
-        assertEquals(Status.WAITING_INPUT, store.get(waiting.id(), owner).status());
-        assertFalse(store.finish(active, Status.COMPLETED, Map.of(), Map.of(), null));
+        var entered = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        ResearchRunner blocking = session -> {
+            entered.countDown();
+            try { assertTrue(release.await(10, TimeUnit.SECONDS)); }
+            catch (InterruptedException e) { throw new RuntimeException(e); }
+            return new ResearchSession.Outcome(null, new SubtaskResult("main", List.of(), List.of("unavailable"), List.of(), SubtaskResult.Status.COMPLETED));
+        };
+        var instanceA = new ResearchRunService(store, blocking, new ResearchProperties(), jdbc, json, completion(), new ResearchEvidenceStore(jdbc, json));
+        try {
+            var running = instanceA.create(new ResearchRunService.CreateRequest(conversation, "instance-a", "compare", ResearchBrief.OutputType.REPORT, List.of(), List.of(kb), List.of()));
+            assertTrue(entered.await(10, TimeUnit.SECONDS));
+            long epoch = store.get(running.id(), owner).epoch();
+            // 实例 B 启动再停止：此前两者都会把全库 QUEUED / RUNNING 标为 INTERRUPTED。
+            new ResearchRunService(store, blocking, new ResearchProperties(), jdbc, json, completion(), new ResearchEvidenceStore(jdbc, json)).close();
+            assertEquals(Status.RUNNING, store.get(running.id(), owner).status());
+            assertEquals(epoch, store.get(running.id(), owner).epoch());
+            assertEquals(Status.QUEUED, store.get(queued.id(), owner).status());
+            assertEquals(Status.WAITING_INPUT, store.get(waiting.id(), owner).status());
+            release.countDown();
+            await(() -> store.get(running.id(), owner).status().terminal());
+            assertEquals(epoch, store.get(running.id(), owner).epoch());
+            assertTrue(store.events(running.id(), owner, 0, 100).stream().noneMatch(e -> e.type().equals("INTERRUPTED")));
+        } finally { release.countDown(); instanceA.close(); }
     }
 
     @Test
@@ -368,7 +383,7 @@ class ResearchRunPostgresIT {
             for (int i = 0; i < events.size(); i++) assertEquals(i + 1, events.get(i).sequence());
             assertEquals(20, events.stream().filter(e -> e.taskId().equals("worker-1")).count());
             assertTrue(main.checkpoint(a, "RUNNING", null, json));
-            store.interruptOrphans();
+            assertTrue(store.finish(claim, Status.PARTIAL, Map.of(), budget.snapshot(), "RUN_DURATION_BUDGET"));
             var saved = (Map<String, Map<String, Object>>) store.get(run.id(), owner).state().get("subtasks");
             assertEquals("INTERRUPTED", saved.get("worker-1").get("status"));
         } finally { executor.shutdownNow(); }

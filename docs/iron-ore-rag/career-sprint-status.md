@@ -4,8 +4,8 @@
 
 | 项 | 值 |
 | --- | --- |
-| 更新时间 | 2026-09-18（W1 第 2 项完成） |
-| 当前工作项 | W1：第 1—2 项完成（`b186852`），下一项台账时延与 `cache_report.py` |
+| 更新时间 | 2026-09-18（W1 第 3 项完成） |
+| 当前工作项 | W1：第 1—3 项完成（`b186852`、`73deab5`），下一项实验 X1 |
 | 分支 / 提交 | `feat/llm-backend-hardening`，自 `65c99c7`（标签 `career-v0-baseline`）拉出 |
 | 基线回归通过数 | `LC_ALL=en_US.UTF-8 bash scripts/validate-agentic-research-p7.sh`：Python 33/33，Java 217/217（infra-ai 10 + bootstrap 207），约 20 s |
 | 最近的运行目录 | 无（协议探针 29 + 5 次调用，数字见 `eval/agentic-research/manifests/career-cache-probe-2026-09-18.json`） |
@@ -13,7 +13,7 @@
 ## 进度
 
 - [x] S0 分支、基线标签、提交计划、基线回归
-- [ ] W1 缓存友好的上下文布局 + X1（[x] 文档与探针 [x] 布局与压缩 [ ] 台账与报告 [ ] X1）
+- [ ] W1 缓存友好的上下文布局 + X1（[x] 文档与探针 [x] 布局与压缩 [x] 台账与报告 [ ] X1）
 - [ ] W3 模拟上游与故障注入基准 + X3
 - [ ] W2 心跳租约、跨实例接管、断点续跑、优雅停机 + X2
 - [ ] W4 权限隔离 + 越权矩阵
@@ -31,7 +31,7 @@
 
 ## 下一步
 
-W1 第 3 项：台账加 `durationMs` / `firstTokenMs`（缓存写入量 `cacheCreationTokens` / `cacheType` 已随第 2 项落地），写 `eval/agentic-research/cache_report.py` 与 Python 单测。第 2 项回归：Python 33/33，Java 220/220；新代码生成的请求原样重放百炼 Flash 与 Max 均逐步命中（2272→2394）。
+W1 第 4 项：准备并交给用户运行实验 X1（计划 §7）。第 3 项回归：Python 36/36，Java 220/220；`cache_report.py` 对 P7 复算得 B 5.19%、C 0.02%，与 E1 一致。
 
 ## 已知事实与遗留问题
 

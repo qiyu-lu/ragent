@@ -1,0 +1,446 @@
+{
+  "date": "2026-09-18",
+  "purpose": "W1 item 1: Bailian prompt-cache protocol probe and why mode C hit ~0",
+  "model": "qwen3.7-flash-2026-07-15",
+  "endpoint": "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions (stream, max_tokens=512)",
+  "vendorDoc": {
+    "url": "https://help.aliyun.com/zh/model-studio/context-cache",
+    "implicit": "automatic; identical prefix >= 1024 tokens; hit billed 20% of input price; hit not guaranteed",
+    "explicit": "cache_control {type: ephemeral} inside a content block; >= 1024 tokens; 5 min TTL reset on hit; creation 125%, hit 10%; max 4 markers; lookback 20 content blocks; tools count as part of the system message",
+    "exclusive": "explicit and implicit are mutually exclusive per request"
+  },
+  "capture": "request bodies emitted by AgentScope 2.0.1 against MockWebServer using the ResearchNativeToolsTest fixture flow (search, read, search, read, finish); B = delegation disabled, C = enabled; suffix = call index 0-4",
+  "layouts": {
+    "cur": "current code: volatile reminder appended to the first system message",
+    "tail": "static system message; reminder sent as a trailing user message",
+    "rev": "cur with the tool list reversed",
+    "exp": "tail + content-block cache_control on the system text",
+    "xl": "tail + content-block cache_control on the newest history message",
+    "xm": "tail + message-level cache_control on the newest history message (AgentScope serialization)",
+    "K0-K6": "calibration: K1/K3 = B/C static system text without tools, K2/K4 = with tools, K6 = K4 plus one line appended to the system text"
+  },
+  "calibratedTokens": {
+    "templateOverhead": 17,
+    "bStaticSystem": 632,
+    "bTools": 714,
+    "cStaticSystem": 1018,
+    "cTools": 926
+  },
+  "history": {
+    "P7_regression_v4": {
+      "B_main": {
+        "calls": 3169,
+        "input": 37302150,
+        "cached": 1964800,
+        "hitCalls": 1535,
+        "hitSize": 1280
+      },
+      "C_main": {
+        "calls": 3485,
+        "input": 43452138,
+        "cached": 0
+      }
+    },
+    "R3_R4_R5_B_main": "every call cached exactly 1280 tokens (447/447 across R3, R4 baseline, R4 thinking, R5); P7 hits are ~50% at every call index",
+    "R3_R5_R4_C_main_flash": "0 cached in 186 calls",
+    "S1_S2_C_main_max": "1152 cached on 16 of 19 calls"
+  },
+  "records": [
+    {
+      "step": "cur:C-2",
+      "promptTokens": 2440,
+      "cachedTokens": 0,
+      "cacheCreation": null,
+      "cacheType": null,
+      "firstTokenMs": 559,
+      "durationMs": 816,
+      "finishReason": "tool_calls",
+      "toolCalls": [
+        "read_source"
+      ],
+      "status": 200
+    },
+    {
+      "step": "cur:C-2",
+      "promptTokens": 2440,
+      "cachedTokens": 2176,
+      "cacheCreation": null,
+      "cacheType": null,
+      "firstTokenMs": 614,
+      "durationMs": 995,
+      "finishReason": "tool_calls",
+      "toolCalls": [
+        "read_source"
+      ],
+      "status": 200
+    },
+    {
+      "step": "cur:B-2",
+      "promptTokens": 1842,
+      "cachedTokens": 0,
+      "cacheCreation": null,
+      "cacheType": null,
+      "firstTokenMs": 452,
+      "durationMs": 826,
+      "finishReason": "tool_calls",
+      "toolCalls": [
+        "read_source"
+      ],
+      "status": 200
+    },
+    {
+      "step": "cur:B-2",
+      "promptTokens": 1842,
+      "cachedTokens": 1536,
+      "cacheCreation": null,
+      "cacheType": null,
+      "firstTokenMs": 489,
+      "durationMs": 852,
+      "finishReason": "tool_calls",
+      "toolCalls": [
+        "read_source"
+      ],
+      "status": 200
+    },
+    {
+      "step": "cur:C-3",
+      "promptTokens": 2566,
+      "cachedTokens": 0,
+      "cacheCreation": null,
+      "cacheType": null,
+      "firstTokenMs": 586,
+      "durationMs": 948,
+      "finishReason": "stop",
+      "toolCalls": [
+        "read_source"
+      ],
+      "status": 200
+    },
+    {
+      "step": "cur:B-3",
+      "promptTokens": 1968,
+      "cachedTokens": 0,
+      "cacheCreation": null,
+      "cacheType": null,
+      "firstTokenMs": 548,
+      "durationMs": 859,
+      "finishReason": "stop",
+      "toolCalls": [
+        "read_source"
+      ],
+      "status": 200
+    },
+    {
+      "step": "rev:C-2",
+      "promptTokens": 2440,
+      "cachedTokens": 0,
+      "cacheCreation": null,
+      "cacheType": null,
+      "firstTokenMs": 712,
+      "durationMs": 1091,
+      "finishReason": "tool_calls",
+      "toolCalls": [
+        "read_source"
+      ],
+      "status": 200
+    },
+    {
+      "step": "tail:C-2",
+      "promptTokens": 2436,
+      "cachedTokens": 0,
+      "cacheCreation": null,
+      "cacheType": null,
+      "firstTokenMs": 590,
+      "durationMs": 4130,
+      "finishReason": "tool_calls",
+      "toolCalls": [
+        "finish_research"
+      ],
+      "status": 200
+    },
+    {
+      "step": "rev:C-2",
+      "promptTokens": 2440,
+      "cachedTokens": 2176,
+      "cacheCreation": null,
+      "cacheType": null,
+      "firstTokenMs": 588,
+      "durationMs": 1038,
+      "finishReason": "tool_calls",
+      "toolCalls": [
+        "read_source"
+      ],
+      "status": 200
+    },
+    {
+      "step": "file:K0",
+      "promptTokens": 19,
+      "cachedTokens": 0,
+      "cacheCreation": null,
+      "cacheType": null,
+      "firstTokenMs": 228,
+      "durationMs": 378,
+      "finishReason": "stop",
+      "toolCalls": [],
+      "status": 200
+    },
+    {
+      "step": "file:K1",
+      "promptTokens": 651,
+      "cachedTokens": 0,
+      "cacheCreation": null,
+      "cacheType": null,
+      "firstTokenMs": 495,
+      "durationMs": 1205,
+      "finishReason": "stop",
+      "toolCalls": [],
+      "status": 200
+    },
+    {
+      "step": "file:K2",
+      "promptTokens": 1365,
+      "cachedTokens": 0,
+      "cacheCreation": null,
+      "cacheType": null,
+      "firstTokenMs": 387,
+      "durationMs": 1180,
+      "finishReason": "stop",
+      "toolCalls": [],
+      "status": 200
+    },
+    {
+      "step": "file:K3",
+      "promptTokens": 1037,
+      "cachedTokens": 0,
+      "cacheCreation": null,
+      "cacheType": null,
+      "firstTokenMs": 567,
+      "durationMs": 1434,
+      "finishReason": "stop",
+      "toolCalls": [],
+      "status": 200
+    },
+    {
+      "step": "file:K4",
+      "promptTokens": 1963,
+      "cachedTokens": 0,
+      "cacheCreation": null,
+      "cacheType": null,
+      "firstTokenMs": 436,
+      "durationMs": 926,
+      "finishReason": "stop",
+      "toolCalls": [],
+      "status": 200
+    },
+    {
+      "step": "file:K6",
+      "promptTokens": 1973,
+      "cachedTokens": 0,
+      "cacheCreation": null,
+      "cacheType": null,
+      "firstTokenMs": 423,
+      "durationMs": 1769,
+      "finishReason": "tool_calls",
+      "toolCalls": [
+        "ask_user"
+      ],
+      "status": 200
+    },
+    {
+      "step": "file:K4",
+      "promptTokens": 1963,
+      "cachedTokens": 1920,
+      "cacheCreation": null,
+      "cacheType": null,
+      "firstTokenMs": 432,
+      "durationMs": 1168,
+      "finishReason": "stop",
+      "toolCalls": [],
+      "status": 200
+    },
+    {
+      "step": "tail:C-3",
+      "promptTokens": 2558,
+      "cachedTokens": 0,
+      "cacheCreation": null,
+      "cacheType": null,
+      "firstTokenMs": 461,
+      "durationMs": 745,
+      "finishReason": "stop",
+      "toolCalls": [
+        "read_source"
+      ],
+      "status": 200
+    },
+    {
+      "step": "tail:C-4",
+      "promptTokens": 2704,
+      "cachedTokens": 2176,
+      "cacheCreation": null,
+      "cacheType": null,
+      "firstTokenMs": 451,
+      "durationMs": 2057,
+      "finishReason": "tool_calls",
+      "toolCalls": [
+        "finish_research"
+      ],
+      "status": 200
+    },
+    {
+      "step": "tail:B-2",
+      "promptTokens": 1838,
+      "cachedTokens": 0,
+      "cacheCreation": null,
+      "cacheType": null,
+      "firstTokenMs": 394,
+      "durationMs": 4350,
+      "finishReason": "tool_calls",
+      "toolCalls": [
+        "finish_research"
+      ],
+      "status": 200
+    },
+    {
+      "step": "tail:B-3",
+      "promptTokens": 1960,
+      "cachedTokens": 0,
+      "cacheCreation": null,
+      "cacheType": null,
+      "firstTokenMs": 473,
+      "durationMs": 762,
+      "finishReason": "stop",
+      "toolCalls": [
+        "read_source"
+      ],
+      "status": 200
+    },
+    {
+      "step": "tail:B-4",
+      "promptTokens": 2106,
+      "cachedTokens": 0,
+      "cacheCreation": null,
+      "cacheType": null,
+      "firstTokenMs": 412,
+      "durationMs": 5249,
+      "finishReason": "stop",
+      "toolCalls": [],
+      "status": 200
+    },
+    {
+      "step": "exp:C-2",
+      "promptTokens": 2436,
+      "cachedTokens": 0,
+      "cacheCreation": 1949,
+      "cacheType": "ephemeral",
+      "firstTokenMs": 472,
+      "durationMs": 793,
+      "finishReason": "tool_calls",
+      "toolCalls": [
+        "read_source"
+      ],
+      "status": 200
+    },
+    {
+      "step": "exp:C-3",
+      "promptTokens": 2558,
+      "cachedTokens": 1949,
+      "cacheCreation": 0,
+      "cacheType": "ephemeral",
+      "firstTokenMs": 574,
+      "durationMs": 918,
+      "finishReason": "stop",
+      "toolCalls": [
+        "read_source"
+      ],
+      "status": 200
+    },
+    {
+      "step": "xl:C-2",
+      "promptTokens": 2436,
+      "cachedTokens": 1949,
+      "cacheCreation": 323,
+      "cacheType": "ephemeral",
+      "firstTokenMs": 444,
+      "durationMs": 797,
+      "finishReason": "tool_calls",
+      "toolCalls": [
+        "read_source"
+      ],
+      "status": 200
+    },
+    {
+      "step": "xl:C-3",
+      "promptTokens": 2558,
+      "cachedTokens": 2272,
+      "cacheCreation": 122,
+      "cacheType": "ephemeral",
+      "firstTokenMs": 517,
+      "durationMs": 905,
+      "finishReason": "stop",
+      "toolCalls": [
+        "read_source"
+      ],
+      "status": 200
+    },
+    {
+      "step": "xl:C-4",
+      "promptTokens": 2704,
+      "cachedTokens": 2394,
+      "cacheCreation": 144,
+      "cacheType": "ephemeral",
+      "firstTokenMs": 434,
+      "durationMs": 5352,
+      "finishReason": "stop",
+      "toolCalls": [],
+      "status": 200
+    },
+    {
+      "step": "xm:B-2",
+      "promptTokens": 1838,
+      "cachedTokens": 0,
+      "cacheCreation": null,
+      "cacheType": null,
+      "firstTokenMs": 686,
+      "durationMs": 1176,
+      "finishReason": "tool_calls",
+      "toolCalls": [
+        "search_knowledge"
+      ],
+      "status": 200
+    },
+    {
+      "step": "xm:B-3",
+      "promptTokens": 1960,
+      "cachedTokens": 0,
+      "cacheCreation": null,
+      "cacheType": null,
+      "firstTokenMs": 466,
+      "durationMs": 764,
+      "finishReason": "stop",
+      "toolCalls": [
+        "read_source"
+      ],
+      "status": 200
+    },
+    {
+      "step": "xm:B-4",
+      "promptTokens": 2106,
+      "cachedTokens": 0,
+      "cacheCreation": null,
+      "cacheType": null,
+      "firstTokenMs": 1004,
+      "durationMs": 5296,
+      "finishReason": "stop",
+      "toolCalls": [],
+      "status": 200
+    }
+  ],
+  "conclusions": [
+    "Byte-identical requests hit (5/5); hits are 128-token aligned and exclude roughly the final message.",
+    "Any change inside the system message (appended line, tool order, reminder moved or changed) gives 0 even with 1,000-1,944 identical leading tokens (K6, rev, tail, cur step-to-step).",
+    "The current layout changes the system message on every call, so C cannot hit; B's fixed 1280-token hits equal floor((714+632+17)/128)*128, a shared tools+static prefix served by the provider that the probe could not reproduce (cur B-3 = 0) and that never occurred for C.",
+    "With a stable system message and append-only history, implicit hits were still unreliable step-to-step (1 of 4).",
+    "Explicit content-block markers hit deterministically: marker on the newest history message gives hits of the whole previous prefix with creation billed only for the delta (1949 -> 2272 -> 2394 cached; 323/122/144 created).",
+    "Message-level cache_control, which AgentScope emits when cacheControl=true, is ignored by Bailian (xm: no creation, no hit)."
+  ]
+}

@@ -7,7 +7,7 @@
 | 更新时间 | 2026-09-18（W3 收尾、W2 完成） |
 | 当前工作项 | W4：权限隔离 + 越权矩阵（尚未开始） |
 | 分支 / 提交 | `feat/llm-backend-hardening`；标签 `career-w1`、`career-w3`、`career-w2` |
-| 回归通过数 | `bash scripts/validate-agentic-research-p7.sh`：W3 后 Python 41/41、Java 225/225（13 + 212）；W2 后 Python 41/41、Java 240/240（13 + 227），约 35 s |
+| 回归通过数 | `bash scripts/validate-agentic-research-p7.sh`：W2 后 Python 41/41、Java 240/240（13 + 227；W3 后 13 + 212），约 35 s |
 | 最近的运行目录 | X2：`local-data/agentic-research/runs/career_X2_v1/`；X3：`runs/career_X3_v1/`；X1：`runs/career_X1_v1_*` |
 
 ## 进度
@@ -27,7 +27,6 @@
 - W2（模拟上游，独立 JVM 共享运行库，租约 6 s）：kill -9 恢复 4.94 s、SIGSTOP 4.97 s、SIGTERM 0.95 s；每个被接管任务重复 1 次模型调用（在途那次）；5 类故障下不变量全部成立；毒任务 4 次失联后 EXECUTOR_LOST。
 
 ## 交给用户后台运行（编码 Agent 不等待、不轮询）
-
 - **MuSiQue C 复核**已在跑（2026-09-18 21:47 起，after_C 进行中；命令见 `e53f469`）。结果：`runs/career_X1_mq80_{before,after}_C/summary.json` 与 `runs/career_X1_mq80_cache_report.md`。
 
 ## 下一步（下个会话）
@@ -38,5 +37,4 @@
 
 - 用户自己的未跟踪笔记（如 `docs/current-code-notes-*`）出现时不修改、不提交。
 - AgentScope 自带 JVM 关闭钩子（`GracefulShutdownManager`）会在“模型已决定、工具未执行”处中断 Agent，所以 SIGTERM 仍重复 1 次模型调用；消除需持久化 tool_call 决定，未做。
-- X2 只跑单 Agent 模式（模拟上游策略不读续跑提示）；多 Agent 下已完成 worker 不重跑只由测试覆盖。
-- 熔断修复（`77ca3ae`）不在 X3 数字里，只由单测覆盖（评测命令直连 embedding 客户端）。
+- X2 只跑单 Agent 模式；多 Agent 下已完成 worker 不重跑只由测试覆盖。X3 不含熔断修复 `77ca3ae`（只由单测覆盖）。

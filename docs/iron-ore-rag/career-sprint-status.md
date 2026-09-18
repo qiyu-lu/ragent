@@ -5,7 +5,7 @@
 | 项 | 值 |
 | --- | --- |
 | 更新时间 | 2026-09-19（W5 完成，X5 真实上游结果已补入） |
-| 当前工作项 | S6：简历条目、README、面试卡（尚未开始） |
+| 当前工作项 | **S6 之前先做瘦身**：见 [slim-down-plan-2026-09-19.md](slim-down-plan-2026-09-19.md) 与 [slim-down-status.md](slim-down-status.md)；完成后再做 S6（尚未开始） |
 | 分支 / 提交 | `feat/llm-backend-hardening`；标签 `career-w1`、`career-w3`、`career-w2`、`career-w4`、`career-w5` |
 | 回归通过数 | `bash scripts/validate-agentic-research-p7.sh`：W5 后 Python 41/41、Java 13 + 260（W4 后 13 + 247），约 40 s；另有 `validate-agentic-research-p2-database.sh` 结构校验 |
 | 最近的运行目录 | X2：`local-data/agentic-research/runs/career_X2_v1/`；X3：`runs/career_X3_v1/`；X1：`runs/career_X1_v1_*`；X5：`runs/career_X5_real_v1/`（模拟上游 `career_X5_stub_v1/`） |

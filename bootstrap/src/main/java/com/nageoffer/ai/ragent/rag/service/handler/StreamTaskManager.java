@@ -45,6 +45,7 @@ public class StreamTaskManager {
 
     private static final String CANCEL_TOPIC = "ragent:stream:cancel";
     private static final String CANCEL_KEY_PREFIX = "ragent:stream:cancel:";
+    private static final String OWNER_KEY_PREFIX = "ragent:stream:owner:";
     private static final Duration CANCEL_TTL = Duration.ofMinutes(30);
 
     private final Cache<String, StreamTaskInfo> tasks = CacheBuilder.newBuilder()
@@ -88,6 +89,24 @@ public class StreamTaskManager {
             reportTraceRunCancelled(taskId);
             completeCancelledTask(taskId, taskInfo);
         }
+    }
+
+    /**
+     * 记录任务归属。停止请求可能落到任一实例，归属必须放在共享存储里；随取消标记同样过期，
+     * 任务结束时不删除，避免用户在结束瞬间点停止被误判为越权
+     */
+    public void bindOwner(String taskId, String userId) {
+        if (StrUtil.isBlank(taskId) || StrUtil.isBlank(userId)) {
+            return;
+        }
+        redissonClient.<String>getBucket(OWNER_KEY_PREFIX + taskId).set(userId, CANCEL_TTL);
+    }
+
+    public boolean isOwnedBy(String taskId, String userId) {
+        if (StrUtil.isBlank(taskId) || StrUtil.isBlank(userId)) {
+            return false;
+        }
+        return userId.equals(redissonClient.<String>getBucket(OWNER_KEY_PREFIX + taskId).get());
     }
 
     public void bindHandle(String taskId, StreamCancellationHandle handle) {

@@ -19,7 +19,10 @@ package com.nageoffer.ai.ragent.rag.service.impl;
 
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
+import com.nageoffer.ai.ragent.framework.context.LoginUser;
 import com.nageoffer.ai.ragent.framework.context.UserContext;
+import com.nageoffer.ai.ragent.framework.exception.ClientException;
+import com.nageoffer.ai.ragent.knowledge.service.KnowledgeAccessService;
 import com.nageoffer.ai.ragent.infra.chat.StreamCallback;
 import com.nageoffer.ai.ragent.rag.service.ratelimit.ChatQueueLimiter;
 import com.nageoffer.ai.ragent.rag.service.RAGChatService;
@@ -51,6 +54,8 @@ public class RAGChatServiceImpl implements RAGChatService {
     public void streamChat(String question, String conversationId, Boolean deepThinking, SseEmitter emitter) {
         String actualConversationId = StrUtil.isBlank(conversationId) ? IdUtil.getSnowflakeNextIdStr() : conversationId;
         String taskId = IdUtil.getSnowflakeNextIdStr();
+        // 先记归属再让 taskId 随事件发给前端，停止请求到达时归属一定已写入
+        taskManager.bindOwner(taskId, UserContext.getUserId());
         StreamCallback callback = callbackFactory.createChatEventHandler(emitter, actualConversationId, taskId);
 
         chatQueueLimiter.enqueue(question, actualConversationId, emitter,
@@ -69,6 +74,11 @@ public class RAGChatServiceImpl implements RAGChatService {
 
     @Override
     public void stopTask(String taskId) {
+        LoginUser user = UserContext.requireUser();
+        // 不存在与不属于自己同一提示；管理员可停止任意任务
+        if (!taskManager.isOwnedBy(taskId, user.getUserId()) && !KnowledgeAccessService.ADMIN_ROLE.equals(user.getRole())) {
+            throw new ClientException("任务不存在或无权操作");
+        }
         taskManager.cancel(taskId);
     }
 }

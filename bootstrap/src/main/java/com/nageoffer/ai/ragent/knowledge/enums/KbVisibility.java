@@ -15,31 +15,27 @@
  * limitations under the License.
  */
 
-package com.nageoffer.ai.ragent.knowledge.controller.request;
+package com.nageoffer.ai.ragent.knowledge.enums;
 
-import com.nageoffer.ai.ragent.knowledge.enums.KbVisibility;
-import lombok.Data;
-
-@Data
-public class KnowledgeBaseCreateRequest {
-
-    /**
-     * 知识库名称
-     */
-    private String name;
+/**
+ * 知识库可见性
+ * <p>
+ * 所有者与管理员不受可见性影响；授权表只在 PUBLIC 与 RESTRICTED 下生效
+ */
+public enum KbVisibility {
 
     /**
-     * 嵌入模型，如 qwen3-embedding:8b-fp16
+     * 全员可读；管理权限仍只给所有者、管理员与 MANAGE 授权对象
      */
-    private String embeddingModel;
+    PUBLIC,
 
     /**
-     * Milvus Collection 名称
+     * 仅所有者与管理员，忽略授权表
      */
-    private String collectionName;
+    PRIVATE,
 
     /**
-     * 可见性，缺省为 PRIVATE
+     * 所有者、管理员与授权对象
      */
-    private KbVisibility visibility;
+    RESTRICTED
 }

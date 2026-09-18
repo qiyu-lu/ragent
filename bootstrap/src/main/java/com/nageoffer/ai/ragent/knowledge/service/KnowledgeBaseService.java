@@ -22,6 +22,7 @@ import com.nageoffer.ai.ragent.knowledge.controller.request.KnowledgeBaseCreateR
 import com.nageoffer.ai.ragent.knowledge.controller.request.KnowledgeBasePageRequest;
 import com.nageoffer.ai.ragent.knowledge.controller.request.KnowledgeBaseUpdateRequest;
 import com.nageoffer.ai.ragent.knowledge.controller.vo.KnowledgeBaseVO;
+import java.util.Collection;
 
 /**
  * 知识库服务接口
@@ -70,7 +71,8 @@ public interface KnowledgeBaseService {
      * 分页查询知识库
      *
      * @param requestParam 分页查询请求参数
+     * @param readableKbIds 可见的知识库范围，由调用方按访问权限给出；为空时结果为空
      * @return 知识库分页结果
      */
-    IPage<KnowledgeBaseVO> pageQuery(KnowledgeBasePageRequest requestParam);
+    IPage<KnowledgeBaseVO> pageQuery(KnowledgeBasePageRequest requestParam, Collection<String> readableKbIds);
 }

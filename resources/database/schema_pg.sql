@@ -174,10 +174,32 @@ CREATE TABLE t_knowledge_base (
     create_time     TIMESTAMP  NOT NULL DEFAULT CURRENT_TIMESTAMP,
     update_time     TIMESTAMP  NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted         SMALLINT     NOT NULL DEFAULT 0,
-    CONSTRAINT uk_collection_name UNIQUE (collection_name)
+    owner_user_id   VARCHAR(20),
+    visibility      VARCHAR(16)  NOT NULL DEFAULT 'PRIVATE',
+    CONSTRAINT uk_collection_name UNIQUE (collection_name),
+    CONSTRAINT ck_kb_visibility CHECK (visibility IN ('PUBLIC', 'PRIVATE', 'RESTRICTED'))
 );
 CREATE INDEX idx_kb_name ON t_knowledge_base (name);
 COMMENT ON TABLE t_knowledge_base IS '知识库表';
+COMMENT ON COLUMN t_knowledge_base.owner_user_id IS '所有者用户ID，拥有管理权限';
+COMMENT ON COLUMN t_knowledge_base.visibility IS '可见性：PUBLIC 全员可读 / PRIVATE 仅所有者与管理员 / RESTRICTED 所有者、管理员与授权对象';
+
+CREATE TABLE t_knowledge_base_grant (
+    id           VARCHAR(20) NOT NULL PRIMARY KEY,
+    kb_id        VARCHAR(20) NOT NULL,
+    subject_type VARCHAR(8)  NOT NULL,
+    subject_id   VARCHAR(64) NOT NULL,
+    permission   VARCHAR(8)  NOT NULL,
+    created_by   VARCHAR(20),
+    create_time  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uk_kb_grant_subject UNIQUE (kb_id, subject_type, subject_id),
+    CONSTRAINT ck_kb_grant_subject_type CHECK (subject_type IN ('USER', 'ROLE')),
+    CONSTRAINT ck_kb_grant_permission CHECK (permission IN ('READ', 'MANAGE'))
+);
+CREATE INDEX idx_kb_grant_subject ON t_knowledge_base_grant (subject_type, subject_id);
+COMMENT ON TABLE t_knowledge_base_grant IS '知识库授权：PUBLIC 与 RESTRICTED 库生效，PRIVATE 库忽略';
+COMMENT ON COLUMN t_knowledge_base_grant.subject_type IS '授权对象类型：USER 用户ID / ROLE 角色名';
+COMMENT ON COLUMN t_knowledge_base_grant.permission IS 'READ 检索与查看 / MANAGE 另含知识库与文档的增删改';
 
 CREATE TABLE t_knowledge_document (
     id               VARCHAR(20)        NOT NULL PRIMARY KEY,

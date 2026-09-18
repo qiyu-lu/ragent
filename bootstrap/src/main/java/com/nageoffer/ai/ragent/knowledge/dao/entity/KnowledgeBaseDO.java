@@ -79,5 +79,15 @@ public class KnowledgeBaseDO {
      */
     @TableLogic
     private Integer deleted;
+
+    /**
+     * 所有者用户 ID，拥有管理权限
+     */
+    private String ownerUserId;
+
+    /**
+     * 可见性，取值见 {@link com.nageoffer.ai.ragent.knowledge.enums.KbVisibility}
+     */
+    private String visibility;
 }
 

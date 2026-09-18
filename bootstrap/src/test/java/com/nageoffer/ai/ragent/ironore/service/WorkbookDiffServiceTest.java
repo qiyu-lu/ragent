@@ -18,7 +18,10 @@
 package com.nageoffer.ai.ragent.ironore.service;
 
 import com.nageoffer.ai.ragent.knowledge.dao.entity.KnowledgeDocumentDO;
+import com.nageoffer.ai.ragent.framework.exception.ClientException;
 import com.nageoffer.ai.ragent.knowledge.dao.mapper.KnowledgeDocumentMapper;
+import com.nageoffer.ai.ragent.knowledge.enums.KbPermission;
+import com.nageoffer.ai.ragent.knowledge.service.KnowledgeAccessService;
 import com.nageoffer.ai.ragent.rag.service.FileStorageService;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
@@ -26,10 +29,13 @@ import org.junit.jupiter.api.Test;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class WorkbookDiffServiceTest {
@@ -47,7 +53,7 @@ class WorkbookDiffServiceTest {
         when(storage.openStream("base-key")).thenReturn(new ByteArrayInputStream(baseBytes));
         when(storage.openStream("target-key")).thenReturn(new ByteArrayInputStream(targetBytes));
 
-        var result = new WorkbookDiffService(mapper, storage)
+        var result = new WorkbookDiffService(mapper, storage, access(Set.of("kb-1")))
                 .compare("铁矿石人工检测流程调研", "V1.2", "V1.3-demo");
 
         assertEquals(3, result.changeCount());
@@ -58,6 +64,23 @@ class WorkbookDiffServiceTest {
         assertEquals("旧值", result.changes().get(0).beforeValue());
         assertEquals("新值", result.changes().get(0).afterValue());
         assertEquals("V1.3-demo", result.targetDocument().version());
+    }
+
+    @Test
+    void documentsInUnreadableKnowledgeBasesAreNeverLookedUp() {
+        KnowledgeDocumentMapper mapper = mock(KnowledgeDocumentMapper.class);
+        FileStorageService storage = mock(FileStorageService.class);
+
+        assertThrows(ClientException.class, () -> new WorkbookDiffService(mapper, storage, access(Set.of()))
+                .compare("铁矿石人工检测流程调研", "V1.2", "V1.3-demo"));
+        verifyNoInteractions(mapper, storage);
+    }
+
+    private static KnowledgeAccessService access(Set<String> readable) {
+        KnowledgeAccessService access = mock(KnowledgeAccessService.class);
+        when(access.current()).thenReturn(KnowledgeAccessService.Subject.NOBODY);
+        when(access.accessibleKbIds(KnowledgeAccessService.Subject.NOBODY, KbPermission.READ)).thenReturn(readable);
+        return access;
     }
 
     private static KnowledgeDocumentDO document(String id, String key, String version, int demoData) {

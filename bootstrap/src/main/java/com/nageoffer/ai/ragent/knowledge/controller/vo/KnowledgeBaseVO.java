@@ -57,6 +57,10 @@ public class KnowledgeBaseVO {
      */
     private String createdBy;
 
+    private String ownerUserId;
+
+    private String visibility;
+
     /**
      * 创建时间
      */

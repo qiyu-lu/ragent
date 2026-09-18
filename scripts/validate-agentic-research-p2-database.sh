@@ -35,14 +35,14 @@ psql_p2 < resources/database/init_data_pg.sql
 
 p2_catalog_sql="SELECT table_name, column_name, udt_name, is_nullable, column_default
   FROM information_schema.columns
-  WHERE table_schema = 'public' AND table_name IN ('t_research_run', 't_research_evidence', 't_research_event', 't_research_corpus_document')
+  WHERE table_schema = 'public' AND table_name IN ('t_research_run', 't_research_evidence', 't_research_event', 't_research_corpus_document', 't_knowledge_base', 't_knowledge_base_grant')
   ORDER BY table_name, ordinal_position;
   SELECT conrelid::regclass, conname, pg_get_constraintdef(oid)
   FROM pg_constraint
-  WHERE conrelid IN ('t_research_run'::regclass, 't_research_evidence'::regclass, 't_research_event'::regclass, 't_research_corpus_document'::regclass)
+  WHERE conrelid IN ('t_research_run'::regclass, 't_research_evidence'::regclass, 't_research_event'::regclass, 't_research_corpus_document'::regclass, 't_knowledge_base'::regclass, 't_knowledge_base_grant'::regclass)
   ORDER BY conrelid::regclass::text, conname;
   SELECT tablename, indexname, indexdef FROM pg_indexes
-  WHERE schemaname = 'public' AND tablename IN ('t_research_run', 't_research_evidence', 't_research_event', 't_research_corpus_document', 't_knowledge_vector')
+  WHERE schemaname = 'public' AND tablename IN ('t_research_run', 't_research_evidence', 't_research_event', 't_research_corpus_document', 't_knowledge_vector', 't_knowledge_base', 't_knowledge_base_grant')
   ORDER BY tablename, indexname;"
 psql_p2 -Atc "$p2_catalog_sql" > "$p2_scratch/fresh-catalog.txt"
 
@@ -62,6 +62,14 @@ DROP TABLE t_research_evidence;
 DROP TABLE t_research_run;
 DROP TABLE t_research_corpus_document;
 DROP INDEX idx_vector_collection_doc;
+
+-- W4: rewind the knowledge-base access columns and keep a pre-existing row created by an existing user.
+DROP TABLE t_knowledge_base_grant;
+ALTER TABLE t_knowledge_base DROP CONSTRAINT ck_kb_visibility;
+ALTER TABLE t_knowledge_base DROP COLUMN visibility;
+ALTER TABLE t_knowledge_base DROP COLUMN owner_user_id;
+INSERT INTO t_knowledge_base (id, name, embedding_model, collection_name, created_by)
+SELECT 'p2-legacy-kb', 'legacy', 'fixture', 'p2_legacy', username FROM t_user ORDER BY id LIMIT 1;
 SQL
 psql_p2 < resources/database/upgrades/v1.1.0/260917_02_research_evidence.sql
 psql_p2 < resources/database/upgrades/v1.1.0/260917_03_research_neighbors.sql
@@ -71,6 +79,8 @@ psql_p2 < resources/database/upgrades/v1.1.0/260917_02_research_evidence.sql
 psql_p2 < resources/database/upgrades/v1.1.0/260917_03_research_neighbors.sql
 psql_p2 < resources/database/upgrades/v1.1.0/260917_04_research_corpus.sql
 psql_p2 < resources/database/upgrades/v1.1.0/260918_01_research_durable_execution.sql
+psql_p2 < resources/database/upgrades/v1.1.0/260918_02_knowledge_base_access.sql
+psql_p2 < resources/database/upgrades/v1.1.0/260918_02_knowledge_base_access.sql
 psql_p2 -Atc "$p2_catalog_sql" > "$p2_scratch/upgraded-catalog.txt"
 diff -u "$p2_scratch/fresh-catalog.txt" "$p2_scratch/upgraded-catalog.txt"
 
@@ -124,8 +134,16 @@ WITH allocated AS (
 INSERT INTO t_research_event (run_id, sequence_no, task_id, event_type, summary)
 SELECT id, event_sequence, 'main', 'SOURCE_READ', 'Storage example' FROM allocated;
 
+INSERT INTO t_knowledge_base (id, name, embedding_model, collection_name, created_by)
+VALUES ('p2-new-kb', 'new', 'fixture', 'p2_new', 'nobody');
+
 DO $$
 BEGIN
+    IF (SELECT visibility FROM t_knowledge_base WHERE id = 'p2-legacy-kb') <> 'PUBLIC'
+       OR (SELECT owner_user_id FROM t_knowledge_base WHERE id = 'p2-legacy-kb') IS DISTINCT FROM (SELECT id FROM t_user ORDER BY id LIMIT 1)
+       OR (SELECT visibility FROM t_knowledge_base WHERE id = 'p2-new-kb') <> 'PRIVATE' THEN
+        RAISE EXCEPTION 'Knowledge-base access upgrade must keep existing rows PUBLIC with owners and default new rows to PRIVATE';
+    END IF;
     IF (SELECT count(*) FROM t_iron_ore_task_template WHERE id = 'p2-history' AND status = 'DRAFT') <> 1 THEN
         RAISE EXCEPTION 'Incremental upgrade changed historical draft';
     END IF;

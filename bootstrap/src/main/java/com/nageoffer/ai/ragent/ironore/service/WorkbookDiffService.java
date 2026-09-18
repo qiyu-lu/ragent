@@ -25,6 +25,8 @@ import com.nageoffer.ai.ragent.ironore.model.WorkbookDiffView.CellChange;
 import com.nageoffer.ai.ragent.ironore.model.WorkbookDiffView.DocumentVersionRef;
 import com.nageoffer.ai.ragent.knowledge.dao.entity.KnowledgeDocumentDO;
 import com.nageoffer.ai.ragent.knowledge.dao.mapper.KnowledgeDocumentMapper;
+import com.nageoffer.ai.ragent.knowledge.enums.KbPermission;
+import com.nageoffer.ai.ragent.knowledge.service.KnowledgeAccessService;
 import com.nageoffer.ai.ragent.rag.service.FileStorageService;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.Cell;
@@ -46,6 +48,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * XLSX 版本差异使用 POI 做确定性单元格比较。LLM 只负责解释工具结果，不参与判断哪些单元格发生变化。
@@ -56,6 +59,7 @@ public class WorkbookDiffService {
 
     private final KnowledgeDocumentMapper documentMapper;
     private final FileStorageService fileStorageService;
+    private final KnowledgeAccessService accessService;
 
     public WorkbookDiffView compare(String documentKey, String baseVersion, String targetVersion) {
         if (StrUtil.hasBlank(documentKey, baseVersion, targetVersion)) {
@@ -65,8 +69,10 @@ public class WorkbookDiffService {
             throw new ClientException("基准版本和目标版本不能相同");
         }
 
-        KnowledgeDocumentDO base = requireDocument(documentKey, baseVersion);
-        KnowledgeDocumentDO target = requireDocument(documentKey, targetVersion);
+        // 只在当前用户可读的知识库里找版本：不可读库里的同名文档既不参与比较，也不影响「重复记录」判断
+        Set<String> readableKbIds = accessService.accessibleKbIds(accessService.current(), KbPermission.READ);
+        KnowledgeDocumentDO base = requireDocument(documentKey, baseVersion, readableKbIds);
+        KnowledgeDocumentDO target = requireDocument(documentKey, targetVersion, readableKbIds);
         if (!Objects.equals(base.getKbId(), target.getKbId())) {
             throw new ClientException("两个文档版本不属于同一知识库");
         }
@@ -95,9 +101,10 @@ public class WorkbookDiffService {
                 List.copyOf(changes));
     }
 
-    private KnowledgeDocumentDO requireDocument(String documentKey, String version) {
-        List<KnowledgeDocumentDO> matches = documentMapper.selectList(
+    private KnowledgeDocumentDO requireDocument(String documentKey, String version, Set<String> readableKbIds) {
+        List<KnowledgeDocumentDO> matches = readableKbIds.isEmpty() ? List.of() : documentMapper.selectList(
                 new LambdaQueryWrapper<KnowledgeDocumentDO>()
+                        .in(KnowledgeDocumentDO::getKbId, readableKbIds)
                         .eq(KnowledgeDocumentDO::getDocumentKey, documentKey)
                         .eq(KnowledgeDocumentDO::getDocumentVersion, version)
                         .eq(KnowledgeDocumentDO::getEnabled, 1));

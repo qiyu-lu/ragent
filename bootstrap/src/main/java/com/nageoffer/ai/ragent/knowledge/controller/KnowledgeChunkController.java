@@ -25,6 +25,8 @@ import com.nageoffer.ai.ragent.knowledge.controller.request.KnowledgeChunkCreate
 import com.nageoffer.ai.ragent.knowledge.controller.request.KnowledgeChunkPageRequest;
 import com.nageoffer.ai.ragent.knowledge.controller.request.KnowledgeChunkUpdateRequest;
 import com.nageoffer.ai.ragent.knowledge.controller.vo.KnowledgeChunkVO;
+import com.nageoffer.ai.ragent.knowledge.enums.KbPermission;
+import com.nageoffer.ai.ragent.knowledge.service.KnowledgeAccessService;
 import com.nageoffer.ai.ragent.knowledge.service.KnowledgeChunkService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
@@ -47,6 +49,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class KnowledgeChunkController {
 
     private final KnowledgeChunkService knowledgeChunkService;
+    private final KnowledgeAccessService accessService;
 
     /**
      * 分页查询 Chunk 列表
@@ -54,6 +57,7 @@ public class KnowledgeChunkController {
     @GetMapping("/knowledge-base/docs/{doc-id}/chunks")
     public Result<IPage<KnowledgeChunkVO>> pageQuery(@PathVariable("doc-id") String docId,
                                                      @Validated KnowledgeChunkPageRequest requestParam) {
+        accessService.requireDocument(docId, KbPermission.READ);
         return Results.success(knowledgeChunkService.pageQuery(docId, requestParam));
     }
 
@@ -63,6 +67,7 @@ public class KnowledgeChunkController {
     @PostMapping("/knowledge-base/docs/{doc-id}/chunks")
     public Result<KnowledgeChunkVO> create(@PathVariable("doc-id") String docId,
                                            @RequestBody KnowledgeChunkCreateRequest request) {
+        accessService.requireDocument(docId, KbPermission.MANAGE);
         return Results.success(knowledgeChunkService.create(docId, request));
     }
 
@@ -73,6 +78,7 @@ public class KnowledgeChunkController {
     public Result<Void> update(@PathVariable("doc-id") String docId,
                                @PathVariable("chunk-id") String chunkId,
                                @RequestBody KnowledgeChunkUpdateRequest request) {
+        accessService.requireDocument(docId, KbPermission.MANAGE);
         knowledgeChunkService.update(docId, chunkId, request);
         return Results.success();
     }
@@ -83,6 +89,7 @@ public class KnowledgeChunkController {
     @DeleteMapping("/knowledge-base/docs/{doc-id}/chunks/{chunk-id}")
     public Result<Void> delete(@PathVariable("doc-id") String docId,
                                @PathVariable("chunk-id") String chunkId) {
+        accessService.requireDocument(docId, KbPermission.MANAGE);
         knowledgeChunkService.delete(docId, chunkId);
         return Results.success();
     }
@@ -94,6 +101,7 @@ public class KnowledgeChunkController {
     public Result<Void> enable(@PathVariable("doc-id") String docId,
                                @PathVariable("chunk-id") String chunkId,
                                @RequestParam("value") boolean enabled) {
+        accessService.requireDocument(docId, KbPermission.MANAGE);
         knowledgeChunkService.enableChunk(docId, chunkId, enabled);
         return Results.success();
     }
@@ -105,6 +113,7 @@ public class KnowledgeChunkController {
     public Result<Void> batchEnable(@PathVariable("doc-id") String docId,
                                     @RequestParam("value") boolean enabled,
                                     @RequestBody(required = false) KnowledgeChunkBatchRequest request) {
+        accessService.requireDocument(docId, KbPermission.MANAGE);
         knowledgeChunkService.batchToggleEnabled(docId, request, enabled);
         return Results.success();
     }

@@ -17,29 +17,28 @@
 
 package com.nageoffer.ai.ragent.knowledge.controller.request;
 
-import com.nageoffer.ai.ragent.knowledge.enums.KbVisibility;
+import com.nageoffer.ai.ragent.knowledge.enums.KbGrantSubjectType;
+import com.nageoffer.ai.ragent.knowledge.enums.KbPermission;
 import lombok.Data;
 
+/**
+ * 知识库授权请求
+ */
 @Data
-public class KnowledgeBaseCreateRequest {
+public class KnowledgeBaseGrantRequest {
 
     /**
-     * 知识库名称
+     * 授权对象类型：USER / ROLE
      */
-    private String name;
+    private KbGrantSubjectType subjectType;
 
     /**
-     * 嵌入模型，如 qwen3-embedding:8b-fp16
+     * 用户 ID 或角色名
      */
-    private String embeddingModel;
+    private String subjectId;
 
     /**
-     * Milvus Collection 名称
+     * READ / MANAGE
      */
-    private String collectionName;
-
-    /**
-     * 可见性，缺省为 PRIVATE
-     */
-    private KbVisibility visibility;
+    private KbPermission permission;
 }

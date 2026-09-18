@@ -35,6 +35,7 @@ import com.nageoffer.ai.ragent.knowledge.dao.entity.KnowledgeBaseDO;
 import com.nageoffer.ai.ragent.knowledge.dao.entity.KnowledgeDocumentDO;
 import com.nageoffer.ai.ragent.knowledge.dao.mapper.KnowledgeBaseMapper;
 import com.nageoffer.ai.ragent.knowledge.dao.mapper.KnowledgeDocumentMapper;
+import com.nageoffer.ai.ragent.knowledge.enums.KbVisibility;
 import com.nageoffer.ai.ragent.framework.context.UserContext;
 import com.nageoffer.ai.ragent.framework.exception.ClientException;
 import com.nageoffer.ai.ragent.framework.exception.ServiceException;
@@ -52,6 +53,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -112,6 +114,8 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 .collectionName(requestParam.getCollectionName())
                 .createdBy(UserContext.getUsername())
                 .updatedBy(UserContext.getUsername())
+                .ownerUserId(UserContext.getUserId())
+                .visibility((requestParam.getVisibility() == null ? KbVisibility.PRIVATE : requestParam.getVisibility()).name())
                 .deleted(0)
                 .build();
 
@@ -275,8 +279,12 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
     }
 
     @Override
-    public IPage<KnowledgeBaseVO> pageQuery(KnowledgeBasePageRequest requestParam) {
+    public IPage<KnowledgeBaseVO> pageQuery(KnowledgeBasePageRequest requestParam, Collection<String> readableKbIds) {
+        if (CollUtil.isEmpty(readableKbIds)) {
+            return new Page<>(requestParam.getCurrent(), requestParam.getSize());
+        }
         LambdaQueryWrapper<KnowledgeBaseDO> queryWrapper = Wrappers.lambdaQuery(KnowledgeBaseDO.class)
+                .in(KnowledgeBaseDO::getId, readableKbIds)
                 .like(StringUtils.hasText(requestParam.getName()), KnowledgeBaseDO::getName, requestParam.getName())
                 .eq(KnowledgeBaseDO::getDeleted, 0)
                 .orderByDesc(KnowledgeBaseDO::getUpdateTime);

@@ -27,6 +27,7 @@ import com.nageoffer.ai.ragent.knowledge.controller.vo.KnowledgeDocumentChunkLog
 import com.nageoffer.ai.ragent.knowledge.controller.vo.KnowledgeDocumentSearchVO;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -104,9 +105,10 @@ public interface KnowledgeDocumentService {
      *
      * @param keyword 关键词
      * @param limit   最大返回数量
+     * @param readableKbIds 可见的知识库范围，由调用方按访问权限给出；为空时结果为空
      * @return 文档列表
      */
-    List<KnowledgeDocumentSearchVO> search(String keyword, int limit);
+    List<KnowledgeDocumentSearchVO> search(String keyword, int limit, Collection<String> readableKbIds);
 
     /**
      * 查询文档分块日志

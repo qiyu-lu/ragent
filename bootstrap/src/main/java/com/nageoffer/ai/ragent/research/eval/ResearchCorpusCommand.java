@@ -147,8 +147,8 @@ public class ResearchCorpusCommand {
             var importer = new ResearchCorpusImporter(jdbc, JSON, new ParagraphChunker(), new ChunkEmbeddingService(embedding),
                     index, new VectorTargetResolver(defaults), transactions);
             jdbc.update("""
-                    INSERT INTO t_knowledge_base (id,name,embedding_model,collection_name,created_by)
-                    VALUES (?,?, 'qwen-emb-8b',?,'research-import') ON CONFLICT (collection_name) DO NOTHING
+                    INSERT INTO t_knowledge_base (id,name,embedding_model,collection_name,created_by,visibility)
+                    VALUES (?,?, 'qwen-emb-8b',?,'research-import','PUBLIC') ON CONFLICT (collection_name) DO NOTHING
                     """, IdUtil.getSnowflakeNextIdStr(), job.collection(), job.collection());
             String kbId = jdbc.queryForObject("SELECT id FROM t_knowledge_base WHERE collection_name=? AND deleted=0", String.class, job.collection());
             var kb = bases.selectById(kbId);

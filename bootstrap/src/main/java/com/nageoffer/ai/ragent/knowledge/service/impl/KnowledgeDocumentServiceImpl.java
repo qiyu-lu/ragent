@@ -92,6 +92,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
@@ -626,8 +627,8 @@ public class KnowledgeDocumentServiceImpl implements KnowledgeDocumentService {
     }
 
     @Override
-    public List<KnowledgeDocumentSearchVO> search(String keyword, int limit) {
-        if (!StringUtils.hasText(keyword)) {
+    public List<KnowledgeDocumentSearchVO> search(String keyword, int limit, Collection<String> readableKbIds) {
+        if (!StringUtils.hasText(keyword) || CollUtil.isEmpty(readableKbIds)) {
             return Collections.emptyList();
         }
 
@@ -635,6 +636,7 @@ public class KnowledgeDocumentServiceImpl implements KnowledgeDocumentService {
         Page<KnowledgeDocumentDO> mpPage = new Page<>(1, size);
         LambdaQueryWrapper<KnowledgeDocumentDO> qw = new LambdaQueryWrapper<KnowledgeDocumentDO>()
                 .eq(KnowledgeDocumentDO::getDeleted, 0)
+                .in(KnowledgeDocumentDO::getKbId, readableKbIds)
                 .like(KnowledgeDocumentDO::getDocName, keyword)
                 .orderByDesc(KnowledgeDocumentDO::getUpdateTime);
 

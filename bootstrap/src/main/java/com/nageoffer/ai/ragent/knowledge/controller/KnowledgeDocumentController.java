@@ -28,6 +28,8 @@ import com.nageoffer.ai.ragent.knowledge.controller.vo.KnowledgeDocumentChunkLog
 import com.nageoffer.ai.ragent.knowledge.controller.vo.KnowledgeDocumentSearchVO;
 import com.nageoffer.ai.ragent.framework.convention.Result;
 import com.nageoffer.ai.ragent.framework.web.Results;
+import com.nageoffer.ai.ragent.knowledge.enums.KbPermission;
+import com.nageoffer.ai.ragent.knowledge.service.KnowledgeAccessService;
 import com.nageoffer.ai.ragent.knowledge.service.KnowledgeDocumentService;
 import com.nageoffer.ai.ragent.knowledge.support.IngestionSpecSchemaProvider;
 import com.nageoffer.ai.ragent.rag.service.FileStorageService;
@@ -67,6 +69,7 @@ public class KnowledgeDocumentController {
     private final KnowledgeDocumentService documentService;
     private final FileStorageService fileStorageService;
     private final IngestionSpecSchemaProvider ingestionSpecSchemaProvider;
+    private final KnowledgeAccessService accessService;
 
     private static final Map<String, String> CONTENT_TYPE_MAP = Map.ofEntries(
             Map.entry("pdf", "application/pdf"),
@@ -97,6 +100,7 @@ public class KnowledgeDocumentController {
     public Result<KnowledgeDocumentVO> upload(@PathVariable("kb-id") String kbId,
                                               @RequestPart(value = "file", required = false) MultipartFile file,
                                               @ModelAttribute KnowledgeDocumentUploadRequest requestParam) {
+        accessService.requireKb(kbId, KbPermission.MANAGE);
         return Results.success(documentService.upload(kbId, requestParam, file));
     }
 
@@ -105,6 +109,7 @@ public class KnowledgeDocumentController {
      */
     @PostMapping("/knowledge-base/docs/{doc-id}/chunk")
     public Result<Void> startChunk(@PathVariable(value = "doc-id") String docId) {
+        accessService.requireDocument(docId, KbPermission.MANAGE);
         documentService.startChunk(docId);
         return Results.success();
     }
@@ -114,6 +119,7 @@ public class KnowledgeDocumentController {
      */
     @DeleteMapping("/knowledge-base/docs/{doc-id}")
     public Result<Void> delete(@PathVariable(value = "doc-id") String docId) {
+        accessService.requireDocument(docId, KbPermission.MANAGE);
         documentService.delete(docId);
         return Results.success();
     }
@@ -123,6 +129,7 @@ public class KnowledgeDocumentController {
      */
     @GetMapping("/knowledge-base/docs/{docId}")
     public Result<KnowledgeDocumentVO> get(@PathVariable String docId) {
+        accessService.requireDocument(docId, KbPermission.READ);
         return Results.success(documentService.get(docId));
     }
 
@@ -132,6 +139,7 @@ public class KnowledgeDocumentController {
     @PutMapping("/knowledge-base/docs/{docId}")
     public Result<Void> update(@PathVariable String docId,
                                @RequestBody KnowledgeDocumentUpdateRequest requestParam) {
+        accessService.requireDocument(docId, KbPermission.MANAGE);
         documentService.update(docId, requestParam);
         return Results.success();
     }
@@ -142,6 +150,7 @@ public class KnowledgeDocumentController {
     @GetMapping("/knowledge-base/{kb-id}/docs")
     public Result<IPage<KnowledgeDocumentVO>> page(@PathVariable(value = "kb-id") String kbId,
                                                    KnowledgeDocumentPageRequest requestParam) {
+        accessService.requireKb(kbId, KbPermission.READ);
         return Results.success(documentService.page(kbId, requestParam));
     }
 
@@ -151,7 +160,8 @@ public class KnowledgeDocumentController {
     @GetMapping("/knowledge-base/docs/search")
     public Result<List<KnowledgeDocumentSearchVO>> search(@RequestParam(value = "keyword", required = false) String keyword,
                                                           @RequestParam(value = "limit", defaultValue = "8") int limit) {
-        return Results.success(documentService.search(keyword, limit));
+        return Results.success(documentService.search(keyword, limit,
+                accessService.accessibleKbIds(accessService.current(), KbPermission.READ)));
     }
 
     /**
@@ -160,6 +170,7 @@ public class KnowledgeDocumentController {
     @PatchMapping("/knowledge-base/docs/{docId}/enable")
     public Result<Void> enable(@PathVariable String docId,
                                @RequestParam("value") boolean enabled) {
+        accessService.requireDocument(docId, KbPermission.MANAGE);
         documentService.enable(docId, enabled);
         return Results.success();
     }
@@ -170,6 +181,7 @@ public class KnowledgeDocumentController {
     @GetMapping("/knowledge-base/docs/{docId}/chunk-logs")
     public Result<IPage<KnowledgeDocumentChunkLogVO>> getChunkLogs(@PathVariable String docId,
                                                                    Page<KnowledgeDocumentChunkLogVO> page) {
+        accessService.requireDocument(docId, KbPermission.MANAGE);
         return Results.success(documentService.getChunkLogs(docId, page));
     }
 
@@ -178,6 +190,7 @@ public class KnowledgeDocumentController {
      */
     @GetMapping("/knowledge-base/docs/{docId}/preview")
     public Result<String> preview(@PathVariable String docId) {
+        accessService.requireDocument(docId, KbPermission.READ);
         return Results.success(documentService.preview(docId));
     }
 
@@ -186,6 +199,7 @@ public class KnowledgeDocumentController {
      */
     @GetMapping("/knowledge-base/docs/{docId}/file")
     public void file(@PathVariable String docId, HttpServletResponse response) throws Exception {
+        accessService.requireDocument(docId, KbPermission.READ);
         var doc = documentService.get(docId);
         String fileType = doc.getFileType() != null ? doc.getFileType().toLowerCase() : "";
         String contentType = CONTENT_TYPE_MAP.getOrDefault(fileType, "application/octet-stream");

@@ -1,0 +1,101 @@
+{
+  "experiment": "X5",
+  "date": "2026-09-18",
+  "commit": "80125b0 + IngestionReuseCommand",
+  "upstream": "stub (eval/agentic-research/stub_upstream.py); tokens are stub estimates, latency is not the provider's",
+  "runDir": "local-data/agentic-research/runs/career_X5_stub_v1",
+  "model": "siliconflow:Qwen/Qwen3-Embedding-8B",
+  "dimension": 1536,
+  "steps": [
+    {
+      "step": "v13_uncached",
+      "file": "铁矿石人工检测流程调研V1.3-demo.xlsx",
+      "cache": false,
+      "chunks": 79,
+      "cacheHits": 0,
+      "cacheMisses": 79,
+      "upstreamTexts": 79,
+      "upstreamCalls": 3,
+      "upstreamTokens": 14379,
+      "embedMillis": 312,
+      "totalMillis": 1528,
+      "chunkRows": 79,
+      "vectorRows": 79
+    },
+    {
+      "step": "v12_cold",
+      "file": "铁矿石人工检测流程调研V1.2.xlsx",
+      "cache": true,
+      "chunks": 79,
+      "cacheHits": 0,
+      "cacheMisses": 79,
+      "upstreamTexts": 79,
+      "upstreamCalls": 3,
+      "upstreamTokens": 14352,
+      "embedMillis": 185,
+      "totalMillis": 441,
+      "chunkRows": 79,
+      "vectorRows": 79
+    },
+    {
+      "step": "v12_repeat",
+      "file": "铁矿石人工检测流程调研V1.2.xlsx",
+      "cache": true,
+      "chunks": 79,
+      "cacheHits": 79,
+      "cacheMisses": 0,
+      "upstreamTexts": 0,
+      "upstreamCalls": 0,
+      "upstreamTokens": 0,
+      "embedMillis": 54,
+      "totalMillis": 278,
+      "chunkRows": 79,
+      "vectorRows": 79
+    },
+    {
+      "step": "v13_upgrade",
+      "file": "铁矿石人工检测流程调研V1.3-demo.xlsx",
+      "cache": true,
+      "chunks": 79,
+      "cacheHits": 77,
+      "cacheMisses": 2,
+      "upstreamTexts": 2,
+      "upstreamCalls": 1,
+      "upstreamTokens": 428,
+      "embedMillis": 110,
+      "totalMillis": 263,
+      "chunkRows": 79,
+      "vectorRows": 79
+    },
+    {
+      "step": "v12_rollback",
+      "file": "铁矿石人工检测流程调研V1.2.xlsx",
+      "cache": true,
+      "chunks": 79,
+      "cacheHits": 79,
+      "cacheMisses": 0,
+      "upstreamTexts": 0,
+      "upstreamCalls": 0,
+      "upstreamTokens": 0,
+      "embedMillis": 30,
+      "totalMillis": 216,
+      "chunkRows": 79,
+      "vectorRows": 79
+    }
+  ],
+  "stubEmbeddingRequests": 7,
+  "derived": {
+    "repeatUpstreamCalls": 0,
+    "rollbackUpstreamCalls": 0,
+    "upgradeReembedChunkRatio": 0.0253,
+    "upgradeUpstreamTextRatioVsUncached": 0.0253,
+    "upgradeTokenRatioVsUncached": 0.0298,
+    "upgradeTokensSaved": 13951,
+    "upgradeEmbedMillisVsUncached": [
+      110,
+      312
+    ],
+    "rowsConsistent": true
+  },
+  "real": "pending: X5_UPSTREAM=real X5_STAMP=career_X5_real_v1 bash scripts/career-x5.sh"
+}

@@ -1,10 +1,8 @@
 # 统一研究工作流的数据、评测与复测
 
-最新停点与恢复命令见[2026-09-18 会话交接](../../docs/iron-ore-rag/agentic-research-resume-2026-09-18.md)。R1—R4 已实施，历史 R5 因 embedding 连续无响应停止，主批仅 22/1200；两轮 repeat 与 72 项应用对照尚未开始。当前按计划 8.7 成组实现秋招版本，再集中验收；角色模型改动使用新批次。
+这里实现离线转换、真实幂等摄取、原生研究与统一产物，以及 P7 固定 A/B/C 对照和应用原文核对。转换不调用模型；`import_corpus.py --execute` 复用项目分块、向量化和索引落点。真实评测的配置、逐题输出、trace、usage 和失败保存在独立批次，见执行记录与交接说明。
 
-这里实现离线转换、真实幂等摄取、原生研究与统一产物，以及 P7 固定 A/B/C 对照和应用原文核对。转换不调用模型；`import_corpus.py --execute` 复用项目分块、向量化和索引落点。真实评测的配置、逐题输出、trace、usage 和失败保存在独立批次，见[执行记录](../../docs/iron-ore-rag/agentic-research-execution-log.md)与[交接说明](../../docs/iron-ore-rag/agentic-research-handoff.md)。
-
-P7 固定 regression 已全部记录 400 问题/1200 任务，MuSiQue 答案/支持的分母为 105 行可回答；完整质量和限制见[对照报告](../../docs/iron-ore-rag/agentic-research-evaluation-report.md)。[P7 机器清单](manifests/research-p7-evaluation-2026-09-17.json)冻结配置、原始产物 SHA、调用资源、作者公式对齐、173/28 程序检查和实际委派案例；full 5839/17517 只准备，未付费执行。
+P7 固定 regression 已全部记录 400 问题/1200 任务，MuSiQue 答案/支持的分母为 105 行可回答；完整质量和限制见对照报告。[P7 机器清单](manifests/research-p7-evaluation-2026-09-17.json)冻结配置、原始产物 SHA、调用资源、作者公式对齐、173/28 程序检查和实际委派案例；full 5839/17517 只准备，未付费执行。
 
 ## 来源与环境
 
@@ -163,7 +161,7 @@ python3 eval/agentic-research/import_corpus.py --prepared local-data/agentic-res
 
 2026-09-17 已完成 QASPER train/validation 与 MuSiQue Full train/dev 全量导入：共 122,620 文档、182,768 来源段落、182,896 实际块/向量。每个 split 的三条真实 scoped search/read 和拒绝检查通过，最终库存、正文 hash、来源映射、标注隔离及标准摄取配置审计通过。真实 test 未转换/入库，未运行答案生成或质量评分。
 
-转换条数和指纹见[转换清单](manifests/prepared-development-2026-09-17.json)；实际主键、库存、源码/产物指纹及 usage 摘要见[导入清单](manifests/imported-development-2026-09-17.json)，失败和验证边界见[验证报告](../../docs/iron-ore-rag/agentic-research-validation-report.md)。大文件和原始日志留在忽略目录。
+转换条数和指纹见[转换清单](manifests/prepared-development-2026-09-17.json)；实际主键、库存、源码/产物指纹及 usage 摘要见[导入清单](manifests/imported-development-2026-09-17.json)，失败和验证边界见验证报告。大文件和原始日志留在忽略目录。
 
 ## P7 固定 A/B/C 质量对照
 

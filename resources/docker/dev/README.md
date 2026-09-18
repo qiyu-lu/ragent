@@ -48,7 +48,7 @@ RAGENT_ROCKETMQ_VOLUME_NAME=ragent-iron-ore-dev_rocketmq-external-data
 RAGENT_ROCKETMQ_VOLUME_EXTERNAL=true
 ```
 
-切换前必须停 Broker，完整复制原存储目录并核对内容、稀疏文件和 UID/GID，然后用 Docker `local` 驱动的 `type=none,o=bind,device=绝对目录` 创建外部卷，最后设置上述变量。**不要只设置变量、挂一个空目录就启动旧业务。** 迁移过程和实际验证统一记录在[任务 Agent 改动记录](../../../docs/iron-ore-rag/changes/2026-09-15-task-agent.md#2026-09-16rocketmq-存储迁移)。
+切换前必须停 Broker，完整复制原存储目录并核对内容、稀疏文件和 UID/GID，然后用 Docker `local` 驱动的 `type=none,o=bind,device=绝对目录` 创建外部卷，最后设置上述变量。**不要只设置变量、挂一个空目录就启动旧业务。** 迁移过程和实际验证统一记录在任务 Agent 改动记录。
 
 日后仍使用本页开头的普通 `docker compose -f ... up -d` 命令，同目录 `.env` 会选择外部卷；没有这两个覆盖项的机器继续使用默认命名卷。机制见 [Docker 外部卷与指定宿主机路径文档](https://docs.docker.com/reference/compose-file/volumes/)。
 

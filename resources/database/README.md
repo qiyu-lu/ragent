@@ -34,7 +34,7 @@ P1 已移除送检、任务模拟与 ROS1 代码，P5 已用研究 artifact 替�
 
 当前已实现任务归属检查、纯知识检索、块级/邻接快照、调度、租约/epoch、取消和事件写入。邻接快照通过 `origin_evidence_id` 关联同一运行内原候选并保留首次展开；事件序号由 run 行原子 UPDATE 分配。REPORT/PLAN artifact 和终态事件原子提交，SSE 查询不负责调度。
 
-公开资料的稳定主键映射使用 `260917_04_research_corpus.sql`；已有环境在 02、03 之后手工应用它，新 schema 已包含对应表。导入及运行说明见[研究交接](../../docs/iron-ore-rag/agentic-research-handoff.md)。本轮只验证隔离新库/升级库，未对业务数据库执行迁移。
+公开资料的稳定主键映射使用 `260917_04_research_corpus.sql`；已有环境在 02、03 之后手工应用它，新 schema 已包含对应表。导入及运行说明见研究交接。本轮只验证隔离新库/升级库，未对业务数据库执行迁移。
 
 可运行 `bash scripts/validate-agentic-research-p2-database.sh`，在开发 PostgreSQL 容器中随机创建隔离库，验证新建 schema 与两次增量执行的列、默认值、约束及索引一致、历史草稿保留和存储约束。`P2_POSTGRES_CONTAINER` 可覆盖容器名；脚本只删除本次成功创建的测试库，不能视为已有业务环境已升级。
 

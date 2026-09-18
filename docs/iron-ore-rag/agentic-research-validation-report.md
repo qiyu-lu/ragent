@@ -1,5 +1,7 @@
 # 统一研究工作流验证报告
 
+S2 最新代码改进及暂停：新增连续检索失败限制、有限原生结束、无证据故障不能转为追问、纯执行错误不必伪造 gaps，以及实际协议/连接复用记录。31 类 217 项后端和 33 项 Python 全通过，0 失败/错误/跳过，随机测试库删除；最后调整空 gaps 契约后，30 项本地 HTTP/工具测试再次通过，不重复累加用例。实际客户端短检查 2 请求成功、已知 8 total tokens、unknown 0，默认协议与 HTTP/1.1 各一次；应用仍出现超时，不能认定检索稳定。应用复测被用户要求中止，1 条 FAILED 记录受 JVM 关闭影响、另一在途任务未导出终态；随机库已删除，完整原始文件保留。S3 未启动，业务语义验收与 S4 暂停，不构成质量结论。见[S2 暂停清单](../../eval/agentic-research/manifests/research-s2-pause-2026-09-18.json)和[最新交接第 7 节](agentic-research-resume-2026-09-18.md#7-s2-代码改进交付与用户要求暂停)。以下均为此前批次快照。
+
 秋招版本 S1 与 S2 状态修复本轮（2026-09-18 13:05）：`scripts/validate-agentic-research-p7.sh` 的 30 个指定测试类共 211 项后端检查及 33 项 Python 全通过，0 失败/错误/跳过；随机 PostgreSQL 测试库已删除。新增检查覆盖角色模型选择、历史单模型实验绑定、SDK 实际请求/台账一致性、未恢复检索失败与成功恢复后的状态。真实 2 条应用的 Max/Flash/Max 共 26 次模型请求均有正常返回，PLAN 一次缺少 gaps 字段后修复；28 次 embedding 全失败、产物零引用，不是业务质量通过。另一次 Max JSON 合成示例通过（53/14 tokens），4 次 embedding transport 检查 2 成功/2 失败，均独立留档。真实应用/JSON 检查完成于 S2 状态修复前，当前状态修复只经本地 SDK/服务回归，未做当前源码的真实业务复测。没有新增前端/浏览器检查。见[本轮清单](../../eval/agentic-research/manifests/research-s1-model-roles-2026-09-18.json)和[最新交接](agentic-research-resume-2026-09-18.md#6-秋招版本本轮实施与下一步)。下方各批次数字保留历史边界。
 
 最新 R1—R5 改进状态见[会话交接](agentic-research-resume-2026-09-18.md)和[R5 清单](../../eval/agentic-research/manifests/research-r5-validation-2026-09-18.json)。本轮唯一相关后端 213 项、Python 30 项、前端流恢复 4 项与浏览器夹具 9 项通过；构建通过，app 原有 24 项类型诊断保留。R5 主批仅 22/1200、复跑与应用未开始，程序检查通过不能代替整体质量验收。以下 P0—P8 数字保留为历史快照。

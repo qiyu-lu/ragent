@@ -28,6 +28,8 @@ import java.util.concurrent.CancellationException;
 
 /** 每个 Agent 独立保存已读证据与结论，父领取、预算和取消关系由服务端绑定。 */
 public class ResearchSession {
+    private static final int MAX_CONSECUTIVE_RETRIEVAL_FAILURES = 2;
+    private static final String RETRIEVAL_FAILURE_LIMIT = "RETRIEVAL_FAILURE_LIMIT";
     public record Outcome(String question, SubtaskResult result) { }
     public final ResearchRunStore.Claim claim;
     public final ResearchBudget budget;
@@ -44,6 +46,7 @@ public class ResearchSession {
     private final Map<String, String> candidateDocuments = new LinkedHashMap<>();
 
     public synchronized void beforeSearch(String query, List<String> documents) {
+        if (retrievalBlocked()) throw new ClientException("RETRIEVAL_FAILURE_LIMIT: stop searching and finish with already-read evidence and execution issues. Changing the query does not repair an unavailable retrieval service.");
         if (query == null || query.isBlank() || query.length() > 10000) throw new ClientException("检索问题无效");
         if (requiresRead()) throw new ClientException("Read a relevant candidate before searching again. Unread IDs: " + unreadCandidates());
         String key = normalize(query) + "|" + (documents == null ? List.of() : documents.stream().sorted().toList());
@@ -69,6 +72,7 @@ public class ResearchSession {
     private int finishRepairCallsRemaining = -1;
     private volatile Outcome outcome;
     private String retrievalIssue;
+    private int consecutiveRetrievalFailures;
     volatile String activeToolCallId;
 
     public <T> T retrieve(java.util.function.Supplier<T> action) {
@@ -80,10 +84,15 @@ public class ResearchSession {
              var cancellation = control.bindInterrupt(operation::cancel);
              var binding = operation.bind()) {
             T result = operation.measure("search_knowledge", action);
-            synchronized (this) { retrievalIssue = null; }
+            synchronized (this) { retrievalIssue = null; consecutiveRetrievalFailures = 0; }
             return result;
         } catch (com.nageoffer.ai.ragent.infra.operation.RequestOperation.Failure failure) {
-            synchronized (this) { retrievalIssue = "RETRIEVAL_FAILED:" + failure.code + "@" + failure.phase; }
+            synchronized (this) {
+                retrievalIssue = "RETRIEVAL_FAILED:" + failure.code + "@" + failure.phase;
+                consecutiveRetrievalFailures++;
+            }
+            if (retrievalBlocked()) event("RETRIEVAL_UNAVAILABLE", "检索连续失败，停止继续补查",
+                    Map.of("consecutiveFailures", consecutiveRetrievalFailures, "code", failure.code, "phase", failure.phase));
             throw failure;
         } catch (RuntimeException error) { throw error; }
         catch (Exception error) { throw new IllegalStateException(error); }
@@ -202,6 +211,7 @@ public class ResearchSession {
         }
     }
     public synchronized int reserveTasks(List<ResearchTask> tasks) {
+        if (retrievalBlocked()) throw new ClientException("RETRIEVAL_FAILURE_LIMIT: do not delegate more searches to an unavailable retrieval service; finish with execution issues.");
         Set<String> goals = new HashSet<>();
         for (var task : tasks) {
             String goal = normalize(task.goal());
@@ -220,8 +230,14 @@ public class ResearchSession {
     public synchronized List<String> executionIssues() {
         Set<String> issues = new LinkedHashSet<>();
         if (retrievalIssue != null) issues.add(retrievalIssue);
+        if (consecutiveRetrievalFailures >= MAX_CONSECUTIVE_RETRIEVAL_FAILURES) issues.add(RETRIEVAL_FAILURE_LIMIT);
         results.values().stream().flatMap(r -> r.executionIssues().stream()).forEach(issues::add);
         return List.copyOf(issues);
+    }
+    public synchronized boolean retrievalBlocked() {
+        return consecutiveRetrievalFailures >= MAX_CONSECUTIVE_RETRIEVAL_FAILURES
+                || citableIds().isEmpty() && !results.isEmpty()
+                && results.values().stream().allMatch(r -> r.executionIssues().contains(RETRIEVAL_FAILURE_LIMIT));
     }
     public synchronized List<String> workerGaps() {
         return results.values().stream().filter(r -> r.status() != SubtaskResult.Status.COMPLETED)

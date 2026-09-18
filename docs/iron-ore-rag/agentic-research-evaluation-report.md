@@ -1,5 +1,7 @@
 # P7 固定公开数据对照结果
 
+当前 S2 代码改进已完成必要程序回归。用户要求为节省 5h 额度暂停、不再测评，32 题/96 ABC 项没有启动；两条应用兼容性复测已受控中止，未形成可验收产物。当前版本没有新增答案 F1、语义支持率或多 Agent 收益结论，暂停后的工作须等用户再次要求继续。详见[S2 暂停清单](../../eval/agentic-research/manifests/research-s2-pause-2026-09-18.json)与[交接第 7 节](agentic-research-resume-2026-09-18.md#7-s2-代码改进交付与用户要求暂停)。
+
 秋招版本（计划 8.7）已新增 Max/Flash/Max 角色配置及检索失败状态修复。当前只有供应商/SDK 兼容性记录，32 题/96 ABC 项的新固定开发验收尚未执行；两条真实应用零引用且检索失败，不能据此更新答案 F1、证据质量或多 Agent 收益。下方及 R1—R5 数字仍属于各自全 Flash 历史配置，详见[最新交接](agentic-research-resume-2026-09-18.md#6-秋招版本本轮实施与下一步)与[本轮清单](../../eval/agentic-research/manifests/research-s1-model-roles-2026-09-18.json)。
 
 固定 regression：QASPER validation 200 个问题与 MuSiQue Full dev 200 行，A/B/C 共 1200 个任务均已记录；失败和超时保留在相应分母。主/worker 为 research-main-v3/research-worker-v2，最终生成 v4，模型 qwen3.7-flash-2026-07-15、temperature=0、thinking=false；并发 2、PGVector、rerank 关闭、recall 20/candidate 40，A 固定 top 10。每运行共享 16 模型/24 工具/300 秒活动预算并预留 2 次最终生成。

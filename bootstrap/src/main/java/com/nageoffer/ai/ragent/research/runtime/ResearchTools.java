@@ -92,6 +92,9 @@ public class ResearchTools {
     public Object ask(@ToolParam(name = "question") String question) {
         return guarded(() -> {
             if (!session.main()) throw new ClientException("子任务的用户条件问题必须通过 gaps 返回");
+            if (session.citableIds().isEmpty() && !session.executionIssues().isEmpty()) {
+                throw new ClientException("RETRIEVAL_EXECUTION_FAILURE: ask_user cannot repair a failed retrieval service. Finish with empty findings and the execution issue; do not ask the user to re-upload or supply source facts because a search timed out.");
+            }
             if (question == null || question.isBlank() || question.length() > 2000) {
                 throw new ClientException("必须提出一个长度合理的明确问题");
             }
@@ -106,8 +109,9 @@ public class ResearchTools {
                          @ToolParam(name = "conflicts") List<String> conflicts) {
         return guarded(() -> {
             if (findings == null || gaps == null || conflicts == null || findings.size() > 30
-                    || gaps.size() > 30 || conflicts.size() > 30 || findings.isEmpty() && gaps.isEmpty()) {
-                throw new ClientException("研究结果必须包含发现或资料缺口，且各项不能超过 30 条");
+                    || gaps.size() > 30 || conflicts.size() > 30
+                    || findings.isEmpty() && gaps.isEmpty() && session.executionIssues().isEmpty()) {
+                throw new ClientException("研究结果必须包含发现、资料缺口或已有执行错误，且各项不能超过 30 条");
             }
             var delivered = session.citableIds();
             if (!session.main() && (findings.size() > 8 || gaps.size() > 8 || conflicts.size() > 8

@@ -1,5 +1,7 @@
 # P7 应用产物原文核对
 
+S2 新批 `20260918_S2_applications_v1` 的两条 C 复测已按用户要求中止，返回 JAVA_EXIT_143，独立任务库已删除。`plan-06/C` 导出 FAILED/RESEARCH_EXECUTION_FAILED，JVM 关闭日志与该终态相邻，应按中止相关记录保留；已读 3 个证据 ID，没有已发布产物。`comparison-02/C` 已启动 worker 与检索，但没有导出终态，不称为完全未发起请求。已捕获 embedding 6 请求、3 成功/3 unknown，实际 h2；已导出模型台账仅覆盖 Max 主角色 6 次正常返回、input 28644/output 973，另一在途任务的模型调用未完整导出，不能作为整批总调用或整批 unknown=0。S3 和当前业务语义验收暂停，见[S2 清单](../../eval/agentic-research/manifests/research-s2-pause-2026-09-18.json)与最新交接第 7 节。下段“未复测”属于此前状态。
+
 秋招 S1 兼容性批次 `20260918_S1_applications_v1` 的 `comparison-02/C` 与 `plan-06/C` 均在旧状态判定下标为 COMPLETED，但 28 次 embedding 全失败，两个产物均零章节/零引用，PLAN 无来源支持的步骤；实际是检索阻塞，不能算比较或计划质量通过。S2 已修复此类无证据执行失败的终态判定，目前经本地回归验证，未用当前源码做真实复测。强模型仍出现一次 PLAN 缺少 gaps 字段并经唯一修复恢复；不能认为换模型后无需结构校验。见[本轮清单](../../eval/agentic-research/manifests/research-s1-model-roles-2026-09-18.json)。下方 P7/R4 原文核对仍为各自历史批次。
 
 24 个冻结任务均已真实执行：5 COMPLETED、15 PARTIAL、4 FAILED。20 个已发布产物的 85 条引用快照已由 Codex 对照正文检查；这不是独立人工盲评，也没有调用裁判模型。运行状态、引用身份合法和语义支持是不同结论。完整固定 A/B/C 结果见[对照报告](agentic-research-evaluation-report.md)，程序验证见[验证报告](agentic-research-validation-report.md)。

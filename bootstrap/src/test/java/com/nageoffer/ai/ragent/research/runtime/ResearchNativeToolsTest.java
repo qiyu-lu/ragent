@@ -187,11 +187,11 @@ class ResearchNativeToolsTest {
         when(search.search(anyString(), anyString(), anyString(), anyString(), anyList(), any(), anyInt()))
                 .thenThrow(new com.nageoffer.ai.ragent.infra.operation.RequestOperation.Failure("embedding", "NETWORK_ERROR", true, null));
         tool("search-failed", "search_knowledge", Map.of("query", "latency"));
-        tool("finish-after-failure", "finish_research", Map.of("findings", List.of(), "gaps", List.of("No retrieved content"), "conflicts", List.of()));
+        tool("finish-after-failure", "finish_research", Map.of("findings", List.of(), "gaps", List.of(), "conflicts", List.of()));
         var result = factory().run(session).result();
         assertEquals(SubtaskResult.Status.PARTIAL, result.status());
         assertEquals(List.of("RETRIEVAL_FAILED:NETWORK_ERROR@embedding"), result.executionIssues());
-        assertEquals(List.of("No retrieved content"), result.gaps());
+        assertTrue(result.gaps().isEmpty(), "A failed service is an execution issue, not proof that the source lacks information");
     }
 
     @Test void successfulRetrievalAfterTransientFailureClearsTheUnresolvedExecutionIssue() {
@@ -203,6 +203,64 @@ class ResearchNativeToolsTest {
         assertTrue(session.executionIssues().isEmpty(), "A recovered API failure must not force a later legitimate source gap to fail");
         var result = (SubtaskResult) new ResearchTools(session, search, reader).finish(List.of(), List.of("The source lacks this parameter"), List.of());
         assertEquals(SubtaskResult.Status.COMPLETED, result.status());
+    }
+
+    @Test void consecutiveFailuresForceBoundedNativeFinishAndRejectFurtherQueries() throws Exception {
+        when(search.search(anyString(), anyString(), anyString(), anyString(), anyList(), any(), anyInt()))
+                .thenThrow(new com.nageoffer.ai.ragent.infra.operation.RequestOperation.Failure("embedding", "NETWORK_ERROR", true, null));
+        tool("first", "search_knowledge", Map.of("query", "latency"));
+        tool("retry", "search_knowledge", Map.of("query", "response time"));
+        // A provider ignoring tool_choice must still be unable to start another HTTP retrieval.
+        tool("ignored-choice", "search_knowledge", Map.of("query", "yet another query"));
+        tool("finish", "finish_research", Map.of("findings", List.of(), "gaps", List.of("Research could not access the service"), "conflicts", List.of()));
+        var result = factory().run(session).result();
+        assertEquals(SubtaskResult.Status.PARTIAL, result.status());
+        assertTrue(result.executionIssues().contains("RETRIEVAL_FAILURE_LIMIT"));
+        assertEquals(4, server.getRequestCount());
+        verify(search, times(2)).search(anyString(), anyString(), anyString(), anyString(), anyList(), any(), anyInt());
+        for (int i = 0; i < 2; i++) server.takeRequest(5, TimeUnit.SECONDS);
+        for (int i = 0; i < 2; i++) {
+            var body = json.readTree(server.takeRequest(5, TimeUnit.SECONDS).getBody().readUtf8());
+            assertEquals("finish_research", body.path("tool_choice").path("function").path("name").asText());
+        }
+    }
+
+    @Test void failedRetrievalWithoutEvidenceCannotBeConvertedIntoAUserQuestion() throws Exception {
+        when(search.search(anyString(), anyString(), anyString(), anyString(), anyList(), any(), anyInt()))
+                .thenThrow(new com.nageoffer.ai.ragent.infra.operation.RequestOperation.Failure("embedding", "NETWORK_ERROR", true, null));
+        tool("failed", "search_knowledge", Map.of("query", "latency"));
+        tool("incorrect-ask", "ask_user", Map.of("question", "Please upload the sources again"));
+        tool("finish", "finish_research", Map.of("findings", List.of(), "gaps", List.of("Service unavailable"), "conflicts", List.of()));
+        var outcome = factory().run(session);
+        assertNull(outcome.question());
+        assertEquals(SubtaskResult.Status.PARTIAL, outcome.result().status());
+        for (int i = 0; i < 2; i++) server.takeRequest(5, TimeUnit.SECONDS);
+        assertTrue(server.takeRequest(5, TimeUnit.SECONDS).getBody().readUtf8().contains("RETRIEVAL_EXECUTION_FAILURE"));
+    }
+
+    @Test void recoveredFailureResetsTheLimitAndPreservesPendingReadsWhenLaterSearchesFail() {
+        var failure = new com.nageoffer.ai.ragent.infra.operation.RequestOperation.Failure("embedding", "NETWORK_ERROR", true, null);
+        assertThrows(failure.getClass(), () -> session.retrieve(() -> { throw failure; }));
+        session.retrieve(List::of);
+        assertThrows(failure.getClass(), () -> session.retrieve(() -> { throw failure; }));
+        assertFalse(session.retrievalBlocked());
+        session.candidateHits(List.of(hit("ev-one")));
+        assertThrows(failure.getClass(), () -> session.retrieve(() -> { throw failure; }));
+        assertTrue(session.retrievalBlocked());
+        var tools = new ResearchTools(session, search, reader);
+        assertFalse(tools.read("ev-one", SourceReadResult.ReadMode.CHUNK) instanceof ToolResultBlock);
+        assertTrue(session.citableIds().contains("ev-one"));
+        var result = (SubtaskResult) tools.finish(List.of(new SubtaskResult.Finding("Parameter is 7 ms.", List.of("ev-one"))), List.of(), List.of());
+        assertEquals(SubtaskResult.Status.PARTIAL, result.status());
+        assertEquals(1, result.findings().size());
+    }
+
+    @Test void mainStopsDelegatingWhenEveryWorkerHitTheRetrievalLimitWithoutEvidence() {
+        session.accept(new SubtaskResult("worker-1", List.of(), List.of(), List.of(), SubtaskResult.Status.PARTIAL,
+                List.of("RETRIEVAL_FAILURE_LIMIT")), java.util.Set.of());
+        assertTrue(session.retrievalBlocked());
+        assertThrows(ClientException.class, () -> session.beforeSearch("retry", List.of()));
+        assertThrows(ClientException.class, () -> session.reserveTasks(List.of()));
     }
 
     @Test

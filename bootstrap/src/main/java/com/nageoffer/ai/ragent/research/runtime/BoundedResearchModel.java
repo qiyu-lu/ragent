@@ -95,6 +95,7 @@ public class BoundedResearchModel implements Model {
     private Flux<ChatResponse> attempt(List<Msg> messages, List<ToolSchema> tools, GenerateOptions options) {
         return Flux.defer(() -> {
             session.check();
+            if (!finalization && session.retrievalBlocked() && !session.requiresRead()) session.requestFinishRepair();
             List<Msg> withBudget = new ArrayList<>(messages);
             int remainingCalls = session.remainingModelCalls(properties.getMaxWorkerModelCalls()) - 1;
             String reminder = "Server budget reminder: after this request "
@@ -102,6 +103,11 @@ public class BoundedResearchModel implements Model {
                     + "read only indispensable evidence and call finish_research with already-read findings and explicit gaps. "
                     + "Do not spend the finalization reserve. Missing source facts must remain gaps.";
             reminder += "\nExact evidence IDs currently permitted in findings[].evidenceIds: " + session.citableIds();
+            if (session.retrievalBlocked()) reminder += "\nRetrieval has reached its consecutive failure limit. "
+                    + "Do not search again or delegate more searches. Read any pending relevant candidates, then call finish_research "
+                    + "with already-read findings. Preserve execution issues; an unavailable service does not establish a source gap "
+                    + "and cannot be repaired by asking the user to provide source facts. If no supported finding or verified source gap "
+                    + "exists, empty findings/gaps/conflicts arrays are valid because the server preserves the execution issues.";
             if (session.main() && !session.results().isEmpty()) {
                 try { reminder += "\nValidated compressed worker results (read proof checked by server): "
                         + json.writeValueAsString(session.results()); }

@@ -155,7 +155,7 @@ python3 eval/agentic-research/import_corpus.py --prepared local-data/agentic-res
 
 `evaluate_research.py` 使用同一份 gold-free query、允许范围、模型和检索配置，默认执行三个模式。A 对原问题做一次 scoped search、固定 top 10 后阅读，再使用共享生成器；这是复用项目组件的控制变量基线，不代表普通聊天的改写、意图、历史、MCP 和候选回退全链路。B 不注册委派工具，C 使用在线主 Agent 的按需委派逻辑；B/C 共用相同的全局研究额度，实际 worker 数单独报告。A 的 toolCalls 统计固定检索阶段，命中块读取是该阶段的正文装配；B/C 的 toolCalls 是原生工具调用数，两者不能直接当作相同粒度的数据库 I/O 次数。
 
-[固定配置](configs/p7.json)保存 `qwen3.7-flash-2026-07-15`、并发 2、PGVector、rerank 关闭、召回 20 / 候选 40、预算与费用估算表。Java 命令校验实际应用模型和预算是否匹配，不能静默换模型。短答案格式只附加到最终生成提示，不混入研究 brief；问题与用户约束在 A/B/C 中相同。QASPER 使用 paper scope；MuSiQue Full dev 使用原 distractor scope。标签只在模型执行结束后的离线评分中解析，执行前仅保存文件指纹。
+[固定配置](configs/p7.json)保存 `qwen3.7-flash-2026-07-15`、并发 2、PGVector、rerank 关闭、召回 20 / 候选 40，以及技术调用上限。Java 命令校验实际应用模型和技术上限是否匹配，不能静默换模型。短答案格式只附加到最终生成提示，不混入研究 brief；问题与用户约束在 A/B/C 中相同。QASPER 使用 paper scope；MuSiQue Full dev 使用原 distractor scope。标签只在模型执行结束后的离线评分中解析，执行前仅保存文件指纹。
 
 ```bash
 # 默认仅冻结请求、数据/源码指纹与配置，不调用 API
@@ -172,9 +172,13 @@ python3 eval/agentic-research/evaluate_research.py --run-dir local-data/agentic-
 python3 eval/agentic-research/evaluate_research.py --run-dir local-data/agentic-research/runs/<existing-id> --profile regression --resume --score-only
 # 已有逐题分数与真实 trace 的失败分类，不调用模型、不覆盖原始预测
 python3 eval/agentic-research/diagnose_research.py --run-dir local-data/agentic-research/runs/<existing-id> --output local-data/agentic-research/runs/<existing-id>/diagnostics.json
+# 原失败题复测：case-ids.json 是预先固定的唯一题目 ID 数组，另开新批次保留失败
+python3 eval/agentic-research/evaluate_research.py --run-dir local-data/agentic-research/runs/<new-replay-id> --profile regression --case-ids <case-ids.json> --execute
 ```
 
-恢复和离线重算必须使用相同数据、源码和配置；代码变化时创建新批次，或使用原批次 `source-snapshot` 的隔离检出。每批包含 `run.json`、`requests.json`、源码快照、逐模式 attempts、原始预测/trace/usage、规范预测、逐题分数、`summary.json` 和 `report.md`。失败与超时进入分母和耗时统计，未知 usage 保持 unknown，未执行数量单列。默认每批生成费用估算上限为 30 元，按实际已知 usage 和未知请求预留逐步检查；Embedding 费用与账户账单未核对，不将估算当实际扣款。full 的总规模和预估费用必须先核对，提供命令不代表已经运行全量。
+恢复和离线重算必须使用相同数据、源码和配置；代码变化时创建新批次，或使用原批次 `source-snapshot` 的隔离检出。每批包含 `run.json`、`requests.json`、源码快照、逐模式 attempts、原始预测/trace/usage、规范预测、逐题分数、`summary.json` 和 `report.md`。失败与超时进入分母和耗时统计，未知 usage 保持 unknown，未执行数量单列。
+
+按用户 2026-09-18 的调用约定，默认直接执行已授权实验，省略价格查询、金额估算和费用确认。`estimate_generation_cost=false` 时不计算金额，Java 的 `maxCostCny=null` 不触发金额门槛；实际 token、请求、耗时、失败和 unknown usage 仍留档。仅显式启用金额估算并设置正数上限时才使用可选费用拦截。历史批次的配置与报告保留原样。full 的任务规模与实际执行数量继续分开记录，提供命令不代表已经运行全量。
 
 QASPER 答案按作者归一化 token F1、多标注取最大值；证据使用准备语料中的段落文本身份，单独多标注取最大值，未映射的标注仍留在分母，图表 FLOAT 标注忽略。块与邻块经 source_paragraph_id 映射为段落选择，选中一个块不代表模型看到整个段落；实际交付正文、extent 与截断字段保留。报告另给 EM 和逐题可回答性诊断，它们不是作者论文的新增官方指标。MuSiQue 的答案 EM/F1 与支持证据 F1 只对 answerable 记录计算，可回答性按全部记录计算。固定抽样不是完整成对记录，不报告作者 paired sufficiency。引用/已读段落覆盖都不能证明语义支持。
 

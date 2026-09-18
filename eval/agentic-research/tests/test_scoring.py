@@ -7,7 +7,7 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scoring import answer_f1, aggregate, prediction, score_one, source_ids
-from evaluate_research import full_execution_boundaries, prepare_cases, resource_summary
+from evaluate_research import full_execution_boundaries, prepare_cases, resource_summary, monetary_limit, select_cases
 
 
 class ScoringTest(unittest.TestCase):
@@ -104,12 +104,20 @@ class ScoringTest(unittest.TestCase):
                 + json.dumps({"call": {"callId": "d", "model": "flash", "status": "CANCELLED", "usageStatus": "unknown"}}) + "\n")
             (attempt / "embedding-usage.jsonl").write_text(json.dumps({"call_id": "e", "usage": None, "usage_status": "unknown"}) + "\n"
                 + json.dumps({"call_id": "e", "usage": {"total_tokens": 7}, "usage_status": "provider"}) + "\n")
-            summary = resource_summary(root, {"prices": {"chat_tiers": [[32000, .2, .8]]}})
+            summary = resource_summary(root, {"estimate_generation_cost": True, "prices": {"chat_tiers": [[32000, .2, .8]]}})
             self.assertEqual(summary["model_requests"], 2)
             self.assertEqual(summary["model_usage_unknown"], 1)
             self.assertEqual(summary["embedding_requests"], 1)
             self.assertEqual(summary["embedding_known_total_tokens"], 7)
             self.assertGreater(summary["budget_reserve_cny"], summary["known_generation_cost_estimate_cny"])
+            actual_only = resource_summary(root, {})
+            self.assertEqual(actual_only["known_input_tokens"], 1000)
+            self.assertEqual(actual_only["model_usage_unknown"], 1)
+            self.assertIsNone(actual_only["known_generation_cost_estimate_cny"])
+            self.assertIsNone(actual_only["budget_reserve_cny"])
+            self.assertIsNone(monetary_limit({"max_generation_cost_cny": 0.01}, actual_only))
+            self.assertAlmostEqual(monetary_limit({"estimate_generation_cost": True, "max_generation_cost_cny": 2}, summary),
+                                   2 - summary["budget_reserve_cny"])
 
     def test_partial_or_limited_full_profile_cannot_claim_full_execution(self):
         self.assertFalse(full_execution_boundaries("full", {"q1", "q2"}, {"q1", "q2"}, list("ABC"), 5)["full_split_executed"])
@@ -117,6 +125,16 @@ class ScoringTest(unittest.TestCase):
         completed = full_execution_boundaries("full", {"q1", "q2"}, {"q1", "q2"}, list("ABC"), 6)
         self.assertTrue(completed["full_abc_executed"])
         self.assertFalse(full_execution_boundaries("regression", {"q1", "q2"}, {"q1", "q2"}, list("ABC"), 6)["full_split_executed"])
+
+    def test_failure_replay_selects_exact_fixed_ids_and_rejects_unknown_or_repeated_ids(self):
+        cases = [{"id": "a"}, {"id": "b"}]
+        queries = {"a": {"question": "A"}, "b": {"question": "B"}}
+        selected, request_queries = select_cases(cases, queries, ["b", "a"])
+        self.assertEqual([c["id"] for c in selected], ["b", "a"])
+        self.assertEqual(list(request_queries), ["b", "a"])
+        for invalid in ([], ["missing"], ["a", "a"], [1], {"a": True}):
+            with self.assertRaises(ValueError):
+                select_cases(cases, queries, invalid)
 
 
 if __name__ == "__main__":

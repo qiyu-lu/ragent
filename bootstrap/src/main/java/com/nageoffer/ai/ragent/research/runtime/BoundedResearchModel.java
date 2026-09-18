@@ -32,6 +32,9 @@ import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -77,6 +80,7 @@ public class BoundedResearchModel implements Model {
                     + remainingCalls + " exploration model calls remain. When at most 2 remain, stop opening new searches, "
                     + "read only indispensable evidence and call finish_research with already-read findings and explicit gaps. "
                     + "Do not spend the finalization reserve. Missing source facts must remain gaps.";
+            reminder += "\nExact evidence IDs currently permitted in findings[].evidenceIds: " + session.citableIds();
             if (session.main() && !session.results().isEmpty()) {
                 try { reminder += "\nValidated compressed worker results (read proof checked by server): "
                         + json.writeValueAsString(session.results()); }
@@ -117,12 +121,23 @@ public class BoundedResearchModel implements Model {
             try {
                 String id = UUID.randomUUID().toString();
                 session.budget.startCall(id, getModelName(), estimate(trimmed, tools), finalization ? "finalization" : session.main() ? "main" : "worker", session.taskId);
-                session.event("MODEL_STARTED", "正在调用研究模型", Map.of("callId", id, "model", getModelName()));
+                ToolChoice choice = session.finishingRepair() || session.remainingModelCalls(properties.getMaxWorkerModelCalls()) <= 1
+                        ? new ToolChoice.Specific("finish_research") : new ToolChoice.Required();
+                if (!session.finishingRepair() && !session.main() && session.remainingModelCalls(properties.getMaxWorkerModelCalls()) > 1
+                        && session.requiresRead()) choice = new ToolChoice.Specific("read_source");
+                GenerateOptions effective = tools == null || tools.isEmpty() ? options
+                        : GenerateOptions.mergeOptions(GenerateOptions.builder().toolChoice(choice).build(), options);
+                session.event("MODEL_STARTED", "正在调用研究模型", Map.of("callId", id, "model", getModelName(),
+                        "requestedToolChoice", tools == null || tools.isEmpty() ? "none"
+                                : choice instanceof ToolChoice.Specific specific
+                                    ? Map.of("type", "function", "function", Map.of("name", specific.toolName())) : "required",
+                        "toolSchemaSha256", schemaHash(tools), "finishRepair", !finalization && session.finishingRepair()));
                 AtomicReference<ChatUsage> usage = new AtomicReference<>();
                 AtomicReference<String> requestId = new AtomicReference<>();
                 AtomicBoolean nativeSeen = new AtomicBoolean();
                 AtomicBoolean textSeen = new AtomicBoolean();
                 AtomicReference<String> finishReason = new AtomicReference<>("unknown");
+                AtomicReference<String> errorType = new AtomicReference<>("none");
                 AtomicBoolean recorded = new AtomicBoolean();
                 java.util.function.Consumer<String> finish = status -> {
                     if (!recorded.compareAndSet(false, true)) return;
@@ -130,18 +145,13 @@ public class BoundedResearchModel implements Model {
                     session.budget.finishCall(id, status, requestId.get(), actual == null ? null : actual.getInputTokens(),
                             actual == null ? null : actual.getOutputTokens(), actual == null ? null : actual.getCachedTokens());
                     session.event("MODEL_ENDED", "研究模型请求已结束", Map.of("callId", id, "model", getModelName(), "status", status,
-                            "nativeToolOutputSeen", nativeSeen.get(), "textOutputSeen", textSeen.get(), "finishReason", finishReason.get()));
+                            "nativeToolOutputSeen", nativeSeen.get(), "textOutputSeen", textSeen.get(), "finishReason", finishReason.get(),
+                            "errorType", errorType.get(), "phase", finalization ? "finalization" : "research"));
                 };
                 Duration timeout = Duration.ofMillis(Math.min(session.budget.remaining().toMillis(),
                         properties.getModelCallTimeoutSeconds() * 1000L));
                 return Flux.defer(() -> {
                             session.check();
-                            // 研究状态只能由原生工具终止；不要让 auto 模式的纯文本绕过终止契约。
-                            ToolChoice choice = session.remainingModelCalls(properties.getMaxWorkerModelCalls()) <= 1 ? new ToolChoice.Specific("finish_research") : new ToolChoice.Required();
-                            if (!session.main() && session.remainingModelCalls(properties.getMaxWorkerModelCalls()) > 1
-                                    && session.requiresRead()) choice = new ToolChoice.Specific("read_source");
-                            GenerateOptions effective = tools == null || tools.isEmpty() ? options
-                                    : GenerateOptions.mergeOptions(GenerateOptions.builder().toolChoice(choice).build(), options);
                             return delegate.stream(trimmed, tools, effective);
                         }).doOnNext(response -> {
                             if (response.getUsage() != null) usage.set(response.getUsage());
@@ -155,7 +165,10 @@ public class BoundedResearchModel implements Model {
                         // 整次请求超时，不能靠持续发小数据包无限延长 idle timeout。
                         .collectList().timeout(timeout).flatMapMany(Flux::fromIterable)
                         .doOnComplete(() -> finish.accept("COMPLETED"))
-                        .doOnError(error -> finish.accept(error instanceof java.util.concurrent.TimeoutException ? "TIMED_OUT" : "FAILED"))
+                        .doOnError(error -> {
+                            errorType.set(error.getClass().getSimpleName());
+                            finish.accept(error instanceof java.util.concurrent.TimeoutException ? "TIMED_OUT" : "FAILED");
+                        })
                         .doOnCancel(() -> finish.accept("CANCELLED"))
                         .doFinally(signal -> quota.release());
             } catch (RuntimeException error) {
@@ -163,6 +176,13 @@ public class BoundedResearchModel implements Model {
                 return Flux.error(error);
             }
         }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    private String schemaHash(List<ToolSchema> tools) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(json.writeValueAsString(tools == null ? List.of() : tools).getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception error) { throw new IllegalStateException("工具契约指纹生成失败", error); }
     }
 
     /** 整组删除最早 assistant/tool 往返，保留系统指令、用户目标和最新完整观察。 */

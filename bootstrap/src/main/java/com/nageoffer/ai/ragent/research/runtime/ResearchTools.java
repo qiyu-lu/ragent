@@ -112,15 +112,16 @@ public class ResearchTools {
                     + java.util.stream.Stream.concat(gaps.stream(), conflicts.stream()).mapToInt(t -> t == null ? 0 : t.length()).sum() > 8000)) {
                 throw new ClientException("子任务压缩结果每类最多 8 条，总文字最多 8000 字符");
             }
-            for (var finding : findings) {
+            for (int index = 0; index < findings.size(); index++) {
+                var finding = findings.get(index);
                 if (finding == null || finding.statement() == null || finding.statement().isBlank()
                         || finding.statement().length() > 4000 || finding.evidenceIds() == null
                         || finding.evidenceIds().isEmpty() || finding.evidenceIds().size() > 12) {
-                    throw new ClientException("发现必须包含明确陈述与 1—12 个已读证据 ID");
+                    throw new ClientException("findings[" + index + "].statement/evidenceIds：发现必须包含明确陈述与 1—12 个已读证据 ID");
                 }
                 var unread = finding.evidenceIds().stream().filter(id -> !delivered.contains(id)).toList();
                 if (!unread.isEmpty()) {
-                    throw new ClientException("以下引用尚未通过本次 read_source 提供：" + unread
+                    throw new ClientException("findings[" + index + "].evidenceIds：以下引用尚未通过本次 read_source 提供：" + unread
                             + "；已读取的 ID：" + delivered);
                 }
             }

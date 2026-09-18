@@ -17,10 +17,13 @@
 
 package com.nageoffer.ai.ragent.research.runtime;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
 /** 模型只能提出目标与缩小文档范围；身份、预算和角色不属于参数。 */
-public record ResearchTask(String goal, List<String> dimensions, String expectedOutput, List<String> documentIds) {
+public record ResearchTask(@JsonProperty(required = true) String goal,
+                           @JsonProperty(required = true) List<String> dimensions,
+                           @JsonProperty(required = true) String expectedOutput, List<String> documentIds) {
     public ResearchTask {
         if (goal == null || goal.isBlank() || goal.length() > 4000
                 || expectedOutput == null || expectedOutput.isBlank() || expectedOutput.length() > 2000

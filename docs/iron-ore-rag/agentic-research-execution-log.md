@@ -4,6 +4,8 @@
 
 ## 当前接续点
 
+2026-09-18 已完成计划 8.6 的 R1：工具参数契约、原生结束恢复及默认取消金额估算门槛。相关后端 114 项、Python 29 项检查通过；12 个预先固定原题 × A/B/C 的真实诊断复测为 35 COMPLETED / 1 PARTIAL / 0 FAILED，历史同题为 21/4/11。4 个运行真实触发结束修复，使用 6 次调用；语义负例与未读引用错误仍保留，不能宣称整体质量或多 Agent 收益。见文末 R1 记录和[R1 清单](../../eval/agentic-research/manifests/research-r1-reliability-2026-09-18.json)。下一阶段为 R2：检索可恢复性和连接恢复补强；R2—R5 尚未实施。以下 P0—P8 数字保留为此前验收快照。
+
 P0—P8 已完成实现与本轮约定验证（2026-09-18）。P7 提交 `3381fa9`；P8 通过唯一标题 `docs: finalize research workflow and implementation handoff` 定位。固定 regression 的 QASPER 200 问题与 MuSiQue Full dev 200 行，A/B/C 共 1200 个任务全部记录（932 COMPLETED / 93 PARTIAL / 175 FAILED），没有未执行任务。QASPER Answer F1：A 0.3365/B 0.2338/C 0.2442；MuSiQue Answer F1：A 0.3325/B 0.3269/C 0.3918；MuSiQue 答案/支持只评分 105 行 answerable，非 200 行答案分母。C 实际 2 个运行委派、创建 4 个 worker。结果和费用见[固定对照报告](agentic-research-evaluation-report.md)。
 
 当前后端 24 类 173/173、Python 28/28、新库/重复增量保留历史、前端 build、node 类型与 9 项受控浏览器检查通过；app 仍有与 P6 相同的 24 项诊断。24 个应用由 Codex 核对 85 条引用快照，两例 v4 复测的错误推断和失败保留；不是独立人工盲评。最终生成 v4 隔离 evidence 输入中的托管元数据，服务端引用快照保持，输入检查不等于语义可靠。
@@ -414,3 +416,55 @@ P7 阶段提交为 `3381fa9d0a8bab051873b5ec415cc8f642da933f`。随后运行 `ba
 四个产物的 10 条引用快照由 Codex 核对，身份、段落 ID 和正文 SHA 在 semantic-review.json / P8 清单；不是独立人工盲评，无裁判 API。SDK 模型调用记录 33、已知输入 444152/输出 11886 token，usage unknown 0；已知生成费估算 0.1457 元。Embedding 17 请求、已知 total_tokens 271、unknown 0，金额/账单未核对。这是实际公开语料—检索/模型—隔离 PostgreSQL—产物的 CLI 路径，没有生产登录或来源预览下载。
 
 最终检查覆盖 15 份当前入口文档的链接/锚点、围栏、whitespace、三份 shell 语法、JSON 清单、72 项运行源码/配置与固定回归一致、16 份历史 SQL 字节不变及既有 XLSX 事实比较主体。后端/前端代码在最终 173/28 程序检查、clean package 和 v4 浏览器检查后未改动，不重复声称新的付费/生产服务测试。目录 docs/current-code-notes-2026-09-18/ 是工作期间新增的独立未跟踪文档，保留在阶段提交范围外。
+
+## R1：工具契约、原生结束恢复与原题复测（2026-09-18，已完成）
+
+分支 `feat/agentic-research`，起始提交 `243d0c0`。阶段提交通过唯一标题 `fix: repair research tool contracts and native finish recovery` 定位。用户已授权直接调用配置的供应商并使用 Git 记录；本阶段省略价格查询、金额预估和费用确认。独立未跟踪目录 `docs/current-code-notes-2026-09-18/` 保留在提交范围外。
+
+### 实现与程序检查
+
+- `Finding.statement/evidenceIds`、委派任务的 `goal/dimensions/expectedOutput` 显式声明嵌套 required，SDK 在 DTO 转换前拒绝缺字段、错误类型和 null finding。结束工具的参数错误增加 `/findings/0/evidenceIds` 等路径；未读引用业务校验继续拒绝并返回对应 finding 下标。AgentScope 2.0.1 构建 Agent 时复制 Toolkit，诊断适配器同时实现复制，避免错误反馈在构建时丢失。
+- 模型提前输出普通文本时复用同一 Agent 和上下文，保留已经完成的 read 工具消息与证据，再请求原生 `finish_research`。最多消耗两次修复模型调用，仍受原有全局/worker 调用次数、最终生成预留、超时和取消约束；连续无效输出最终仍失败，不将文本或假工具 JSON 接纳为完成。
+- `MODEL_STARTED` 保存 SDK 请求边界的 `requestedToolChoice`、schema SHA-256、是否修复；`MODEL_ENDED` 保存原生工具/文本出现情况、finish reason、状态、阶段和错误类型。本地 HTTP 桩验证最终发送的 tool_choice 和嵌套 schema；真实供应商批次保存 SDK 边界数据，不把它写成独立抓取的原始 HTTP 请求。
+- Python 评测默认 `estimate_generation_cost=false`，Java 允许 `maxCostCny=null`，此时不计算或拦截金额；实际 usage 仍记录。新增 `--case-ids`，只接受固定 profile 中唯一的题目 ID，冻结顺序与清单指纹；标签不进入模型请求。历史批次和费用报告没有重写。
+
+相关后端检查累计 **114/114**：P3 随机库套件实际通过 103 项，另 11 项因需要 P2 环境跳过；随后在 P2 随机库单独执行 11/11，通过新库、重复增量和历史行保留检查，临时库均清理。原生 HTTP 检查包含 18 项，补强“修复请求保留完整 read 工具消息及 tool_call_id”断言后再次 18/18；Python 29/29。此前沙箱本地套接字拒绝及字段路径适配的失败迭代均保留在日志中。这是本阶段相关测试，未重跑 P8 的全部普通业务/前端检查。
+
+### 真实诊断复测
+
+新批次：[运行目录](../../local-data/agentic-research/runs/20260918_R1_failure_replay_v1/run.json)。过程日志、选题脚本、同题比较与引用核对：[验证目录](../../local-data/agentic-research/runs/20260918_R1_validation/comparison.json)。可版本化的汇总、73 项运行源码指纹和输出哈希见 [R1 清单](../../eval/agentic-research/manifests/research-r1-reliability-2026-09-18.json)。
+
+从原 regression 固定题目中预先选择 12 题：QASPER/MuSiQue 各 6；4 个原生结束失败、4 个出现 ClassCast 的工具错误样例、2 个检索超时失败、2 个正常对照。按数据集/模式及题目 ID 顺序选择，ClassCast 层优先失败、再部分完成，不使用答案得分挑题。固定 [12 个题目 ID](../../eval/agentic-research/manifests/research-r1-case-ids-2026-09-18.json)各运行 A/B/C，模型仍为 `qwen3.7-flash-2026-07-15`，PGVector、rerank 关闭、范围、提示设置和技术上限保持原约定。
+
+| 模式 | 历史同题：完成/部分完成/失败 | R1 同题：完成/部分完成/失败 |
+| --- | --- | --- |
+| A | 12/0/0 | 12/0/0 |
+| B | 4/2/6 | 11/1/0 |
+| C | 5/2/5 | 12/0/0 |
+| 合计 | 21/4/11 | 35/1/0 |
+
+原 11 个 FAILED 中，10 个转为 COMPLETED，1 个转为 PARTIAL；后者仍有 `MODEL_CALL_BUDGET`。本批 4 个运行触发原生结束修复，共 6 次实际模型调用，均得到原生工具输出并最终完成。历史同题的 13 次 ClassCast 工具错误，本批未再出现；但未读引用错误从 6 次变为 12 次，保留逐次反馈，不能称所有工具问题已消除。没有新超时，且 141 次 embedding usage 均返回；本阶段没有修改检索超时链路，这不证明网络/超时已经修复。两批实际 worker 均为 0，不能推导并行研究收益。
+
+| 数据集/模式 | 历史同题 Answer F1 | R1 Answer F1 | 答案分母 |
+| --- | ---: | ---: | ---: |
+| QASPER A | 0.3623 | 0.3932 | 6 |
+| QASPER B | 0.1931 | 0.3416 | 6 |
+| QASPER C | 0.0969 | 0.4401 | 6 |
+| MuSiQue A | 0.3333 | 0.0000 | 3 |
+| MuSiQue B | 0.3333 | 0.6667 | 3 |
+| MuSiQue C | 0.3333 | 1.0000 | 3 |
+
+这是按故障分层的诊断样本，各模式时段不同且只运行一次，MuSiQue 仅 3 个 answerable；连 A 的分数也变化，不能用这些数字替代原 400 题回归或宣称稳定的整体质量收益。逐题得分、证据覆盖、答案格式、状态和延迟仍全部留档。
+
+实际 SDK 模型调用 273 次，已知输入 3,269,722 / 输出 50,727 token，usage unknown 0；embedding 141 次、已知 total_tokens 1,579、unknown 0。三个随机运行库均删除，只读语料未修改；金额估算与门槛实际关闭。首次执行申请因自动审批尚未核实供应商和公开语料而拒绝，未启动进程；补齐 Bailian/SiliconFlow 端点及公开 QASPER/MuSiQue 范围证据后重新审批通过，记录在 provider-scope-verification.json。
+
+### 原文核对与接续
+
+Codex 对全部 4 个触发修复的已完成产物核对引用原文，见 [semantic-review.json](../../local-data/agentic-research/runs/20260918_R1_validation/semantic-review.json)，没有独立人工盲评或裁判模型：
+
+- B 的 BERT 回答有 MEDDOCAN 相对性能和 recall 的直接支持，但引用没有数值，不能据此宣称完整性能评估。
+- B 的多语言训练回答主要陈述有支持；其“七种语言没有完整列出”的缺口却与已读原文不符。
+- C 的比较回答引用的是前人方法介绍，引用片段不足以证明这些方法全是实际实验对照。
+- C 的多跳回答名字有冻结数据快照支持；最终单条引用没有展示出生国和委员会的整条关系，也不构成对当前在任者的事实判断。
+
+下一阶段按计划 8.6 执行 **R2**：先给检索排队、embedding HTTP、PG、工具加可对应的耗时和错误，区分成功无命中/暂时失败，安排内外 deadline 和取消传播，再做有限传输重试及查询 embedding 缓存。同时补 SSE 无数据连接检测与退避重连，验证不重复创建任务、持久事件重放和终态竞争；模型中途断流要丢弃不完整输出，从完成的工具步骤恢复，不能拼接不完整 tool JSON 或承诺第 N 个 token 原位续算。后续 R3—R5 再处理有效阅读、产物语义和固定 400 题/应用对照，本阶段没有提前标记完成。

@@ -184,11 +184,119 @@ class ResearchNativeToolsTest {
 
     @Test
     void textualJsonCannotPretendToBeANativeToolCall() throws Exception {
-        response(Map.of("role", "assistant", "content", "{\"tool\":\"ask_user\",\"question\":\"Which?\"}"), "stop");
+        for (int i = 0; i < 3; i++) response(Map.of("role", "assistant", "content", "{\"tool\":\"ask_user\",\"question\":\"Which?\"}"), "stop");
         var failure = assertThrows(IllegalStateException.class, () -> factory().run(session));
         assertEquals("NATIVE_FINISH_REQUIRED", failure.getMessage());
         assertNull(session.outcome());
+        assertEquals(3, server.getRequestCount());
+        assertEquals(3, session.budget.snapshot().get("modelCalls"));
         verifyNoInteractions(search, reader);
+    }
+
+    @Test
+    void nestedRequiredFieldsAndTypesAreRejectedBeforeDtoConversion() throws Exception {
+        tool("missing", "finish_research", Map.of("findings", List.of(Map.of("statement", "A fact")), "gaps", List.of(), "conflicts", List.of()));
+        tool("wrong-type", "finish_research", Map.of("findings", List.of(Map.of("statement", "A fact", "evidenceIds", "ev-one")), "gaps", List.of(), "conflicts", List.of()));
+        tool("fixed", "finish_research", Map.of("findings", List.of(), "gaps", List.of("No supported fact"), "conflicts", List.of()));
+        assertTrue(factory().run(session).result().findings().isEmpty());
+        var first = json.readTree(server.takeRequest(5, TimeUnit.SECONDS).getBody().readUtf8());
+        var schema = java.util.stream.StreamSupport.stream(first.path("tools").spliterator(), false)
+                .map(t -> t.path("function")).filter(t -> t.path("name").asText().equals("finish_research")).findFirst().orElseThrow();
+        var required = schema.path("parameters").path("properties").path("findings").path("items").path("required");
+        assertTrue(required.toString().contains("statement"));
+        assertTrue(required.toString().contains("evidenceIds"));
+        String feedback = server.takeRequest(5, TimeUnit.SECONDS).getBody().readUtf8();
+        assertTrue(feedback.contains("required property 'evidenceIds'"), feedback);
+        assertTrue(feedback.contains("/findings/0"), feedback);
+        assertTrue(feedback.contains("INVALID_TOOL_ARGUMENTS"), feedback);
+        assertFalse(feedback.contains("ClassCastException"));
+        String corrected = server.takeRequest(5, TimeUnit.SECONDS).getBody().readUtf8();
+        assertTrue(corrected.contains("array"));
+        assertTrue(corrected.contains("/findings/0/evidenceIds"), corrected);
+        assertFalse(corrected.contains("ClassCastException"));
+    }
+
+    @Test
+    void textFinishIsRepairedNativelyWithExistingReadEvidence() throws Exception {
+        tool("search", "search_knowledge", Map.of("query", "X"));
+        tool("read", "read_source", Map.of("evidence_id", "ev-one"));
+        response(Map.of("role", "assistant", "content", "The parameter is 7 ms."), "stop");
+        tool("finish", "finish_research", Map.of("findings", List.of(Map.of("statement", "Parameter is 7 ms.", "evidenceIds", List.of("ev-one"))), "gaps", List.of(), "conflicts", List.of()));
+        var result = factory().run(session).result();
+        assertEquals(List.of("ev-one"), result.findings().get(0).evidenceIds());
+        for (int i = 0; i < 3; i++) server.takeRequest(5, TimeUnit.SECONDS);
+        var repair = json.readTree(server.takeRequest(5, TimeUnit.SECONDS).getBody().readUtf8());
+        assertEquals("finish_research", repair.path("tool_choice").path("function").path("name").asText());
+        assertTrue(repair.path("messages").toString().contains("7 ms"));
+        assertTrue(repair.path("messages").toString().contains("ev-one"));
+        assertTrue(java.util.stream.StreamSupport.stream(repair.path("messages").spliterator(), false)
+                .anyMatch(m -> "tool".equals(m.path("role").asText()) && "read".equals(m.path("tool_call_id").asText())
+                        && m.path("content").asText().contains("X identifies Mercury")),
+                "Repair must preserve the completed read tool result, not just a prior text answer");
+        assertEquals(4, session.budget.snapshot().get("modelCalls"));
+        verify(reader, times(1)).read(eq("run"), eq("owner"), eq("ev-one"), any());
+        verify(store).event(any(), eq("NATIVE_FINISH_REPAIR"), anyString(), anyMap(), anyMap());
+    }
+
+    @Test
+    void nullFindingsAndMissingStatementsAreNativeParameterErrors() throws Exception {
+        tool("null", "finish_research", Map.of("findings", java.util.Collections.singletonList(null), "gaps", List.of(), "conflicts", List.of()));
+        tool("missing-statement", "finish_research", Map.of("findings", List.of(Map.of("evidenceIds", List.of("ev-one"))), "gaps", List.of(), "conflicts", List.of()));
+        tool("fixed", "finish_research", Map.of("findings", List.of(), "gaps", List.of("No supported fact"), "conflicts", List.of()));
+        assertTrue(factory().run(session).result().findings().isEmpty());
+        server.takeRequest(5, TimeUnit.SECONDS);
+        String nullFeedback = server.takeRequest(5, TimeUnit.SECONDS).getBody().readUtf8();
+        assertTrue(nullFeedback.contains("/findings/0"), nullFeedback);
+        String missingFeedback = server.takeRequest(5, TimeUnit.SECONDS).getBody().readUtf8();
+        assertTrue(missingFeedback.contains("required property 'statement'"), missingFeedback);
+        assertFalse(missingFeedback.contains("ClassCastException"));
+        verifyNoInteractions(search, reader);
+    }
+
+    @Test
+    void repairErrorsStopAfterTwoCallsAndKeepFinalizationReserve() throws Exception {
+        limits.setMaxModelCalls(5);
+        session = new ResearchSession(store, session.claim, new ResearchBudget(limits, Map.of()), new ResearchControl());
+        response(Map.of("role", "assistant", "content", "Finished."), "stop");
+        for (int i = 0; i < 2; i++) tool("invalid-" + i, "finish_research",
+                Map.of("findings", List.of(Map.of("statement", "Unsupported", "evidenceIds", List.of("unread"))), "gaps", List.of(), "conflicts", List.of()));
+        var error = assertThrows(IllegalStateException.class, () -> factory().run(session));
+        assertEquals("NATIVE_FINISH_REQUIRED", error.getMessage());
+        assertNull(session.outcome());
+        assertEquals(3, server.getRequestCount());
+        session.budget.acquireModel(true);
+        session.budget.acquireModel(true);
+        verifyNoInteractions(search, reader);
+    }
+
+    @Test
+    void nestedWorkerRequirementsAreValidatedBeforeConstructingTasks() throws Exception {
+        tool("missing-task-fields", "conduct_research", Map.of("tasks", List.of(Map.of("goal", "Compare sources"))));
+        tool("fixed", "finish_research", Map.of("findings", List.of(), "gaps", List.of("No supported fact"), "conflicts", List.of()));
+        assertNotNull(factory().run(session).result());
+        server.takeRequest(5, TimeUnit.SECONDS);
+        String feedback = server.takeRequest(5, TimeUnit.SECONDS).getBody().readUtf8();
+        assertTrue(feedback.contains("required property 'dimensions'"), feedback);
+        assertTrue(feedback.contains("required property 'expectedOutput'"), feedback);
+        assertFalse(feedback.contains("ClassCastException"));
+        assertEquals(0, session.budget.snapshot().get("workersCreated"));
+    }
+
+    @Test
+    void cancellationDuringFinishRepairStopsFurtherRequests() throws Exception {
+        response(Map.of("role", "assistant", "content", "Finished."), "stop");
+        server.enqueue(new MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE));
+        var executor = Executors.newSingleThreadExecutor();
+        try {
+            var pending = executor.submit(() -> factory().run(session));
+            assertNotNull(server.takeRequest(5, TimeUnit.SECONDS));
+            assertNotNull(server.takeRequest(5, TimeUnit.SECONDS));
+            session.control.cancel();
+            var failure = assertThrows(ExecutionException.class, () -> pending.get(5, TimeUnit.SECONDS));
+            assertInstanceOf(CancellationException.class, failure.getCause());
+            assertNull(session.outcome());
+            assertEquals(2, server.getRequestCount());
+        } finally { executor.shutdownNow(); }
     }
 
     @Test

@@ -43,6 +43,7 @@ public class ResearchSession {
     private final Set<String> acceptedIds = new LinkedHashSet<>();
     private final Set<String> delegatedGoals = new HashSet<>();
     private int localModelCalls;
+    private int finishRepairCallsRemaining = -1;
     private volatile Outcome outcome;
 
     public ResearchSession(ResearchRunStore store, ResearchRunStore.Claim claim,
@@ -178,16 +179,28 @@ public class ResearchSession {
     }
 
     public synchronized void acquireModel(int workerLimit) {
+        if (finishRepairCallsRemaining == 0) throw new IllegalStateException("NATIVE_FINISH_REQUIRED");
         if (main()) budget.acquireModel(false);
         else {
             if (localModelCalls >= workerLimit) throw new ResearchBudget.Exhausted("WORKER_LOCAL_MODEL_BUDGET");
             budget.acquireWorkerModel();
         }
         localModelCalls++;
+        if (finishRepairCallsRemaining > 0) finishRepairCallsRemaining--;
     }
+
+    /** 同一 Agent/上下文内最多再请求两次原生结束；仍扣原有全局和 worker 额度。 */
+    public synchronized void requestFinishRepair() {
+        check();
+        if (finishRepairCallsRemaining == 0) throw new IllegalStateException("NATIVE_FINISH_REQUIRED");
+        if (finishRepairCallsRemaining < 0) finishRepairCallsRemaining = 2;
+    }
+
+    public synchronized boolean finishingRepair() { return finishRepairCallsRemaining >= 0; }
     public synchronized int remainingModelCalls(int workerLimit) {
         int global = budget.explorationCallsRemaining() - (main() ? 0 : 1);
-        return Math.max(0, main() ? global : Math.min(global, workerLimit - localModelCalls));
+        int available = main() ? global : Math.min(global, workerLimit - localModelCalls);
+        return Math.max(0, finishRepairCallsRemaining < 0 ? available : Math.min(available, finishRepairCallsRemaining));
     }
     public synchronized void conclude(Outcome outcome) {
         check();

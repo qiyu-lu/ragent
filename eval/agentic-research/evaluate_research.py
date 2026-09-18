@@ -71,6 +71,15 @@ def fingerprints():
     return {str(p.relative_to(REPO)): sha256_file(p) for p in sorted(paths)}
 
 
+def select_cases(cases, queries, identifiers):
+    if not isinstance(identifiers, list) or not identifiers or any(not isinstance(i, str) for i in identifiers):
+        raise ValueError("Case IDs must be a nonempty JSON array of strings")
+    if len(set(identifiers)) != len(identifiers) or not set(identifiers) <= queries.keys():
+        raise ValueError("Case IDs must be unique and belong to the selected fixed profile")
+    by_id = {case["id"]: case for case in cases}
+    return [by_id[i] for i in identifiers], {i: queries[i] for i in identifiers}
+
+
 def full_execution_boundaries(profile, queries, full_ids, modes, recorded):
     full_scope = profile == "full" and set(queries) == set(full_ids)
     complete = recorded == len(queries) * len(modes)
@@ -105,17 +114,30 @@ def resource_summary(directory, config):
     for path in sorted(directory.glob("attempts/*/embedding-usage.jsonl")):
         for row in rows(path):
             embeddings[row["call_id"]] = row
-    known_cost = sum(call_cost(c, config) or 0 for c in calls.values())
+    estimate_cost = config.get("estimate_generation_cost", False)
+    known_cost = sum(call_cost(c, config) or 0 for c in calls.values()) if estimate_cost else None
     unknown = sum(c.get("usageStatus") != "provider" for c in calls.values())
     return {"model_requests": len(calls), "known_input_tokens": sum(c.get("inputTokens", 0) for c in calls.values()),
             "known_output_tokens": sum(c.get("outputTokens", 0) for c in calls.values()), "model_usage_unknown": unknown,
             "known_generation_cost_estimate_cny": known_cost,
-            "budget_reserve_cny": known_cost + unknown * 0.03,
+            "budget_reserve_cny": known_cost + unknown * 0.03 if estimate_cost else None,
+            "cost_estimation_enabled": estimate_cost,
             "actual_models": sorted({c["model"] for c in calls.values()}),
             "embedding_requests": len(embeddings),
             "embedding_known_total_tokens": sum((c.get("usage") or {}).get("total_tokens", 0) for c in embeddings.values()),
             "embedding_usage_unknown": sum(c.get("usage_status") != "provider" for c in embeddings.values()),
-            "embedding_currency_cost": None, "invoice_verified": False, "prices": config["prices"]}
+            "embedding_currency_cost": None, "invoice_verified": False, "prices": config.get("prices") if estimate_cost else None}
+
+
+def monetary_limit(config, resources):
+    if not config.get("estimate_generation_cost", False):
+        return None
+    cap = config.get("max_generation_cost_cny")
+    if cap is None:
+        return None
+    if not isinstance(cap, (int, float)) or not math.isfinite(cap) or cap <= 0:
+        raise ValueError("Optional generation cost cap must be finite and positive")
+    return cap - resources["budget_reserve_cny"]
 
 
 def run_job(args, attempt, job):
@@ -208,7 +230,7 @@ def score_run(directory, prepared, profile, queries, config, modes):
         fmt = lambda name: "{:.4f}".format(value[name]) if value[name] is not None else "n/a"
         lines.append("| {} | {} | {} | {} | {} | {} | {} |".format(key, value["records"], value["answer_scored_records"], fmt("answer_em"), fmt("answer_f1"), fmt("evidence_f1"), fmt("answerability_accuracy")))
     lines += ["", "Failed/timed-out records remain in the relevant denominators. MuSiQue answer/support metrics use answerable records only; answerability uses all records. No paired sufficiency score is reported.", "",
-              "Generation cost is an estimate from known provider usage, excluding cache discounts, embedding invoice costs and unknown usage. See summary.json. Evidence identity/paragraph coverage does not establish semantic support.", "",
+              "Actual usage and unknown requests are recorded. Monetary estimation is disabled unless explicitly enabled in the run configuration. Evidence identity/paragraph coverage does not establish semantic support.", "",
               "A uses the project's scoped retrieval components with a fixed model and shared generator; it is not an end-to-end measurement of the production chat pipeline."]
     (directory / "report.md").write_text("\n".join(lines) + "\n")
     return summary
@@ -222,6 +244,7 @@ def main():
     parser.add_argument("--profile", choices=("smoke", "regression", "full"), default="smoke")
     parser.add_argument("--mode", choices=("all", "A", "B", "C"), default="all")
     parser.add_argument("--limit", type=int)
+    parser.add_argument("--case-ids", type=Path, help="JSON array of fixed question IDs for reproducible failure replay")
     parser.add_argument("--container", default="ragent-iron-ore-dev-postgres-1")
     parser.add_argument("--corpus-database", default="research_corpus_v1")
     parser.add_argument("--idea", type=Path, default=Path(".idea/workspace.xml"))
@@ -236,9 +259,12 @@ def main():
     args.run_dir, args.prepared = args.run_dir.resolve(), args.prepared.resolve()
     config = json.loads(args.config.read_text())
     cases, queries = prepare_cases(args.prepared, args.profile, config, args.limit)
+    if args.case_ids is not None:
+        cases, queries = select_cases(cases, queries, json.loads(args.case_ids.read_text()))
     modes = list("ABC") if args.mode == "all" else [args.mode]
     identity = {"profile": args.profile, "modes": modes, "query_ids": list(queries), "config": config,
                 "source_sha256": fingerprints(),
+                "selection_sha256": sha256_file(args.case_ids) if args.case_ids else None,
                 "query_sha256": {dataset: sha256_file(query_file(args.prepared, dataset, args.profile)) for dataset in ("qasper", "musique")},
                 "prepared_sha256": {str(path.relative_to(args.prepared)): sha256_file(path)
                     for scope in ("qasper-validation", "musique-dev")
@@ -273,8 +299,8 @@ def main():
             if not pending:
                 continue
             resources = resource_summary(args.run_dir, config)
-            remaining = config["max_generation_cost_cny"] - resources["budget_reserve_cny"]
-            if remaining <= .3:
+            remaining = monetary_limit(config, resources)
+            if remaining is not None and remaining <= .3:
                 record["stopped_reason"] = "EVALUATION_COST_LIMIT"
                 break
             attempt = args.run_dir / "attempts" / ("{:04d}_{}".format(len(list((args.run_dir / "attempts").iterdir())), mode))
@@ -284,7 +310,7 @@ def main():
                    "generationInstruction": config["generation_instruction"],
                    "expectedModel": config["model_id"], "expectedBudget": expected_budget(config)}
             write_json(attempt / "job.json", job)
-            print("Running mode {}: {} fixed tasks; generation allowance {:.2f} CNY.".format(mode, len(pending), remaining), flush=True)
+            print("Running mode {}: {} fixed tasks; monetary cap {}.".format(mode, len(pending), "disabled" if remaining is None else remaining), flush=True)
             code = run_job(args, attempt, job)
             if code:
                 record["stopped_reason"] = "JAVA_EXIT_" + str(code)

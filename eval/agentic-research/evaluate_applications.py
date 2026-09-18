@@ -50,7 +50,8 @@ def main():
     attempt = args.run_dir / "attempts/0000_C"
     attempt.mkdir(parents=True)
     job = {"runDir": str(attempt), "cases": cases, "generateArtifacts": True,
-           "evaluationMode": "C", "concurrency": config["concurrency"], "maxCostCny": config["max_generation_cost_cny"],
+           "evaluationMode": "C", "concurrency": config["concurrency"],
+           "maxCostCny": config.get("max_generation_cost_cny") if config.get("estimate_generation_cost", False) else None,
            "generationInstruction": "Write in English. Address each requested dimension with actual evidence; missing dimensions remain gaps. A plan is a draft, not an executable or approved procedure.",
            "expectedModel": config["model_id"], "expectedBudget": expected_budget(config)}
     write_json(attempt / "job.json", job)

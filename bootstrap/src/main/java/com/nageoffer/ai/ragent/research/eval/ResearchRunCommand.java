@@ -81,7 +81,7 @@ public class ResearchRunCommand {
         int concurrency = job.concurrency() == null ? 1 : job.concurrency();
         if (job.cases().isEmpty() || job.cases().size() > (evaluation ? 6000 : 6)
                 || evaluation && (!Set.of("A", "B", "C").contains(job.evaluationMode()) || !Boolean.TRUE.equals(job.generateArtifacts())
-                || job.maxCostCny() == null || !Double.isFinite(job.maxCostCny()) || job.maxCostCny() <= 0)
+                || job.maxCostCny() != null && (!Double.isFinite(job.maxCostCny()) || job.maxCostCny() <= 0))
                 || concurrency < 1 || concurrency > 2 || !evaluation && concurrency != 1
                 || job.cases().stream().map(Case::id).distinct().count() != job.cases().size()) {
             throw new IllegalArgumentException("Invalid bounded smoke/evaluation job");
@@ -175,7 +175,9 @@ public class ResearchRunCommand {
             ResearchRunner execution = "A".equals(job.evaluationMode()) ? new OneShotResearchRunner(search, reader) : runner;
             List<Future<?>> futures = new ArrayList<>();
             for (Case example : job.cases()) futures.add(runs.submit(() -> {
-                if (evaluation && estimatedCost.sum() + 0.3 > job.maxCostCny()) throw new IllegalStateException("EVALUATION_COST_LIMIT");
+                if (evaluation && job.maxCostCny() != null && estimatedCost.sum() + 0.3 > job.maxCostCny()) {
+                    throw new IllegalStateException("EVALUATION_COST_LIMIT");
+                }
                 long started = System.nanoTime();
                 String kb = corpusJdbc.queryForObject("SELECT id FROM t_knowledge_base WHERE collection_name = ? AND deleted = 0", String.class, example.collection());
                 List<String> documents = new ArrayList<>();
@@ -203,10 +205,11 @@ public class ResearchRunCommand {
                         Map.of("runId", run.id(), "caseId", example.id(), "event", event));
                 if (run.usage().get("calls") instanceof List<?> calls) for (Object call : calls) append(usage,
                         Map.of("runId", run.id(), "caseId", example.id(), "call", call));
-                if (run.usage().get("calls") instanceof List<?> calls) for (Object value : calls) {
+                if (job.maxCostCny() != null && run.usage().get("calls") instanceof List<?> calls) for (Object value : calls) {
                     if (value instanceof Map<?, ?> call) estimatedCost.add(estimateCost(call));
                 }
-                System.out.println(example.id() + " " + run.status() + " calls=" + run.usage().get("modelCalls") + " estimatedCny=" + estimatedCost.sum());
+                System.out.println(example.id() + " " + run.status() + " calls=" + run.usage().get("modelCalls")
+                        + (job.maxCostCny() == null ? "" : " estimatedCny=" + estimatedCost.sum()));
             }));
             for (Future<?> future : futures) future.get();
             }

@@ -34,7 +34,6 @@ import io.agentscope.core.middleware.ActingInput;
 import io.agentscope.core.middleware.MiddlewareBase;
 import io.agentscope.core.model.ExecutionConfig;
 import io.agentscope.core.tool.Toolkit;
-import io.agentscope.core.tool.ToolkitConfig;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
@@ -92,7 +91,7 @@ public class ResearchAgentFactory implements ResearchRunner, AutoCloseable {
     @Override
     public ResearchSession.Outcome run(ResearchSession session) {
         session.check();
-        Toolkit tools = new Toolkit(ToolkitConfig.builder().parallel(false).build());
+        Toolkit tools = new ResearchToolkit(json);
         if (session.main()) {
             session.restoreResults(json);
             tools.registerTool(new ResearchTools(session, search, reader));
@@ -120,14 +119,23 @@ public class ResearchAgentFactory implements ResearchRunner, AutoCloseable {
                             "constraints", session.claim.run().brief().constraints(),
                             "allowedKbIds", session.claim.run().brief().allowedKbIds()));
             var message = Msg.builder().role(MsgRole.USER).textContent(request).build();
-            agent.streamEvents(message, context)
-                    // 不保存 text/thinking 事件；只留下可回放的工具参数、结果和实际 usage。
-                    .takeUntil(event -> event instanceof ToolResultEndEvent && session.outcome() != null)
-                    .takeUntilOther(session.control.signal())
-                    .then().timeout(session.budget.remaining()).block();
-            session.control.check();
-            if (session.outcome() == null) throw new IllegalStateException("NATIVE_FINISH_REQUIRED");
-            return session.outcome();
+            while (true) {
+                agent.streamEvents(message, context)
+                        // 不保存 text/thinking 事件；只留下可回放的工具参数、结果和实际 usage。
+                        .takeUntil(event -> event instanceof ToolResultEndEvent && session.outcome() != null)
+                        .takeUntilOther(session.control.signal())
+                        .then().timeout(session.budget.remaining()).block();
+                session.check();
+                if (session.outcome() != null) return session.outcome();
+                session.requestFinishRepair();
+                session.event("NATIVE_FINISH_REPAIR", "正在修复研究结束协议",
+                        Map.of("reason", "TEXT_WITHOUT_NATIVE_FINISH", "citableEvidenceCount", session.citableIds().size()));
+                message = Msg.builder().role(MsgRole.USER).textContent(
+                        "Your previous response did not finish through the native tool. Call finish_research now. "
+                        + "Use only findings supported by already-read evidence, with exact evidenceIds from the server reminder. "
+                        + "If unsupported, return empty findings and an explicit gap. Do not search again, output plain text, "
+                        + "or imitate a tool call in JSON. Preserve the existing research and user constraints.").build();
+            }
         } catch (RuntimeException e) { throw e; }
         catch (Exception e) { throw new IllegalStateException("研究请求构建失败", e); }
     }

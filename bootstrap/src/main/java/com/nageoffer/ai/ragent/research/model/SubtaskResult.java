@@ -17,6 +17,7 @@
 
 package com.nageoffer.ai.ragent.research.model;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
 /**
@@ -26,7 +27,8 @@ public record SubtaskResult(String taskId, List<Finding> findings, List<String> 
                             List<String> conflicts, Status status) {
     public enum Status { COMPLETED, PARTIAL, FAILED, CANCELLED }
 
-    public record Finding(String statement, List<String> evidenceIds) {
+    public record Finding(@JsonProperty(required = true) String statement,
+                          @JsonProperty(required = true) List<String> evidenceIds) {
         public Finding {
             evidenceIds = List.copyOf(evidenceIds);
         }

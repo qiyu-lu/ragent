@@ -442,5 +442,86 @@
     "With a stable system message and append-only history, implicit hits were still unreliable step-to-step (1 of 4).",
     "Explicit content-block markers hit deterministically: marker on the newest history message gives hits of the whole previous prefix with creation billed only for the delta (1949 -> 2272 -> 2394 cached; 323/122/144 created).",
     "Message-level cache_control, which AgentScope emits when cacheControl=true, is ignored by Bailian (xm: no creation, no hit)."
-  ]
+  ],
+  "sdkReplay": {
+    "commit": "b186852",
+    "what": "request bodies emitted by the committed code (explicit-prompt-cache on, delegation on, same fixture flow) replayed unchanged; confirms Bailian accepts the adapter's content-block markers on both research models",
+    "records": [
+      {
+        "step": "file:C-2",
+        "model": "qwen3.7-flash-2026-07-15",
+        "promptTokens": 2437,
+        "cachedTokens": 0,
+        "cacheCreation": 2272,
+        "cacheType": "ephemeral",
+        "firstTokenMs": 504,
+        "durationMs": 890,
+        "finishReason": "tool_calls",
+        "toolCalls": [
+          "search_knowledge"
+        ],
+        "status": 200
+      },
+      {
+        "step": "file:C-3",
+        "model": "qwen3.7-flash-2026-07-15",
+        "promptTokens": 2559,
+        "cachedTokens": 2272,
+        "cacheCreation": 122,
+        "cacheType": "ephemeral",
+        "firstTokenMs": 482,
+        "durationMs": 747,
+        "finishReason": "stop",
+        "toolCalls": [
+          "read_source"
+        ],
+        "status": 200
+      },
+      {
+        "step": "file:C-4",
+        "model": "qwen3.7-flash-2026-07-15",
+        "promptTokens": 2705,
+        "cachedTokens": 2394,
+        "cacheCreation": 144,
+        "cacheType": "ephemeral",
+        "firstTokenMs": 436,
+        "durationMs": 2166,
+        "finishReason": "tool_calls",
+        "toolCalls": [
+          "finish_research"
+        ],
+        "status": 200
+      },
+      {
+        "step": "file:C-2",
+        "model": "qwen3.7-max-2026-05-20",
+        "promptTokens": 2437,
+        "cachedTokens": 0,
+        "cacheCreation": 2272,
+        "cacheType": "ephemeral",
+        "firstTokenMs": 1053,
+        "durationMs": 1669,
+        "finishReason": "tool_calls",
+        "toolCalls": [
+          "search_knowledge"
+        ],
+        "status": 200
+      },
+      {
+        "step": "file:C-3",
+        "model": "qwen3.7-max-2026-05-20",
+        "promptTokens": 2559,
+        "cachedTokens": 2272,
+        "cacheCreation": 122,
+        "cacheType": "ephemeral",
+        "firstTokenMs": 1367,
+        "durationMs": 1647,
+        "finishReason": "stop",
+        "toolCalls": [
+          "read_source"
+        ],
+        "status": 200
+      }
+    ]
+  }
 }

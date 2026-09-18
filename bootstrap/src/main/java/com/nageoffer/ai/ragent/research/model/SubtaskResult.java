@@ -24,7 +24,10 @@ import java.util.List;
  * 子任务的压缩返回契约，不包含隐藏推理或完整工具对话。
  */
 public record SubtaskResult(String taskId, List<Finding> findings, List<String> gaps,
-                            List<String> conflicts, Status status) {
+                            List<String> conflicts, Status status, List<String> executionIssues) {
+    public SubtaskResult(String taskId, List<Finding> findings, List<String> gaps, List<String> conflicts, Status status) {
+        this(taskId, findings, gaps, conflicts, status, List.of());
+    }
     public enum Status { COMPLETED, PARTIAL, FAILED, CANCELLED }
 
     public record Finding(@JsonProperty(required = true) String statement,
@@ -41,5 +44,6 @@ public record SubtaskResult(String taskId, List<Finding> findings, List<String> 
         findings = findings == null ? List.of() : List.copyOf(findings);
         gaps = gaps == null ? List.of() : List.copyOf(gaps);
         conflicts = conflicts == null ? List.of() : List.copyOf(conflicts);
+        executionIssues = executionIssues == null ? List.of() : List.copyOf(executionIssues);
     }
 }

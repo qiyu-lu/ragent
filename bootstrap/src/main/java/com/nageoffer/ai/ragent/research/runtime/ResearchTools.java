@@ -135,7 +135,7 @@ public class ResearchTools {
             var combinedGaps = new java.util.ArrayList<>(gaps);
             session.workerGaps().stream().filter(g -> !combinedGaps.contains(g)).forEach(combinedGaps::add);
             var result = new SubtaskResult(session.taskId, findings, combinedGaps, conflicts,
-                    session.workerFailure() ? SubtaskResult.Status.PARTIAL : SubtaskResult.Status.COMPLETED);
+                    session.workerFailure() ? SubtaskResult.Status.PARTIAL : SubtaskResult.Status.COMPLETED, session.executionIssues());
             session.conclude(new ResearchSession.Outcome(null, result));
             return result;
         });

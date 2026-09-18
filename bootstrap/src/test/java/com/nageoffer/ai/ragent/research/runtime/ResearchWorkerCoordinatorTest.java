@@ -99,7 +99,8 @@ class ResearchWorkerCoordinatorTest {
         }, json)) {
             var returned = (List<SubtaskResult>) coordinator.tools(parent).conduct(List.of(task("one"))).block();
             assertEquals(SubtaskResult.Status.FAILED, returned.get(0).status());
-            assertEquals(List.of("WORKER_TIMEOUT"), returned.get(0).gaps());
+            assertEquals(List.of("WORKER_TIMEOUT"), returned.get(0).executionIssues());
+            assertTrue(returned.get(0).gaps().isEmpty());
             release.countDown(); assertTrue(lateReturned.await(5, TimeUnit.SECONDS));
             assertEquals(SubtaskResult.Status.FAILED, parent.results().get(0).status());
             verify(store, times(1)).subtask(any(), eq("worker-1"), anyMap(), eq("SUBTASK_FAILED"), anyMap());

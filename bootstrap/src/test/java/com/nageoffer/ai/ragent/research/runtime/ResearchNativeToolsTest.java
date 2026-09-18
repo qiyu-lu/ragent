@@ -426,6 +426,17 @@ class ResearchNativeToolsTest {
         assertEquals(List.of("doc"), session.readingCoverage().get("directlyReadDocumentIds"));
     }
 
+    @Test
+    void explicitThinkingAblationChangesOnlyRequestedProviderFlag() throws Exception {
+        models.setThinkingForEvaluation(true);
+        tool("finish", "finish_research", Map.of("findings", List.of(), "gaps", List.of("Missing source"), "conflicts", List.of()));
+        assertNotNull(factory().run(session).result());
+        var request = json.readTree(server.takeRequest().getBody().readUtf8());
+        assertTrue(request.path("enable_thinking").asBoolean());
+        assertEquals("fixture-native", request.path("model").asText());
+        assertEquals(limits.getMaxOutputTokens(), request.path("max_tokens").asInt());
+    }
+
     private void tool(String id, String name, Map<String, Object> arguments) throws Exception {
         response(Map.of("role", "assistant", "tool_calls", List.of(Map.of("index", 0, "id", id, "type", "function", "function", Map.of("name", name, "arguments", json.writeValueAsString(arguments))))), "tool_calls");
     }

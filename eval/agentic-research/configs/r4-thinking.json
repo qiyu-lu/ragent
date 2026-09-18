@@ -1,0 +1,59 @@
+{
+  "schema_version": "research-evaluation-config-v2",
+  "model_id": "qwen3.7-flash-2026-07-15",
+  "thinking": true,
+  "temperature": 0.0,
+  "concurrency": 2,
+  "estimate_generation_cost": false,
+  "max_generation_cost_cny": null,
+  "runtime_budget": {
+    "model_calls": 16,
+    "tool_calls": 24,
+    "duration_seconds": 300,
+    "model_timeout_seconds": 60,
+    "tool_timeout_seconds": 30,
+    "max_input_tokens": 28000,
+    "max_output_tokens": 4096,
+    "finalization_reserve": 2,
+    "worker_concurrency": 2,
+    "worker_total": 4
+  },
+  "retrieval": {
+    "channel": "PGVector",
+    "rerank": false,
+    "recall_budget": 20,
+    "candidate_limit": 40,
+    "one_shot_top_k": 10
+  },
+  "scope": {
+    "qasper": "paper",
+    "musique": "distractor"
+  },
+  "generation_instruction": "Write in English. For REPORT return exactly one section with heading Answer and text containing only the shortest complete direct answer, without explanation, prefatory wording or citation markers. For yes/no questions use Yes or No. Preserve lists when the question asks for multiple items. If the sources cannot answer, use empty sections and explain the missing support in gaps. Never infer an answer from general knowledge.",
+  "prices": {
+    "date": "2026-09-17",
+    "region": "China Beijing",
+    "currency": "CNY",
+    "source": "https://help.aliyun.com/zh/model-studio/model-pricing",
+    "chat_tiers": [
+      [
+        32000,
+        0.2,
+        0.8
+      ],
+      [
+        256000,
+        0.6,
+        2.4
+      ],
+      [
+        1000000,
+        1.2,
+        4.8
+      ]
+    ],
+    "cache_discounts_applied": false,
+    "embedding_cost": "unknown until account price/invoice verified"
+  },
+  "execution_order": "interleaved"
+}

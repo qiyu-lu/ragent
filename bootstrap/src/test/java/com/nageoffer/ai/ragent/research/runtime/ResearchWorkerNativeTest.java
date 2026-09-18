@@ -153,12 +153,13 @@ class ResearchWorkerNativeTest {
         assertTrue(calls.stream().allMatch(c -> c.get("taskId") != null));
     }
 
-    @Test void failedWorkerLeavesSuccessfulFindingsAndExplicitPartialGap() {
+    @Test void failedWorkerLeavesSuccessfulFindingsAndSeparateExecutionIssue() {
         failBeta = true;
         var result = factory.run(session).result();
         assertEquals(SubtaskResult.Status.PARTIAL, result.status());
         assertEquals("Alpha is 7 ms.", result.findings().get(0).statement());
-        assertTrue(result.gaps().stream().anyMatch(g -> g.contains("WORKER_EXECUTION_FAILED")));
+        assertTrue(result.executionIssues().stream().anyMatch(g -> g.contains("WORKER_EXECUTION_FAILED")));
+        assertTrue(result.gaps().isEmpty());
         assertEquals(8, session.budget.snapshot().get("modelCalls"));
         assertEquals(1, session.results().stream().filter(r -> r.status() == SubtaskResult.Status.FAILED).count());
     }

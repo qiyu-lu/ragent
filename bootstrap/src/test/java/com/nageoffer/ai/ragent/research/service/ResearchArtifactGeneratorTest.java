@@ -73,11 +73,49 @@ class ResearchArtifactGeneratorTest {
     private SubtaskResult result() { return new SubtaskResult("main", List.of(new SubtaskResult.Finding("参数 7 ms", List.of("ev-a"))), List.of("保留的资料缺口"), List.of("来源口径不同"), SubtaskResult.Status.COMPLETED); }
     private Map<String, Object> report(String id) { return Map.of("title", "比较报告", "sections", List.of(Map.of("heading", "条件", "text", "参数是 7 ms", "evidenceIds", List.of(id, "ev-b"))), "gaps", List.of()); }
     private void response(Object body) throws Exception {
+        if (body instanceof Map<?,?> map && !map.containsKey("plan")) {
+            var complete = new LinkedHashMap<Object,Object>(map); complete.put("plan", null); body = complete;
+        }
         String content = body instanceof String text ? text : json.writeValueAsString(body);
         var delta = Map.of("id", "response", "choices", List.of(Map.of("index", 0, "delta", Map.of("role", "assistant", "content", content), "finish_reason", "stop")), "usage", Map.of("prompt_tokens", 50, "completion_tokens", 25, "total_tokens", 75));
         server.enqueue(new MockResponse().setHeader("Content-Type", "text/event-stream").setBody("data: " + json.writeValueAsString(delta) + "\n\ndata: [DONE]\n\n"));
     }
     @AfterEach void close() throws Exception { server.shutdown(); }
+
+    @Test void missingPlanArrayReportsFieldPathThenAcceptsAnEmptyArray() throws Exception {
+        session = session(ResearchBrief.OutputType.PLAN, Map.of()); session.delivered(item("ev-a"));
+        var plan = new LinkedHashMap<String,Object>();
+        plan.put("steps", List.of()); plan.put("resources", List.of()); plan.put("cautions", List.of());
+        plan.put("pendingItems", List.of("Source does not specify a procedure"));
+        response(Map.of("title", "Draft", "sections", List.of(), "plan", plan, "gaps", List.of()));
+        plan.put("prerequisites", List.of());
+        response(Map.of("title", "Draft", "sections", List.of(), "plan", plan, "gaps", List.of()));
+        assertNotNull(generator.generate(session, result()).plan());
+        server.takeRequest(); String repair = server.takeRequest().getBody().readUtf8();
+        assertTrue(repair.contains("prerequisites")); assertTrue(repair.contains("plan"));
+    }
+
+    @Test void unknownParameterUsesNullAndInvalidStepOrderReportsTheExactPath() {
+        var validator = new PlanDraftValidator();
+        var unknown = new PlanDraft.Parameter("temperature", "", null, List.of());
+        var step = new PlanDraft.Step(1, "Prepare", List.of("ev-a"), List.of(unknown));
+        var draft = new PlanDraft(List.of(), List.of(step), List.of(), List.of(), List.of("temperature unknown"));
+        var invalid = assertThrows(IllegalArgumentException.class, () -> validator.validate(draft, Set.of("ev-a")));
+        assertTrue(invalid.getMessage().contains("plan.steps[0].parameters[0]"));
+        var badOrder = new PlanDraft(List.of(), List.of(new PlanDraft.Step(2, "Prepare", List.of("ev-a"), List.of())), List.of(), List.of(), List.of());
+        assertTrue(assertThrows(IllegalArgumentException.class, () -> validator.validate(badOrder, Set.of("ev-a")))
+                .getMessage().contains("plan.steps[0].order"));
+    }
+
+    @Test void executionFailureIsSavedSeparatelyFromSourceGaps() {
+        var partial = session.partial("EXPLORATION_DURATION_BUDGET");
+        assertTrue(partial.gaps().isEmpty());
+        assertEquals(List.of("EXPLORATION_DURATION_BUDGET"), partial.executionIssues());
+        var payload = new ResearchArtifact.Payload("Partial", List.of(), null, List.of());
+        var artifact = generator.validate(session.claim.run().brief(), payload, partial, List.of(), Map.of());
+        assertTrue(artifact.gaps().isEmpty()); assertTrue(artifact.markdown().contains("执行问题"));
+        assertFalse(artifact.markdown().contains("资料缺口"));
+    }
 
     @Test void reportUsesTwoDocumentsAndServerCitationMappingWithProviderUsage() throws Exception {
         response(report("ev-a"));

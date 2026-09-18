@@ -211,6 +211,9 @@ public class ResearchSession {
     public synchronized boolean workerFailure() {
         return results.values().stream().anyMatch(r -> r.status() != SubtaskResult.Status.COMPLETED);
     }
+    public synchronized List<String> executionIssues() {
+        return results.values().stream().flatMap(r -> r.executionIssues().stream()).distinct().toList();
+    }
     public synchronized List<String> workerGaps() {
         return results.values().stream().filter(r -> r.status() != SubtaskResult.Status.COMPLETED)
                 .flatMap(r -> r.gaps().stream().map(g -> "[" + r.taskId() + "] " + g)).distinct().toList();
@@ -250,8 +253,9 @@ public class ResearchSession {
     public synchronized SubtaskResult partial(String reason) {
         List<SubtaskResult.Finding> findings = results.values().stream().flatMap(r -> r.findings().stream()).limit(30).toList();
         List<String> gaps = new ArrayList<>(results.values().stream().flatMap(r -> r.gaps().stream()).distinct().limit(29).toList());
-        gaps.add(reason);
+        List<String> issues = new ArrayList<>(executionIssues());
+        issues.add(reason);
         List<String> conflicts = results.values().stream().flatMap(r -> r.conflicts().stream()).distinct().limit(30).toList();
-        return new SubtaskResult(taskId, findings, gaps, conflicts, SubtaskResult.Status.PARTIAL);
+        return new SubtaskResult(taskId, findings, gaps, conflicts, SubtaskResult.Status.PARTIAL, issues);
     }
 }

@@ -35,7 +35,7 @@ import java.util.*;
 /** 同一研究的末尾生成调用；结构/引用失败最多修复一次，不另起 Agent。 */
 @Component
 public class ResearchArtifactGenerator {
-    public static final String PROMPT_VERSION = "research-artifact-v4";
+    public static final String PROMPT_VERSION = "research-artifact-v5";
     private final ResearchModelFactory models;
     private final ResearchProperties properties;
     private final ResearchEvidenceStore evidenceStore;
@@ -96,7 +96,11 @@ public class ResearchArtifactGenerator {
                 var payload = json.readValue(raw.toString(), ResearchArtifact.Payload.class);
                 return validate(session.claim.run().brief(), payload, result, session.results(), evidence);
             } catch (Exception invalid) {
-                String reason = invalid instanceof IllegalArgumentException ? invalid.getMessage() : "ARTIFACT_JSON_INVALID";
+                String reason = invalid instanceof com.fasterxml.jackson.databind.JsonMappingException mapping
+                        ? "ARTIFACT_JSON_INVALID at " + mapping.getPathReference() + ": " + EvidenceText.preview(mapping.getOriginalMessage(), 1500)
+                        : invalid instanceof com.fasterxml.jackson.core.JsonParseException parsing
+                        ? "ARTIFACT_JSON_INVALID at " + parsing.getLocation().getLineNr() + ":" + parsing.getLocation().getColumnNr()
+                        : invalid instanceof IllegalArgumentException ? invalid.getMessage() : "ARTIFACT_JSON_INVALID";
                 session.event("FINALIZATION_VALIDATION_FAILED", "产物结构或引用校验失败", Map.of(
                         "attempt", attempt + 1, "reason", reason,
                         "rawOutput", EvidenceText.preview(raw.toString(), 16000), "rawOutputTruncated", raw.length() > 16000));
@@ -190,6 +194,8 @@ public class ResearchArtifactGenerator {
             payload.plan().resources().forEach(r -> referenced.addAll(r.evidenceIds()));
             payload.plan().cautions().forEach(r -> referenced.addAll(r.evidenceIds()));
         }
+        LinkedHashSet<String> executionIssues = new LinkedHashSet<>(main.executionIssues());
+        workers.forEach(w -> executionIssues.addAll(w.executionIssues()));
         LinkedHashSet<String> gaps = new LinkedHashSet<>(main.gaps());
         workers.forEach(w -> gaps.addAll(w.gaps()));
         gaps.addAll(payload.gaps());
@@ -201,8 +207,8 @@ public class ResearchArtifactGenerator {
             plan.steps().forEach(s -> s.parameters().stream().filter(p -> p.value() == null || p.value().isBlank())
                     .forEach(p -> pending.add("步骤 " + s.order() + " 的参数“" + p.name() + "”未提供，待确认")));
             plan = new PlanDraft(plan.prerequisites(), plan.steps(), plan.resources(), plan.cautions(), List.copyOf(pending));
-            if (plan.steps().isEmpty() && pending.isEmpty() && gaps.isEmpty()) throw new IllegalArgumentException("EMPTY_PLAN_MUST_EXPLAIN_GAPS");
-        } else if (payload.sections().isEmpty() && gaps.isEmpty()) throw new IllegalArgumentException("EMPTY_REPORT_MUST_EXPLAIN_GAPS");
+            if (plan.steps().isEmpty() && pending.isEmpty() && gaps.isEmpty() && executionIssues.isEmpty()) throw new IllegalArgumentException("EMPTY_PLAN_MUST_EXPLAIN_GAPS");
+        } else if (payload.sections().isEmpty() && gaps.isEmpty() && executionIssues.isEmpty()) throw new IllegalArgumentException("EMPTY_REPORT_MUST_EXPLAIN_GAPS");
         List<ResearchArtifact.Citation> citations = new ArrayList<>();
         for (String id : referenced) {
             var e = evidence.get(id);
@@ -214,6 +220,7 @@ public class ResearchArtifactGenerator {
         StringBuilder markdown = new StringBuilder("# " + payload.title() + "\n\n");
         for (var section : payload.sections()) markdown.append("## ").append(section.heading()).append("\n\n")
                 .append(section.text()).append(" ").append(section.evidenceIds().stream().map(id -> "[" + indexes.get(id) + "](#cite-" + indexes.get(id) + ")").reduce("", String::concat)).append("\n\n");
+        if (!executionIssues.isEmpty()) markdown.append("## 执行问题\n\n").append(String.join("\n\n", executionIssues)).append("\n\n");
         if (!gaps.isEmpty()) markdown.append("## 资料缺口\n\n").append(String.join("\n\n", gaps)).append("\n\n");
         if (!conflicts.isEmpty()) markdown.append("## 资料冲突\n\n").append(String.join("\n\n", conflicts));
         return new ResearchArtifact(brief.outputType(), payload.title(), brief.goal(),

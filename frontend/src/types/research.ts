@@ -70,6 +70,7 @@ export interface ResearchRun {
   state: {
     question?: string;
     artifactError?: string;
+    executionIssues?: string[];
     subtasks?: Record<
       string,
       {

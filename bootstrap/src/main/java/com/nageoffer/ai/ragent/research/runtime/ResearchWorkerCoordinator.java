@@ -127,7 +127,7 @@ public class ResearchWorkerCoordinator implements AutoCloseable {
                         var status = child.delivered().isEmpty() ? SubtaskResult.Status.FAILED : SubtaskResult.Status.PARTIAL;
                         if (!child.delivered().isEmpty()) reason += ": " + child.delivered().size()
                                 + " evidence excerpt(s) read; no validated findings returned. Retained read IDs: " + child.delivered().keySet();
-                        return Mono.just(new SubtaskResult(child.taskId, List.of(), List.of(reason), List.of(), status));
+                        return Mono.just(new SubtaskResult(child.taskId, List.of(), List.of(), List.of(), status, List.of(reason)));
                     }).doOnNext(result -> {
                         parent.check();
                         // 结果写入由订阅者完成，取消/超时后 callable 的迟到返回不会经过这里。

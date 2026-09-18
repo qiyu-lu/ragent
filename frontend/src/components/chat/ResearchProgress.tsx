@@ -102,9 +102,9 @@ export function ResearchProgress({ runId }: { runId: string }) {
             查看来源（{sources.length}）
           </button>
         )}
-        {run.errorSummary && (
+        {(run.errorSummary || !!run.state.executionIssues?.length) && (
           <p className="mt-2 text-xs text-amber-700">
-            {run.artifact ? "研究中有未完成事项，见资料缺口。" : "未能形成完整结果，可重新生成。"}
+            {run.artifact ? "部分研究步骤未完成，现有结果仅覆盖已取得的资料，可重新生成补充研究。" : "未能形成完整结果，可重新生成。"}
           </p>
         )}
         {run.status === "WAITING_INPUT" && (

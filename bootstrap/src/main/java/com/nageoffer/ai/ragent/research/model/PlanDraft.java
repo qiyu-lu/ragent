@@ -18,12 +18,13 @@
 package com.nageoffer.ai.ragent.research.model;
 
 import java.util.List;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 /** 可核对的草稿；缺失参数保留 null，不包含审批或执行状态。 */
-public record PlanDraft(List<Requirement> prerequisites, List<Step> steps,
-                        List<Requirement> resources, List<Requirement> cautions,
-                        List<String> pendingItems) {
-    public record Requirement(String text, List<String> evidenceIds) { }
-    public record Step(Integer order, String action, List<String> evidenceIds, List<Parameter> parameters) { }
-    public record Parameter(String name, String value, String unit, List<String> evidenceIds) { }
+public record PlanDraft(@JsonProperty(required = true) List<Requirement> prerequisites, @JsonProperty(required = true) List<Step> steps,
+                        @JsonProperty(required = true) List<Requirement> resources, @JsonProperty(required = true) List<Requirement> cautions,
+                        @JsonProperty(required = true) List<String> pendingItems) {
+    public record Requirement(@JsonProperty(required = true) String text, @JsonProperty(required = true) List<String> evidenceIds) { }
+    public record Step(@JsonProperty(required = true) Integer order, @JsonProperty(required = true) String action, @JsonProperty(required = true) List<String> evidenceIds, @JsonProperty(required = true) List<Parameter> parameters) { }
+    public record Parameter(@JsonProperty(required = true) String name, @JsonProperty(required = true) String value, @JsonProperty(required = true) String unit, @JsonProperty(required = true) List<String> evidenceIds) { }
 }

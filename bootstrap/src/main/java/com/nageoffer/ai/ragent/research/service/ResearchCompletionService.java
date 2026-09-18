@@ -48,6 +48,7 @@ public class ResearchCompletionService {
             return;
         }
         state.put("researchResult", json.convertValue(outcome.result(), Map.class));
+        state.put("executionIssues", outcome.result().executionIssues());
         try {
             var artifact = generator.generate(session, outcome.result());
             session.check();
@@ -64,21 +65,22 @@ public class ResearchCompletionService {
     public void researchFailed(ResearchSession session, RuntimeException failure) {
         Throwable cause = root(failure);
         String reason = reason(failure);
-        boolean bounded = cause instanceof ResearchBudget.Exhausted || cause instanceof java.util.concurrent.TimeoutException;
+        boolean bounded = !(cause instanceof java.util.concurrent.CancellationException);
         if ((bounded && !session.citableIds().isEmpty()) || !session.acceptedEvidenceIds().isEmpty()) {
             complete(session, new ResearchSession.Outcome(null, session.partial(reason)), reason);
-        } else store.finish(session.claim, Status.FAILED, Map.of("researchResult", json.convertValue(session.partial(reason), Map.class),
+        } else store.finish(session.claim, Status.FAILED, Map.of("executionIssues", session.partial(reason).executionIssues(), "researchResult", json.convertValue(session.partial(reason), Map.class),
                 "readEvidenceIds", session.delivered().keySet(), "acceptedWorkerEvidenceIds", session.acceptedEvidenceIds()), session.budget.snapshot(), reason);
     }
 
     private static Throwable root(Throwable error) {
-        while (error.getCause() != null && !(error instanceof ResearchBudget.Exhausted)) error = error.getCause();
+        while (error.getCause() != null && !(error instanceof ResearchBudget.Exhausted) && !(error instanceof com.nageoffer.ai.ragent.infra.operation.RequestOperation.Failure)) error = error.getCause();
         return error;
     }
     private static String reason(Throwable failure) {
         if ("ARTIFACT_VALIDATION_FAILED".equals(failure.getMessage())) return "ARTIFACT_VALIDATION_FAILED";
         Throwable cause = root(failure);
         if (cause instanceof ResearchBudget.Exhausted) return cause.getMessage();
+        if (cause instanceof com.nageoffer.ai.ragent.infra.operation.RequestOperation.Failure operation) return operation.code;
         if (cause instanceof java.util.concurrent.TimeoutException) return "RESEARCH_TIMEOUT";
         if (cause instanceof java.util.concurrent.CancellationException) return "EXECUTION_CANCELLED";
         return "NATIVE_FINISH_REQUIRED".equals(cause.getMessage()) ? "NATIVE_FINISH_REQUIRED" : "RESEARCH_EXECUTION_FAILED";

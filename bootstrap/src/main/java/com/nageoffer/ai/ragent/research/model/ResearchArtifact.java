@@ -32,5 +32,5 @@ public record ResearchArtifact(ResearchBrief.OutputType outputType, String title
                            String excerpt, Map<String, Object> sourceLocation,
                            boolean truncated, EvidenceRecord.SourceExtent sourceExtent) { }
     /** 模型只提交内容；不能自行提供用户约束、来源位置或展示编号。 */
-    public record Payload(String title, List<Section> sections, PlanDraft plan, List<String> gaps) { }
+    public record Payload(@com.fasterxml.jackson.annotation.JsonProperty(required = true) String title, @com.fasterxml.jackson.annotation.JsonProperty(required = true) List<Section> sections, PlanDraft plan, @com.fasterxml.jackson.annotation.JsonProperty(required = true) List<String> gaps) { }
 }

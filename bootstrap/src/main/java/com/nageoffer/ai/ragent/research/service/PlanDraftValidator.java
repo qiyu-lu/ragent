@@ -30,17 +30,18 @@ public class PlanDraftValidator {
         requirements(draft.prerequisites(), readIds, "plan.prerequisites");
         requirements(draft.resources(), readIds, "plan.resources");
         requirements(draft.cautions(), readIds, "plan.cautions");
-        bounded(draft.steps(), 40);
+        bounded(draft.steps(), 40, "plan.steps");
+        bounded(draft.pendingItems(), 40, "plan.pendingItems");
         strings(draft.pendingItems(), 40);
-        int order = 1;
-        for (var step : draft.steps()) {
-            if (step == null || step.order() == null || step.order() != order++) {
-                throw new IllegalArgumentException("STEP_ORDER_MUST_BE_CONTIGUOUS");
+        for (int stepIndex = 0; stepIndex < draft.steps().size(); stepIndex++) {
+            var step = draft.steps().get(stepIndex);
+            String path = "plan.steps[" + stepIndex + "]";
+            if (step == null || step.order() == null || step.order() != stepIndex + 1) {
+                throw new IllegalArgumentException("STEP_ORDER_MUST_BE_CONTIGUOUS at " + path + ".order; expected " + (stepIndex + 1));
             }
-            String path = "plan.steps[" + (step.order() - 1) + "]";
             text(step.action());
             references(step.evidenceIds(), readIds, true, path + ".evidenceIds");
-            bounded(step.parameters(), 20);
+            bounded(step.parameters(), 20, path + ".parameters");
             for (int index = 0; index < step.parameters().size(); index++) {
                 var parameter = step.parameters().get(index);
                 if (parameter == null) throw new IllegalArgumentException("PARAMETER_REQUIRED");
@@ -49,15 +50,15 @@ public class PlanDraftValidator {
                 boolean supplied = parameter.value() != null && !parameter.value().isBlank();
                 if (supplied) text(parameter.value());
                 references(parameter.evidenceIds(), readIds, supplied, path + ".parameters[" + index + "].evidenceIds");
-                if (!supplied && (!parameter.evidenceIds().isEmpty() || parameter.unit() != null && !parameter.unit().isBlank())) {
-                    throw new IllegalArgumentException("MISSING_PARAMETER_MUST_HAVE_NULL_VALUE_UNIT_AND_NO_CITATION");
+                if (!supplied && (parameter.value() != null || !parameter.evidenceIds().isEmpty() || parameter.unit() != null)) {
+                    throw new IllegalArgumentException("MISSING_PARAMETER_MUST_HAVE_NULL_VALUE_UNIT_AND_NO_CITATION at " + path + ".parameters[" + index + "]");
                 }
             }
         }
     }
 
     private void requirements(List<PlanDraft.Requirement> items, Set<String> ids, String path) {
-        bounded(items, 40);
+        bounded(items, 40, path);
         for (int index = 0; index < items.size(); index++) {
             var item = items.get(index);
             if (item == null) throw new IllegalArgumentException("REQUIREMENT_REQUIRED");
@@ -67,7 +68,7 @@ public class PlanDraftValidator {
     }
 
     static void references(List<String> ids, Set<String> allowed, boolean required, String path) {
-        bounded(ids, 12);
+        bounded(ids, 12, path);
         if (required && ids.isEmpty()) {
             throw new IllegalArgumentException("EVIDENCE_IDS_REQUIRED at " + path);
         }
@@ -85,9 +86,10 @@ public class PlanDraftValidator {
         }
     }
     static void strings(List<String> values, int max) { bounded(values, max); values.forEach(PlanDraftValidator::text); }
-    static void bounded(List<?> values, int max) {
+    static void bounded(List<?> values, int max) { bounded(values, max, "array"); }
+    static void bounded(List<?> values, int max, String path) {
         if (values == null || values.size() > max || values.stream().anyMatch(v -> v == null)) {
-            throw new IllegalArgumentException("ARRAY_REQUIRED_OR_TOO_LARGE");
+            throw new IllegalArgumentException("ARRAY_REQUIRED_OR_TOO_LARGE at " + path);
         }
     }
 }

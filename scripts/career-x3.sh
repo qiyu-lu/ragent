@@ -6,7 +6,7 @@
 set -euo pipefail
 repo=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 before_ref=${X3_BEFORE_REF:-3381fa9}
-after_ref=${X3_AFTER_REF:-77ca3ae}
+after_ref=${X3_AFTER_REF:-97edcc1}
 stamp=${X3_STAMP:-career_X3_v1}
 trees=${X3_TREES:-$(dirname -- "$repo")/ragent-x3}
 runs=$repo/local-data/agentic-research/runs/$stamp

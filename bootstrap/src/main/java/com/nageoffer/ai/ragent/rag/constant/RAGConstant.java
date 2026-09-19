@@ -67,18 +67,6 @@ public class RAGConstant {
      */
     public static final String INTENT_CLASSIFIER_PROMPT_PATH = "prompt/intent-classifier.st";
 
-    /**
-     * 引导式问答提示词模板路径
-     * 用于生成引导式问答的选项提示内容
-     */
-    public static final String GUIDANCE_PROMPT_PATH = "prompt/guidance-prompt.st";
-
-    /**
-     * 歧义确认提示词模板路径
-     * 用于边界 case 时调 LLM 二次确认是否存在品类歧义
-     */
-    public static final String GUIDANCE_AMBIGUITY_CHECK_PROMPT_PATH = "prompt/guidance-ambiguity-check.st";
-
 
     /**
      * 查询改写 + 多问句拆分提示词模板路径

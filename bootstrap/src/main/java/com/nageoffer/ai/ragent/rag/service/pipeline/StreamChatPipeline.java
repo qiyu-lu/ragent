@@ -25,8 +25,6 @@ import com.nageoffer.ai.ragent.framework.convention.SourceRef;
 import com.nageoffer.ai.ragent.infra.chat.LLMService;
 import com.nageoffer.ai.ragent.infra.chat.StreamCallback;
 import com.nageoffer.ai.ragent.infra.chat.StreamCancellationHandle;
-import com.nageoffer.ai.ragent.rag.core.guidance.GuidanceDecision;
-import com.nageoffer.ai.ragent.rag.core.guidance.IntentGuidanceService;
 import com.nageoffer.ai.ragent.rag.core.intent.IntentResolver;
 import com.nageoffer.ai.ragent.rag.core.memory.ConversationMemoryService;
 import com.nageoffer.ai.ragent.rag.core.prompt.AgentPromptResolver;
@@ -54,7 +52,7 @@ import java.util.List;
  * 流式对话流水线
  * <p>
  * 承载从 RAGChatServiceImpl 提取的业务编排逻辑：
- * 记忆加载 -> 改写拆分 -> 意图解析 -> 歧义引导 -> 系统响应 / 检索 -> Prompt 组装 -> 流式输出
+ * 记忆加载 -> 改写拆分 -> 意图解析 -> 系统响应 / 检索 -> Prompt 组装 -> 流式输出
  * <p>
  * 流水线模式：通过私有方法 + boolean 返回值（handleXxx 返回 true 表示已处理并短路）
  */
@@ -66,7 +64,6 @@ public class StreamChatPipeline {
     private final ConversationMemoryService memoryService;
     private final QueryRewriteService queryRewriteService;
     private final IntentResolver intentResolver;
-    private final IntentGuidanceService guidanceService;
     private final RetrievalEngine retrievalEngine;
     private final LLMService llmService;
     private final RAGPromptService promptBuilder;
@@ -84,9 +81,6 @@ public class StreamChatPipeline {
         rewriteQuery(ctx);
         resolveIntents(ctx);
 
-        if (handleGuidance(ctx)) {
-            return;
-        }
         if (handleSystemOnly(ctx)) {
             return;
         }
@@ -117,20 +111,6 @@ public class StreamChatPipeline {
     private void resolveIntents(StreamChatContext ctx) {
         List<SubQuestionIntent> subIntents = intentResolver.resolve(ctx.getRewriteResult());
         ctx.setSubIntents(subIntents);
-    }
-
-    private boolean handleGuidance(StreamChatContext ctx) {
-        GuidanceDecision decision = guidanceService.detectAmbiguity(
-                ctx.getRewriteResult().rewrittenQuestion(),
-                ctx.getSubIntents()
-        );
-        if (!decision.isPrompt()) {
-            return false;
-        }
-        StreamCallback callback = ctx.getCallback();
-        callback.onContent(decision.getPrompt());
-        callback.onComplete();
-        return true;
     }
 
     private boolean handleSystemOnly(StreamChatContext ctx) {

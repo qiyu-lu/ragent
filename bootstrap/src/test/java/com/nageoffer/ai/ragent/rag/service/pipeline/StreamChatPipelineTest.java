@@ -20,8 +20,6 @@ package com.nageoffer.ai.ragent.rag.service.pipeline;
 import com.nageoffer.ai.ragent.framework.convention.RetrievedChunk;
 import com.nageoffer.ai.ragent.infra.chat.LLMService;
 import com.nageoffer.ai.ragent.infra.chat.StreamCallback;
-import com.nageoffer.ai.ragent.rag.core.guidance.GuidanceDecision;
-import com.nageoffer.ai.ragent.rag.core.guidance.IntentGuidanceService;
 import com.nageoffer.ai.ragent.rag.core.intent.IntentResolver;
 import com.nageoffer.ai.ragent.rag.core.memory.ConversationMemoryService;
 import com.nageoffer.ai.ragent.rag.core.prompt.AgentPromptResolver;
@@ -65,8 +63,6 @@ class StreamChatPipelineTest {
     @Mock
     private IntentResolver intentResolver;
     @Mock
-    private IntentGuidanceService guidanceService;
-    @Mock
     private RetrievalEngine retrievalEngine;
     @Mock
     private LLMService llmService;
@@ -105,7 +101,6 @@ class StreamChatPipelineTest {
         when(memoryService.append(any(), any(), any())).thenReturn("message-1");
         when(queryRewriteService.rewriteWithSplit("原问题", List.of())).thenReturn(rewriteResult);
         when(intentResolver.resolve(rewriteResult)).thenReturn(subIntents);
-        when(guidanceService.detectAmbiguity("改写问题", subIntents)).thenReturn(GuidanceDecision.none());
         when(intentResolver.isSystemOnly(anyList())).thenReturn(false);
         when(retrievalEngine.retrieve(subIntents)).thenReturn(retrievalContext);
         when(intentResolver.mergeIntentGroup(subIntents)).thenReturn(new IntentGroup(List.of(), List.of()));

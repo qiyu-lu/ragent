@@ -3,6 +3,8 @@
 # 治理前 = 3381fa9（P7，三层 30 s、不重试、失败当空结果），治理后 = W3 代码提交；各建临时工作树并编译。
 # 同一 50 个脚本化任务（B 模式）× embedding 无响应率 0 / 10% / 30% / 50%，每格独立的模拟上游与隔离运行库；
 # 每个故障率轮换两版的先后。中断后用同一 X3_STAMP 重跑本脚本，已完成的格不会重跑。
+# X3_SEEDS=7,11,13,17 让每个种子各跑一整套格（4 × 8 格，约 2 小时），报告按版本与故障率合并并附 Wilson 95% 区间。
+# 驱动脚本用本仓库的 x3_upstream.py（与 97edcc1 中的版本只差 --seeds 与合并报告），两版只提供编译产物与建表脚本。
 set -euo pipefail
 repo=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 before_ref=${X3_BEFORE_REF:-3381fa9}
@@ -30,6 +32,6 @@ tree after "$after_ref"
 # 固定小语料只需导入一次；导入用无故障的模拟上游，完成后停掉它。
 "$repo/scripts/stub-upstream.sh" > /dev/null
 "$repo/scripts/stub-upstream.sh" stop
-python3 "$trees/after/eval/agentic-research/x3_upstream.py" --tree before="$trees/before" --tree after="$trees/after" \
-    --run-dir "$runs" --rates 0,0.1,0.3,0.5 --tasks 50 --mode B --target embedding
+python3 "$repo/eval/agentic-research/x3_upstream.py" --tree before="$trees/before" --tree after="$trees/after" \
+    --run-dir "$runs" --rates 0,0.1,0.3,0.5 --tasks 50 --mode B --target embedding --seeds "${X3_SEEDS:-7}"
 say "X3 finished: $runs/x3-report.md and $runs/x3-summary.json"

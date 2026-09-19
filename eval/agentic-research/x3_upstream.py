@@ -7,9 +7,11 @@ on research_corpus_stub. Checkouts that predate the stub profile are pointed at 
 relaxed-binding environment variables (AI_PROVIDERS_*_URL), which every version reads.
 
 All numbers are from the stub upstream, not a real provider. A cell reruns completely when its
-predictions are incomplete; finished cells are kept.
+predictions are incomplete; finished cells are kept. With several --seeds every seed is a full set of
+cells (…_s11); the report pools the seeds per checkout and rate, with Wilson 95% intervals.
 
   x3_upstream.py --tree before=/path/a --tree after=/path/b --run-dir DIR           # run missing cells, then report
+  x3_upstream.py ... --seeds 7,11,13,17                                             # 4 seeds × the same tasks
   x3_upstream.py --run-dir DIR --report-only
 """
 from __future__ import annotations
@@ -67,8 +69,8 @@ def free_port() -> int:
         return probe.getsockname()[1]
 
 
-def start_stub(directory: Path, port: int, rate: float, args) -> subprocess.Popen:
-    stub = subprocess.Popen([sys.executable, str(HERE / "stub_upstream.py"), "--port", str(port), "--seed", str(args.seed),
+def start_stub(directory: Path, port: int, rate: float, seed: int, args) -> subprocess.Popen:
+    stub = subprocess.Popen([sys.executable, str(HERE / "stub_upstream.py"), "--port", str(port), "--seed", str(seed),
                              "--log", str(directory / "stub-requests.jsonl"), "--{}-hang".format(args.target), str(rate)],
                             stdout=(directory / "stub.log").open("a"), stderr=subprocess.STDOUT)
     for _ in range(100):
@@ -86,7 +88,7 @@ def complete(directory: Path, count: int) -> bool:
     return path.exists() and sum(1 for line in path.open() if line.strip()) == count
 
 
-def run_cell(name: str, tree: Path, rate: float, directory: Path, tasks: list, args) -> None:
+def run_cell(name: str, tree: Path, rate: float, seed: int, directory: Path, tasks: list, args) -> None:
     directory.mkdir(parents=True, exist_ok=True)
     for stale in ("predictions.jsonl", "usage.jsonl", "traces.jsonl", "embedding-usage.jsonl", "stub-requests.jsonl"):
         (directory / stale).unlink(missing_ok=True)
@@ -97,9 +99,9 @@ def run_cell(name: str, tree: Path, rate: float, directory: Path, tasks: list, a
            "maxCostCny": 1000.0, "generationInstruction": INSTRUCTION, "expectedModel": MODEL, "expectedBudget": {}}
     (directory / "job.json").write_text(json.dumps(job, indent=2) + "\n")
     commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=tree, text=True).strip()
-    record = {"tree": name, "commit": commit, "rate": rate, "target": args.target, "mode": args.mode, "seed": args.seed,
+    record = {"tree": name, "commit": commit, "rate": rate, "target": args.target, "mode": args.mode, "seed": seed,
               "tasks": len(tasks), "database": database, "started_at": datetime.now(timezone.utc).isoformat()}
-    stub = start_stub(directory, port, rate, args)
+    stub = start_stub(directory, port, rate, seed, args)
     created = False
     try:
         docker(args.container, "sh", "-c", 'exec createdb -U "$POSTGRES_USER" "$1"', "sh", database)
@@ -141,6 +143,34 @@ def percentile(values: list, q: float):
     return values[max(0, math.ceil(len(values) * q) - 1)] if values else None
 
 
+def wilson(successes: int, total: int, z: float = 1.96):
+    """Wilson score interval for a binomial proportion; (None, None) when there are no trials."""
+    if not total:
+        return None, None
+    p = successes / total
+    centre = (p + z * z / (2 * total)) / (1 + z * z / total)
+    half = z * math.sqrt(p * (1 - p) / total + z * z / (4 * total * total)) / (1 + z * z / total)
+    return max(0.0, centre - half), min(1.0, centre + half)
+
+
+def pool(cells: list) -> list:
+    """Cells of the same checkout and rate (one per seed) added up."""
+    groups = {}
+    for c in cells:
+        groups.setdefault((c["rate"], c["tree"]), []).append(c)
+    pooled = []
+    for (rate, tree), group in sorted(groups.items()):
+        recorded = sum(c["recorded"] for c in group)
+        success = sum(c["success"] for c in group)
+        wrong = sum(c["wrong_completion"] for c in group)
+        pooled.append({"tree": tree, "rate": rate, "seeds": sorted(c.get("seed") for c in group), "recorded": recorded,
+                       "success": success, "wrong_completion": wrong, "honest_failure": sum(c["honest_failure"] for c in group),
+                       "success_rate": success / recorded if recorded else None, "success_ci95": wilson(success, recorded),
+                       "wrong_completion_rate": wrong / recorded if recorded else None, "wrong_completion_ci95": wilson(wrong, recorded),
+                       "per_seed_success_rate": [c["success_rate"] for c in sorted(group, key=lambda c: c.get("seed") or 0)]})
+    return pooled
+
+
 def classify(prediction: dict) -> str:
     run = prediction["run"]
     keys = re.findall(r"SRC-\d{3}", run["brief"]["goal"])
@@ -165,7 +195,8 @@ def summarize_cell(directory: Path) -> dict:
     stub = Counter((r["endpoint"], r["fault"]) for r in rows(directory / "stub-requests.jsonl"))
     elapsed = [p["elapsedMillis"] for p in predictions]
     total = len(predictions)
-    return {"tree": cell["tree"], "commit": cell["commit"][:7], "rate": cell["rate"], "tasks": cell["tasks"], "recorded": total,
+    return {"tree": cell["tree"], "commit": cell["commit"][:7], "rate": cell["rate"], "seed": cell.get("seed"), "tasks": cell["tasks"],
+            "recorded": total,
             "statuses": dict(Counter(p["run"]["status"] for p in predictions)),
             "success": outcomes[SUCCESS], "wrong_completion": outcomes[WRONG], "honest_failure": outcomes[HONEST],
             "success_rate": outcomes[SUCCESS] / total if total else None,
@@ -181,22 +212,32 @@ def summarize_cell(directory: Path) -> dict:
 
 def report(run_dir: Path) -> None:
     cells = [summarize_cell(d) for d in sorted(run_dir.iterdir()) if (d / "cell.json").exists()]
-    cells.sort(key=lambda c: (c["rate"], c["tree"]))
+    cells.sort(key=lambda c: (c["rate"], c["tree"], c["seed"] or 0))
+    pooled = pool(cells)
     (run_dir / "x3-summary.json").write_text(json.dumps({"basis": "stub upstream (eval/agentic-research/stub_upstream.py), not a real provider",
-                                                         "cells": cells}, indent=2) + "\n")
+                                                         "pooled": pooled, "cells": cells}, indent=2) + "\n")
     lines = ["# X3 upstream faults (stub upstream, not a real provider)", "",
-             "| no-response | tree | recorded | COMPLETED/PARTIAL/FAILED | success | wrong completion (zero evidence) | P50 s | P95 s | model calls (wasted) | embedding req (failed) |",
-             "| ---: | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |"]
+             "| no-response | tree | seed | recorded | COMPLETED/PARTIAL/FAILED | success | wrong completion (zero evidence) | P50 s | P95 s | model calls (wasted) | embedding req (failed) |",
+             "| ---: | --- | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |"]
     for c in cells:
         s = c["statuses"]
-        lines.append("| {:.0%} | {} {} | {}/{} | {}/{}/{} | {:.0%} | {:.0%} ({}) | {:.1f} | {:.1f} | {} ({}) | {} ({}) |".format(
-            c["rate"], c["tree"], c["commit"], c["recorded"], c["tasks"], s.get("COMPLETED", 0), s.get("PARTIAL", 0), s.get("FAILED", 0),
+        lines.append("| {:.0%} | {} {} | {} | {}/{} | {}/{}/{} | {:.0%} | {:.0%} ({}) | {:.1f} | {:.1f} | {} ({}) | {} ({}) |".format(
+            c["rate"], c["tree"], c["commit"], c["seed"], c["recorded"], c["tasks"], s.get("COMPLETED", 0), s.get("PARTIAL", 0), s.get("FAILED", 0),
             c["success_rate"] or 0, c["wrong_completion_rate"] or 0, c["zero_evidence_completed"],
             (c["p50_ms"] or 0) / 1000, (c["p95_ms"] or 0) / 1000, c["model_calls"], c["wasted_model_calls"],
             c["embedding_requests"], c["embedding_failed"]))
     lines += ["", "success = COMPLETED with an artifact and read evidence from every requested SRC document; "
               "wrong completion = COMPLETED without that evidence (an upstream failure reported as an answer); "
               "other terminal states are honest failures. Wasted model calls are the calls of tasks that did not succeed."]
+    lines += ["", "## Pooled over seeds (Wilson 95% intervals)", "",
+              "| no-response | tree | seeds | tasks | success | success rate [95% CI] | per-seed success | wrong completion [95% CI] |",
+              "| ---: | --- | --- | ---: | ---: | --- | --- | --- |"]
+    for c in pooled:
+        (slo, shi), (wlo, whi) = c["success_ci95"], c["wrong_completion_ci95"]
+        lines.append("| {:.0%} | {} | {} | {} | {} | {:.1%} [{:.1%}, {:.1%}] | {} | {} ({:.1%}) [{:.1%}, {:.1%}] |".format(
+            c["rate"], c["tree"], ",".join(str(s) for s in c["seeds"]), c["recorded"], c["success"], c["success_rate"] or 0, slo or 0,
+            shi or 0, " ".join("{:.0%}".format(r or 0) for r in c["per_seed_success_rate"]), c["wrong_completion"],
+            c["wrong_completion_rate"] or 0, wlo or 0, whi or 0))
     (run_dir / "x3-report.md").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
 
@@ -209,7 +250,7 @@ def main():
     parser.add_argument("--tasks", type=int, default=50)
     parser.add_argument("--mode", choices=("B", "C"), default="B")
     parser.add_argument("--target", choices=("embedding", "chat"), default="embedding")
-    parser.add_argument("--seed", type=int, default=7)
+    parser.add_argument("--seeds", default="7", help="comma-separated stub seeds; each seed is a full set of cells")
     parser.add_argument("--container", default="ragent-iron-ore-dev-postgres-1")
     parser.add_argument("--report-only", action="store_true")
     args = parser.parse_args()
@@ -218,14 +259,18 @@ def main():
         trees = [(name, Path(path).resolve()) for name, _, path in (t.partition("=") for t in args.tree)]
         tasks = cases(args.tasks)
         args.run_dir.mkdir(parents=True, exist_ok=True)
-        for position, rate in enumerate(float(r) for r in args.rates.split(",")):
-            # Alternate which checkout goes first at each rate so drift over the run does not favor one side.
-            for name, tree in (trees if position % 2 == 0 else trees[::-1]):
-                directory = args.run_dir / "{}_{}{:02d}".format(name, args.target, round(rate * 100))
-                if complete(directory, len(tasks)) and (directory / "cell.json").exists():
-                    continue
-                print("[{}] {} at {:.0%} {} no-response".format(datetime.now().strftime("%F %T"), name, rate, args.target), flush=True)
-                run_cell(name, tree, rate, directory, tasks, args)
+        seeds = [int(s) for s in args.seeds.split(",")]
+        for seed in seeds:
+            for position, rate in enumerate(float(r) for r in args.rates.split(",")):
+                # Alternate which checkout goes first at each rate so drift over the run does not favor one side.
+                for name, tree in (trees if position % 2 == 0 else trees[::-1]):
+                    directory = args.run_dir / "{}_{}{:02d}{}".format(name, args.target, round(rate * 100),
+                                                                      "_s{}".format(seed) if len(seeds) > 1 else "")
+                    if complete(directory, len(tasks)) and (directory / "cell.json").exists():
+                        continue
+                    print("[{}] {} at {:.0%} {} no-response, seed {}".format(datetime.now().strftime("%F %T"), name, rate, args.target, seed),
+                          flush=True)
+                    run_cell(name, tree, rate, seed, directory, tasks, args)
     report(args.run_dir)
 
 

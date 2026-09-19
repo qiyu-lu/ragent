@@ -16,7 +16,10 @@ ResearchRunService with leases, heartbeats, polling takeover, resume and gracefu
 All numbers are from the stub upstream. Recovery time is from the fault to the first RUN_STARTED of
 the new owner; both clocks are this host's.
 
-  x2_takeover.py --run-dir DIR [--scenarios T0,T1,T2,T3,T4,T5]
+With --repeat N every listed scenario runs N times (DIR/T1/r01 …), each repetition in a fresh database
+and stub. A repetition that times out or raises is recorded with its error and counted, not retried.
+
+  x2_takeover.py --run-dir DIR [--scenarios T0,T1,T2,T3,T4,T5] [--repeat N]
   x2_takeover.py --run-dir DIR --report-only
 """
 from __future__ import annotations
@@ -36,7 +39,7 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 sys.path.insert(0, str(HERE))
 from stub_corpus import DATABASE, classpath  # noqa: E402
-from x3_upstream import docker, free_port  # noqa: E402
+from x3_upstream import docker, free_port, percentile  # noqa: E402
 
 KEYS = ["SRC-{:03d}".format(i) for i in range(1, 61)]
 TERMINAL = {"COMPLETED", "PARTIAL", "FAILED", "CANCELLED", "INTERRUPTED"}
@@ -263,10 +266,43 @@ def t5(s: Scenario) -> dict:
 SCENARIOS = {"T0": t0, "T1": t1, "T2": t2, "T3": t3, "T4": t4, "T5": t5}
 
 
+def spread(values: list) -> dict:
+    values = [v for v in values if v is not None]
+    return {"n": len(values), "p50": percentile(values, .50), "p95": percentile(values, .95), "max": max(values, default=None)}
+
+
+def distributions(results: list, clean) -> dict:
+    """Per scenario over repetitions. Recovery of a repetition is the slowest of its runs (all runs back under a live owner)."""
+    by_scenario = {}
+    for result in results:
+        by_scenario.setdefault(result["scenario"], []).append(result)
+    summary = {}
+    for name, group in sorted(by_scenario.items()):
+        done = [r for r in group if "error" not in r]
+        runs = [run for r in done for run in r["runs"]]
+        duplicates = Counter(run["model_calls"] - clean for run in runs
+                             if clean is not None and run["model_calls"] is not None and run["status"] == "COMPLETED")
+        recovery = [max((run["recovery_seconds"] for run in r["runs"] if run["recovery_seconds"] is not None), default=None) for r in done]
+        row = {"repetitions": len(group), "errored": len(group) - len(done), "runs": len(runs),
+               "runs_not_completed": sum(1 for run in runs if run["status"] != "COMPLETED"),
+               "runs_invariant_failed": sum(1 for run in runs if not all(run["invariants"].values())),
+               "recovery_seconds": spread(recovery),
+               "duplicate_model_calls": {str(k): v for k, v in sorted(duplicates.items())}}
+        if any("sigterm_exit_seconds" in r for r in done):
+            row["sigterm_exit_seconds"] = spread([r.get("sigterm_exit_seconds") for r in done])
+        if any("old_executor_alive" in r for r in done):
+            row["old_executor_alive"] = sum(1 for r in done if r.get("old_executor_alive"))
+        summary[name] = row
+    return summary
+
+
 def report(run_dir: Path) -> None:
-    results = [json.loads(p.read_text()) for p in sorted(run_dir.glob("T*/result.json"))]
-    baseline = next((r for r in results if r["scenario"] == "T0"), None)
-    clean = max((run["model_calls"] for run in baseline["runs"]), default=None) if baseline else None
+    loaded = [json.loads(p.read_text()) for p in list(run_dir.glob("T*/result.json")) + list(run_dir.glob("T*/r*/result.json"))]
+    loaded.sort(key=lambda r: (r["scenario"], r.get("repetition", 1)))
+    errored = [r for r in loaded if "error" in r]
+    results = [r for r in loaded if "error" not in r]
+    baseline = [r for r in results if r["scenario"] == "T0"]
+    clean = max((run["model_calls"] for r in baseline for run in r["runs"]), default=None)
     lines = ["# X2 executor takeover (stub upstream, not a real provider)", "",
              "Clean model calls per run (T0): {}. Duplicate model calls = model calls of the run − clean calls.".format(clean), "",
              "| scenario | case | status | executors | takeovers | released | recovery s | model calls (duplicate) | dropped tool calls | invariants | all keys read |",
@@ -279,24 +315,48 @@ def report(run_dir: Path) -> None:
             # 只对完成的任务计算重复调用；失败的任务（如毒任务）本来就没有走完干净路径。
             duplicate = run["model_calls"] - clean if clean is not None and run["model_calls"] is not None and run["status"] == "COMPLETED" else None
             failed = [k for k, v in run["invariants"].items() if not v]
+            label = result["scenario"] + ("/r{:02d}".format(result["repetition"]) if "repetition" in result else "")
             lines.append("| {} | {} | {} {} | {} | {} | {} | {} | {} ({}) | {} | {} | {} |".format(
-                result["scenario"], run["case"], run["status"], run["error"] or "", "→".join(names[e] for e in run["executors"]),
+                label, run["case"], run["status"], run["error"] or "", "→".join(names[e] for e in run["executors"]),
                 run["takeovers"], run["released"], run["recovery_seconds"] if run["recovery_seconds"] is not None else "—",
                 run["model_calls"], duplicate if duplicate is not None else "—", run["dropped_tool_calls"],
                 "all hold" if not failed else "FAILED: " + ", ".join(failed), "yes" if run["all_keys_read"] else "no"))
-    extras = [(r["scenario"], {k: v for k, v in r.items() if k not in ("scenario", "database", "faults", "runs")}) for r in results]
+    extras = [(r["scenario"], {k: v for k, v in r.items() if k not in ("scenario", "database", "faults", "runs", "settings")})
+              for r in results]
     lines += ["", "Scenario details: " + "; ".join("{} {}".format(name, json.dumps(extra)) for name, extra in extras), "",
               "Invariants per run: exactly one terminal event, at most one ARTIFACT event, contiguous event sequence, "
               "no finished tool call (same tool and arguments) executed twice, no INTERRUPTED status."]
+    summary = distributions(loaded, clean)
+    if any(row["repetitions"] > 1 for row in summary.values()):
+        lines += ["", "## Over repetitions", "",
+                  "| scenario | repetitions (errored) | runs | not COMPLETED | invariant failed | recovery s P50 / P95 / max | duplicate model calls → runs |",
+                  "| --- | ---: | ---: | ---: | ---: | --- | --- |"]
+        for name, row in summary.items():
+            r = row["recovery_seconds"]
+            lines.append("| {} | {} ({}) | {} | {} | {} | {} | {} |".format(
+                name, row["repetitions"], row["errored"], row["runs"], row["runs_not_completed"], row["runs_invariant_failed"],
+                "{} / {} / {} (n={})".format(r["p50"], r["p95"], r["max"], r["n"]) if r["n"] else "—",
+                ", ".join("{}→{}".format(k, v) for k, v in row["duplicate_model_calls"].items()) or "—"))
+        notes = ["Recovery of a repetition is its slowest run; percentiles are nearest-rank."]
+        if "sigterm_exit_seconds" in summary.get("T3", {}):
+            notes.append("T3 SIGTERM exit s: {}.".format(json.dumps(summary["T3"]["sigterm_exit_seconds"])))
+        if "old_executor_alive" in summary.get("T4", {}):
+            notes.append("T4 old executor alive after SIGCONT: {} of {}.".format(summary["T4"]["old_executor_alive"], summary["T4"]["repetitions"]))
+        lines += ["", " ".join(notes)]
+    if errored:
+        lines += ["", "Errored repetitions (counted above, not retried): " + "; ".join(
+            "{}/r{:02d} {}".format(r["scenario"], r.get("repetition", 1), r["error"]) for r in errored)]
     (run_dir / "x2-report.md").write_text("\n".join(lines) + "\n")
     (run_dir / "x2-summary.json").write_text(json.dumps({"basis": "stub upstream, separate executor JVMs sharing one run database",
-                                                         "clean_model_calls": clean, "scenarios": results}, indent=2) + "\n")
+                                                         "clean_model_calls": clean, "distributions": summary,
+                                                         "errored": errored, "scenarios": results}, indent=2) + "\n")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--run-dir", type=Path, required=True)
     parser.add_argument("--scenarios", default="T0,T1,T2,T3,T4,T5")
+    parser.add_argument("--repeat", type=int, default=1)
     parser.add_argument("--lease", type=int, default=6)
     parser.add_argument("--heartbeat", type=int, default=2)
     parser.add_argument("--poll", type=int, default=1)
@@ -310,16 +370,24 @@ def main() -> None:
     if not args.report_only:
         cp = classpath(REPO)
         for name in args.scenarios.split(","):
-            directory = args.run_dir / name
-            if (directory / "result.json").exists():
-                continue
-            print("[{}] {}".format(datetime.now().strftime("%H:%M:%S"), name), flush=True)
-            with Scenario(name, directory, args, cp) as scenario:
-                result = SCENARIOS[name](scenario)
-            result["settings"] = {"lease": args.lease, "heartbeat": args.heartbeat, "poll": args.poll, "grace": args.grace,
-                                  "chat_latency_ms": args.chat_latency, "commit": subprocess.check_output(
-                                      ["git", "rev-parse", "--short", "HEAD"], cwd=REPO, text=True).strip()}
-            (directory / "result.json").write_text(json.dumps(result, indent=2) + "\n")
+            for repetition in range(1, args.repeat + 1):
+                directory = args.run_dir / name if args.repeat == 1 else args.run_dir / name / "r{:02d}".format(repetition)
+                if (directory / "result.json").exists():
+                    continue
+                print("[{}] {} {}/{}".format(datetime.now().strftime("%H:%M:%S"), name, repetition, args.repeat), flush=True)
+                try:
+                    with Scenario(name, directory, args, cp) as scenario:
+                        result = SCENARIOS[name](scenario)
+                except (RuntimeError, subprocess.SubprocessError, OSError) as error:
+                    # 失败的重复如实记录并计数，不重试。
+                    result = {"scenario": name, "error": "{}: {}".format(type(error).__name__, error)}
+                    print("  errored: " + result["error"], flush=True)
+                if args.repeat > 1:
+                    result["repetition"] = repetition
+                result["settings"] = {"lease": args.lease, "heartbeat": args.heartbeat, "poll": args.poll, "grace": args.grace,
+                                      "chat_latency_ms": args.chat_latency, "commit": subprocess.check_output(
+                                          ["git", "rev-parse", "--short", "HEAD"], cwd=REPO, text=True).strip()}
+                (directory / "result.json").write_text(json.dumps(result, indent=2) + "\n")
     report(args.run_dir)
     print((args.run_dir / "x2-report.md").read_text())
 

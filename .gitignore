@@ -43,7 +43,6 @@ dist/
 .vite/
 *.tsbuildinfo
 .env.local
-resources/docker/graphrag/.env
 
 ### ROS1 / Python generated ###
 /robot-gateway/ros1_ws/.catkin_workspace

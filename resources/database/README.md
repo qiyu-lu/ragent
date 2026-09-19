@@ -24,9 +24,9 @@
 
 P1 已移除送检、任务模拟与 ROS1 代码，P5 已用研究 artifact 替代旧草稿与审批入口。当前 `schema_pg.sql` 不再创建退役表或 `t_iron_ore_task_template`；已有表停止访问，不在启动时 DROP。过渡期的旧草稿视图也已随 P5 退役。
 
-已有环境手工应用 `upgrades/v1.1.0/260917_retire_execution_demo.sql`，停用指向已删除 `iron_ore_simulate_task` 的意图节点，再清除当前应用 Redis 的意图树缓存 `ragent:intent:tree`（使用应用实际连接的实例与 database）。也可在管理页面停用该节点，由现有服务清除缓存。仅重启后端不会清除 Redis 缓存；下一次分类在缓存缺失时从数据库重建。该脚本可重复执行，不删除任何表或业务数据。仅把 SQL 放入此目录不会自动迁移；本轮没有对已有数据库执行此脚本或清除其缓存。
+停用指向已删除 `iron_ore_simulate_task` 的意图节点的升级脚本 `260917_retire_execution_demo.sql` 已于 2026-09-19 在本机 `ragent` 执行后随瘦身删除（`git show slim-v0-baseline:resources/database/upgrades/v1.1.0/260917_retire_execution_demo.sql`）。
 
-`260915_task_agent.sql`、`260812_ros1_robot_mission.sql` 与 `260812_iron_ore_demo.sql` 保留为历史升级记录，不能作为新环境的追加初始化流程。历史执行表停止访问。过渡期曾将 SIMULATED 草稿按已确认草稿展示；该视图已在 P5 移除，当前应用不再读取，历史数据仍原样保留。
+`260812_iron_ore_demo.sql` 保留为历史升级记录（`260915_task_agent.sql`、`260812_ros1_robot_mission.sql` 已随瘦身删除，由 `slim-v0-baseline` 标签留存），不能作为新环境的追加初始化流程。历史执行表停止访问。过渡期曾将 SIMULATED 草稿按已确认草稿展示；该视图已在 P5 移除，当前应用不再读取，历史数据仍原样保留。
 
 ## 2026-09-17：研究证据存储（P2）
 
@@ -39,12 +39,3 @@ P1 已移除送检、任务模拟与 ROS1 代码，P5 已用研究 artifact 替�
 可运行 `bash scripts/validate-agentic-research-p2-database.sh`，在开发 PostgreSQL 容器中随机创建隔离库，验证新建 schema 与两次增量执行的列、默认值、约束及索引一致、历史草稿保留和存储约束。`P2_POSTGRES_CONTAINER` 可覆盖容器名；脚本只删除本次成功创建的测试库，不能视为已有业务环境已升级。
 
 使用 `P2_RUN_JAVA_TESTS=true bash scripts/validate-agentic-research-p2-database.sh` 可追加运行 `ResearchEvidencePostgresIT`，验证实际 Java 存储、PGVector 文档过滤、MyBatis 来源读取和 Spring 只读 REPEATABLE READ 邻接事务。需本机 JDK 17、可离线解析的 Maven 依赖及容器映射的 PostgreSQL 端口。连接凭证由脚本临时读取为子进程环境变量，不打印到日志；测试只接受本机随机 `research_p2_` 数据库，结束后由同一脚本清理。合成向量及正文夹具不代表公开语料导入或模型效果验证。
-
-## 示例与参考
-
-`examples/` 只保存可选教程或功能参考，不参与全量初始化和增量升级：
-
-- `examples/intent_node_tutorial.sql`：教程中的闲聊、情感反馈和 MCP 意图节点示例。
-- `examples/iron_ore_demo_intents.sql`：工业知识闭环的幂等意图示例，只在创建唯一目标知识库后按文件头说明手工执行。
-
-示例脚本可能包含固定主键、外部工具 ID 或非幂等 `INSERT`。执行前必须阅读文件头说明，并核对目标数据库现有数据；基础 RAG 复现不需要执行这些脚本。

@@ -4,21 +4,22 @@
 
 | 项 | 值 |
 | --- | --- |
-| 更新时间 | 2026-09-19（瘦身完成 `slim-done`；X2 / X3 已补重复测量） |
-| 当前工作项 | **S6**（尚未开始）；瘦身已完成并快进合并，结果见 [slim-down-status.md](slim-down-status.md) |
+| 更新时间 | 2026-09-19（瘦身完成 `slim-done`；X2 / X3 已补重复测量；计划补入 W6、W7） |
+| 当前工作项 | **W6**（尚未开始，S6 顺延到 W7 之后）；瘦身已完成并快进合并，结果见 [slim-down-status.md](slim-down-status.md) |
 | 分支 / 提交 | `feat/llm-backend-hardening`；标签 `career-w1`、`career-w3`、`career-w2`、`career-w4`、`career-w5` |
 | 回归通过数 | `bash scripts/validate-agentic-research-p7.sh`：W5 后 Python 41/41、Java 13 + 260（W4 后 13 + 247），约 40 s；另有 `validate-agentic-research-p2-database.sh` 结构校验 |
 | 最近的运行目录 | X2：`local-data/agentic-research/runs/career_X2_v2/`（重复 20 次；单次 `career_X2_v1/`）；X3：`runs/career_X3_v2/`（4 个种子；单种子 `career_X3_v1/`）；X1：`runs/career_X1_v1_*`；X5：`runs/career_X5_real_v1/`（模拟上游 `career_X5_stub_v1/`） |
 
 ## 进度
 
-- [x] S0 分支、基线标签、提交计划、基线回归
-- [x] W1 缓存友好的上下文布局 + X1（[改动说明](changes/2026-09-18-prompt-cache-stable-prefix.md)）
+- [x] S0 基线；W1 缓存友好的上下文布局 + X1（[改动说明](changes/2026-09-18-prompt-cache-stable-prefix.md)）
 - [x] W3 模拟上游、抖动退避、熔断补缺 + X3（[改动说明](changes/2026-09-18-upstream-fault-injection.md)）
 - [x] W2 心跳租约、跨实例接管、断点续跑、优雅停机 + X2（[改动说明](changes/2026-09-18-durable-research-execution.md)）
 - [x] W4 权限隔离 + 越权矩阵（[改动说明](changes/2026-09-18-knowledge-base-access-control.md)）
 - [x] W5 内容寻址的 embedding 复用 + X5（[改动说明](changes/2026-09-18-content-addressed-embedding-reuse.md)）
-- [ ] S6 简历条目、README、面试卡
+- [ ] W6 W1 的质量护栏：归因、噪声基线、400 题扩样（X1b）
+- [ ] W7 容量基准：多实例排空积压（X6，可砍）
+- [ ] S6 简历条目、README、面试卡（两主一副两句话的结构，见计划 §10）
 
 ## 结果摘要（引用数字时连同条件一起说）
 
@@ -31,10 +32,9 @@
 
 ## 下一步（下个会话）
 
-按计划 §10 做 S6：汇总简历条目（只填结果摘要里的实测值并注明条件）、更新 `README.md` 工程能力表、按 Obsidian 既有格式整理面试卡，打 `career-done`。瘦身前的完整仓库留在标签 `slim-v0-baseline`。
+按计划 §5 的 W6：先写 `quality_diff.py` 并在现有 `career_X1_mq80_before_C / after_C` 上做归因（零接口费）；再生成 4 份题目 ID 文件、扩展 `scripts/career-x1.sh`，把噪声基线与 400 题交错运行的 `nohup` 命令交给用户后台跑。样本来自 MuSiQue dev 全量题（语料已全部导入 `research_corpus_v1`），不从企业资料出题。基线工作树已删除，需要 `git worktree add` 重建 `career-v0-baseline`。
 
 ## 已知事实与遗留问题
 
-- 用户自己的未跟踪笔记（如 `docs/current-code-notes-*`）出现时不修改、不提交。
 - 迁移 `260918_03`（W5）只在 `ragent` 执行（离线语料库不经过缓存）；迁移 `260918_02` 已于 2026-09-18 在 `ragent`（3 个有效库，全部 PUBLIC，所有者回填为 admin）和 `research_corpus_stub` 上执行；`research_corpus_v1` 未执行（X1 不经过判定）。其他本地库运行新代码前仍需执行。
 - AgentScope 自带 JVM 关闭钩子（`GracefulShutdownManager`）会在“模型已决定、工具未执行”处中断 Agent，所以 SIGTERM 仍重复 1 次模型调用；消除需持久化 tool_call 决定，未做。X2 只跑单 Agent 模式；多 Agent 下已完成 worker 不重跑只由测试覆盖。X3 不含熔断修复 `77ca3ae`（只由单测覆盖）。

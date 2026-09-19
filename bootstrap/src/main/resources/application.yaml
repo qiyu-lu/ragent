@@ -47,7 +47,7 @@ ragent:
     type: workflow  # 执行架构档位，可选 workflow（v1 编排管线）/ agent（v2 ReAct 架构，RAG 管线降级为主 Agent 的一个 Tool）
   demo-mode: false
   eval:
-    enabled: true
+    enabled: true  # 框架层开关：true 时 @IdempotentSubmit 跳过防重锁（上游的“测评模式”）；评测端点已删除
 
 rag:
   storage:

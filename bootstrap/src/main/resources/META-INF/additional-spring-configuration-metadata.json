@@ -1,8 +1,0 @@
-{
-  "properties": [
-    {
-      "name": "rag.vector.type",
-      "type": "java.lang.String",
-      "description": "Description for rag.vector.type."
-  }
-] }

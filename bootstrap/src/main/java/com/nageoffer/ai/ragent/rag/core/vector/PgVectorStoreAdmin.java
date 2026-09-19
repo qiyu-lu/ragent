@@ -20,14 +20,12 @@ package com.nageoffer.ai.ragent.rag.core.vector;
 import com.nageoffer.ai.ragent.rag.config.RAGDefaultProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "rag.vector.type", havingValue = "pg")
 public class PgVectorStoreAdmin implements VectorStoreAdmin {
 
 

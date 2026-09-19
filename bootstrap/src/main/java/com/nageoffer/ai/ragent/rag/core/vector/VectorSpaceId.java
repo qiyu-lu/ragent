@@ -36,7 +36,7 @@ public class VectorSpaceId {
 
     /**
      * 可选：命名空间 / 数据库 / 索引前缀 等
-     * 例如：milvus database / ES 索引前缀
+     * 例如：数据库 schema / 索引前缀
      */
     String namespace;
 }

@@ -20,8 +20,8 @@ package com.nageoffer.ai.ragent.core.ingest;
 /**
  * 向量落点身份：块写到哪个逻辑分区、用哪个模型、必须是多少维，由知识库配置（L2）与部署配置（L1）合成
  * <p>
- * {@link #partition} 是逻辑分区键，与 {@code rag.core.vector.VectorSpaceId} 表示的物理空间（PG 下是共享表与共享索引，
- * Milvus 下是 collection）不是一回事，两者都别叫 collectionName；模型与维度随身携带，缺一个都不允许落到系统默认值
+ * {@link #partition} 是逻辑分区键，与 {@code rag.core.vector.VectorSpaceId} 表示的物理空间（PG 下是共享表与共享索引）
+ * 不是一回事，两者都别叫 collectionName；模型与维度随身携带，缺一个都不允许落到系统默认值
  *
  * @param partition      逻辑分区键，取自知识库的 collection_name
  * @param embeddingModel 嵌入模型 ID，取自知识库配置

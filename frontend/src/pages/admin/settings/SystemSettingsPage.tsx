@@ -39,14 +39,12 @@ const ENGINE_CAPTIONS: Record<string, string> = {
 };
 
 const VECTOR_CAPTIONS: Record<string, string> = {
-  pg: "PostgreSQL · pgvector",
-  milvus: "Milvus"
+  pg: "PostgreSQL · pgvector"
 };
 
 // 通道行空间紧凑，用短名
 const VECTOR_SHORT_CAPTIONS: Record<string, string> = {
-  pg: "pgvector",
-  milvus: "Milvus"
+  pg: "pgvector"
 };
 
 const KEYWORD_CAPTIONS: Record<string, string> = {

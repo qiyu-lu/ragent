@@ -25,7 +25,7 @@ import org.springframework.util.StringUtils;
 /**
  * 对象存储配置
  * <p>
- * 与 {@code rag.vector.type}(pg/milvus)、{@code rag.keyword.type}(none/es) 同构，通过 {@code type}
+ * 与 {@code rag.keyword.type}(none/es) 同构，通过 {@code type}
  * 在 S3 兼容存储（rustfs / minio）与阿里云 OSS 间切换。所有知识库文档共用一个全局桶 {@code kbBucket}，
  * 每个知识库对应桶内一个目录（key 前缀 = collectionName）；多模态资产落公共读桶 {@code assetBucket}
  */

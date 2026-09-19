@@ -26,7 +26,7 @@ import java.util.List;
  * 向量检索服务接口（VectorRetrieverService）
  * <p>
  * 用途说明：
- * - 封装对向量数据库（如 Milvus / pgVector / Elasticsearch KNN）的检索能力
+ * - 封装对向量数据库（当前为 pgvector）的检索能力
  * - 负责从向量库中查找与用户问题（Query）最相关的若干文档片段（Chunk）
  * - 是 RAG 系统中 Retrieval 阶段的核心组件
  * <p>
@@ -111,7 +111,7 @@ public interface VectorRetrieverService {
     /**
      * 是否支持在一次查询里跨多个 collection 过滤
      * <p>
-     * - 返回 true 时，调用方用一次 {@link #retrieveByVector} 带总预算跨库召回（PG 单表按列过滤 / Milvus 共享库按标量过滤）
+     * - 返回 true 时，调用方用一次 {@link #retrieveByVector} 带总预算跨库召回（PG 单表按列过滤）
      * - 返回 false 时，调用方退化为逐库并行 fan-out，每库各取总预算后统一截断
      * 两个分支下「预算即总量」的语义一致，故新接入后端不覆写本方法只影响取数效率、不改变召回口径
      *

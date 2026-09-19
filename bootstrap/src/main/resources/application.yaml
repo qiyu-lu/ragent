@@ -68,9 +68,6 @@ rag:
       region: cn-hangzhou
       public-url:  # 虚拟主机式基址（含 bucket 子域），如 https://ragent-assets.oss-cn-hangzhou.aliyuncs.com；留空由 endpoint 推导
 
-  vector:
-    type: pg  # 可选 milvus / pg
-
   keyword:
     type: none  # 可选 none / es
     es:
@@ -357,6 +354,3 @@ sa-token:
   token-style: simple-uuid
   is-log: false
   is-print: false
-
-milvus:
-  uri: http://localhost:19530

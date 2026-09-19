@@ -27,7 +27,7 @@ import java.io.Serializable;
 
 /**
  * 知识库删除清理任务事件
- * 负责异步回收知识库独占的底层物理资源（Milvus collection / bucket / 残留向量）
+ * 负责异步回收知识库独占的底层物理资源（bucket 目录 / 残留向量）
  */
 @Data
 @Builder

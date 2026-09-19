@@ -252,7 +252,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 .operator(operator)
                 .build();
 
-        // 事务消息：本地事务软删知识库，提交后由消费者异步回收底层物理资源（Milvus collection / bucket / 残留向量）
+        // 事务消息：本地事务软删知识库，提交后由消费者异步回收底层物理资源（bucket 目录 / 残留向量）
         messageQueueProducer.sendInTransaction(
                 cleanupTopic,
                 kbId,

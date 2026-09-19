@@ -65,9 +65,6 @@ public class RAGSettingsController {
     private final MemoryProperties memoryProperties;
     private final AIModelProperties aiModelProperties;
 
-    @Value("${rag.vector.type:milvus}")
-    private String vectorType;
-
     @Value("${spring.servlet.multipart.max-file-size:50MB}")
     private DataSize maxFileSize;
 
@@ -98,7 +95,7 @@ public class RAGSettingsController {
         return BackendSettings.builder()
                 .storage(toStorageBackend(ragStorageProperties))
                 .vector(BackendSettings.VectorBackend.builder()
-                        .type(vectorType)
+                        .type("pg")
                         .build())
                 .keyword(BackendSettings.KeywordBackend.builder()
                         .type(keywordProperties.getType())

@@ -32,7 +32,7 @@ import java.util.List;
 /**
  * 向量落点：委托既有的向量写入服务
  * <p>
- * 注入的 {@link VectorStoreService} 是一条装饰器链（图谱同步 → 关键词同步 → PG / Milvus），未启用的
+ * 注入的 {@link VectorStoreService} 是一条装饰器链（图谱同步 → 关键词同步 → PG），未启用的
  * 后端不注册装饰器；要把关键词或图谱从向量写入的副作用提升为一等落点，各加一个 {@link ChunkSink}
  * bean、删掉对应装饰器即可，内核与写入器都不用改
  */

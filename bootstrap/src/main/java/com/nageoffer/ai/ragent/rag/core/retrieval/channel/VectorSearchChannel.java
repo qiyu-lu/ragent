@@ -177,7 +177,7 @@ public class VectorSearchChannel implements SearchChannel {
     /**
      * 在给定 collection 范围内取一路候选：按相关性降序、条数不超过 budget
      * <p>
-     * 后端支持跨库过滤（PG / Milvus 共享库）时一次查询带总预算即可；否则逐库并行 fan-out 兜底，
+     * 后端支持跨库过滤（PG 共享表）时一次查询带总预算即可；否则逐库并行 fan-out 兜底，
      * 每库各取 budget 再统一截断——多取是为了拿到真正的全局前 budget 条（哪个库有好料事前不知道），
      * 但截断不能省：省掉它 budget 就从「总量」悄悄变成「每库上限」，补充路名额被放大成 库数 × 名额
      * <p>

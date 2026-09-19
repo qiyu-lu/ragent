@@ -86,7 +86,7 @@ public class SystemSettingsVO {
         public static class VectorBackend {
 
             /**
-             * pg / milvus
+             * 固定为 pg（pgvector）
              */
             private String type;
         }

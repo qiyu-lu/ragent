@@ -43,7 +43,7 @@ public class KnowledgeBaseVO {
     private String embeddingModel;
 
     /**
-     * Milvus Collection 名称
+     * 知识库 collection 名称
      */
     private String collectionName;
 

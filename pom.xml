@@ -16,7 +16,6 @@
         <java.version>17</java.version>
         <spring-boot.version>3.5.7</spring-boot.version>
         <agentscope.version>2.0.1</agentscope.version>
-        <milvus-sdk.version>2.6.6</milvus-sdk.version>
         <tika.version>3.2.3</tika.version>
         <hutool-all.version>5.8.37</hutool-all.version>
         <mybatis-plus-spring-boot3-starter.version>3.5.14</mybatis-plus-spring-boot3-starter.version>
@@ -75,12 +74,6 @@
                 <version>${tika.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
-            </dependency>
-
-            <dependency>
-                <groupId>io.milvus</groupId>
-                <artifactId>milvus-sdk-java</artifactId>
-                <version>${milvus-sdk.version}</version>
             </dependency>
 
             <dependency>

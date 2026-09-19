@@ -1,0 +1,192 @@
+{
+  "experiment": "X2 executor takeover, repeated",
+  "date": "2026-09-19",
+  "basis": "stub upstream, separate executor JVMs sharing one run database; not a real provider",
+  "command": "X2_STAMP=career_X2_v2 X2_SCENARIOS=T0,T1,T3,T4 X2_REPEAT=20 bash scripts/career-takeover-demo.sh",
+  "run_dir": "local-data/agentic-research/runs/career_X2_v2",
+  "settings": {
+    "lease": 6,
+    "heartbeat": 2,
+    "poll": 1,
+    "grace": 20,
+    "chat_latency_ms": "700:900",
+    "commit": "1adea5a"
+  },
+  "load": "per repetition 2 runs, mode B, 10 model calls per run when clean; each repetition in a fresh database and stub",
+  "previous": "career-x2-2026-09-18.json (single run per scenario at cb42dc4)",
+  "clean_model_calls": 10,
+  "definitions": {
+    "recovery_seconds": "per repetition, the slowest run: first fault to the new owner's RUN_STARTED; nearest-rank percentiles",
+    "errored": "repetition that timed out or raised; recorded, not retried"
+  },
+  "distributions": {
+    "T0": {
+      "repetitions": 20,
+      "errored": 0,
+      "runs": 40,
+      "runs_not_completed": 0,
+      "runs_invariant_failed": 0,
+      "recovery_seconds": {
+        "n": 0,
+        "p50": null,
+        "p95": null,
+        "max": null
+      },
+      "duplicate_model_calls": {
+        "0": 40
+      }
+    },
+    "T1": {
+      "repetitions": 20,
+      "errored": 1,
+      "runs": 38,
+      "runs_not_completed": 0,
+      "runs_invariant_failed": 0,
+      "recovery_seconds": {
+        "n": 19,
+        "p50": 5.13,
+        "p95": 6.12,
+        "max": 6.12
+      },
+      "duplicate_model_calls": {
+        "1": 38
+      }
+    },
+    "T3": {
+      "repetitions": 20,
+      "errored": 0,
+      "runs": 40,
+      "runs_not_completed": 0,
+      "runs_invariant_failed": 0,
+      "recovery_seconds": {
+        "n": 20,
+        "p50": 1.08,
+        "p95": 1.11,
+        "max": 1.11
+      },
+      "duplicate_model_calls": {
+        "1": 40
+      },
+      "sigterm_exit_seconds": {
+        "n": 20,
+        "p50": 1.12,
+        "p95": 1.17,
+        "max": 1.22
+      }
+    },
+    "T4": {
+      "repetitions": 20,
+      "errored": 0,
+      "runs": 40,
+      "runs_not_completed": 0,
+      "runs_invariant_failed": 0,
+      "recovery_seconds": {
+        "n": 20,
+        "p50": 5.12,
+        "p95": 6.12,
+        "max": 6.12
+      },
+      "duplicate_model_calls": {
+        "1": 40
+      },
+      "old_executor_alive": 20
+    }
+  },
+  "recovery_seconds_per_repetition": {
+    "T0": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+    "T1": [
+      5.12,
+      4.98,
+      5.1,
+      6.07,
+      5.13,
+      5.11,
+      6.08,
+      5.08,
+      5.13,
+      5.14,
+      6.11,
+      6.12,
+      5.14,
+      4.95,
+      5.14,
+      6.1,
+      4.98,
+      5.02,
+      4.97
+    ],
+    "T3": [
+      0.93,
+      1.09,
+      1.1,
+      1.11,
+      1.08,
+      1.08,
+      1.11,
+      1.1,
+      0.91,
+      1.07,
+      0.91,
+      1.1,
+      1.09,
+      0.91,
+      0.94,
+      0.93,
+      1.09,
+      1.1,
+      1.05,
+      0.91
+    ],
+    "T4": [
+      4.94,
+      4.94,
+      5.12,
+      6.1,
+      5.14,
+      6.12,
+      5.13,
+      5.12,
+      4.99,
+      5.12,
+      5.08,
+      4.97,
+      6.1,
+      6.12,
+      5.13,
+      5.14,
+      5.12,
+      5.13,
+      5.0,
+      5.03
+    ]
+  },
+  "errored": [
+    {
+      "scenario": "T1",
+      "repetition": 6,
+      "error": "RuntimeError: runs did not start on a"
+    }
+  ],
+  "errored_note": "T1/r06: executor a made 14 upstream requests in 9 s, then went silent for 120 s before any fault was injected; run 2 stopped while registering its tools and run 1 stopped after its last model call. Database dropped and no thread dump taken, so the cause is unknown."
+}

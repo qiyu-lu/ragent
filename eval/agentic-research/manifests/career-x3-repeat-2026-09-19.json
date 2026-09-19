@@ -1,0 +1,958 @@
+{
+  "experiment": "X3 upstream faults, 4 seeds",
+  "date": "2026-09-19",
+  "basis": "stub upstream (eval/agentic-research/stub_upstream.py), not a real provider",
+  "load": "50 scripted research tasks per cell, mode B, corpus research_corpus_stub; embedding no-response 0/10/30/50%; stub seeds 7,11,13,17 (200 tasks per checkout and rate)",
+  "before": "3381fa9",
+  "after": "97edcc1",
+  "command": "X3_STAMP=career_X3_v2 X3_SEEDS=7,11,13,17 bash scripts/career-x3.sh",
+  "run_dir": "local-data/agentic-research/runs/career_X3_v2",
+  "previous": "career-x3-2026-09-18.json (seed 7 only; seed 7 was rerun here and differs slightly because the order of concurrent requests is not fixed)",
+  "definitions": {
+    "success_ci95": "Wilson score interval, z = 1.96, over the pooled tasks"
+  },
+  "failure_reasons_pooled": {
+    "before": {
+      "0.1": {
+        "FAILED RESEARCH_TIMEOUT": 15,
+        "PARTIAL RESEARCH_TIMEOUT": 9,
+        "FAILED RESEARCH_EXECUTION_FAILED": 1
+      },
+      "0.3": {
+        "FAILED RESEARCH_TIMEOUT": 60,
+        "PARTIAL RESEARCH_TIMEOUT": 25
+      },
+      "0.5": {
+        "FAILED RESEARCH_TIMEOUT": 98,
+        "PARTIAL RESEARCH_TIMEOUT": 30
+      }
+    },
+    "after": {
+      "0.3": {
+        "FAILED NATIVE_FINISH_REQUIRED": 2,
+        "FAILED RESEARCH_FAILED_WITHOUT_EVIDENCE": 1
+      },
+      "0.5": {
+        "FAILED RESEARCH_FAILED_WITHOUT_EVIDENCE": 13,
+        "PARTIAL (no code)": 9,
+        "FAILED NATIVE_FINISH_REQUIRED": 6
+      }
+    }
+  },
+  "pooled": [
+    {
+      "tree": "after",
+      "rate": 0.0,
+      "seeds": [
+        7,
+        11,
+        13,
+        17
+      ],
+      "recorded": 200,
+      "success": 200,
+      "wrong_completion": 0,
+      "honest_failure": 0,
+      "success_rate": 1.0,
+      "success_ci95": [
+        0.9811539940816791,
+        1.0
+      ],
+      "wrong_completion_rate": 0.0,
+      "wrong_completion_ci95": [
+        0.0,
+        0.018846005918320894
+      ],
+      "per_seed_success_rate": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "tree": "before",
+      "rate": 0.0,
+      "seeds": [
+        7,
+        11,
+        13,
+        17
+      ],
+      "recorded": 200,
+      "success": 200,
+      "wrong_completion": 0,
+      "honest_failure": 0,
+      "success_rate": 1.0,
+      "success_ci95": [
+        0.9811539940816791,
+        1.0
+      ],
+      "wrong_completion_rate": 0.0,
+      "wrong_completion_ci95": [
+        0.0,
+        0.018846005918320894
+      ],
+      "per_seed_success_rate": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "tree": "after",
+      "rate": 0.1,
+      "seeds": [
+        7,
+        11,
+        13,
+        17
+      ],
+      "recorded": 200,
+      "success": 200,
+      "wrong_completion": 0,
+      "honest_failure": 0,
+      "success_rate": 1.0,
+      "success_ci95": [
+        0.9811539940816791,
+        1.0
+      ],
+      "wrong_completion_rate": 0.0,
+      "wrong_completion_ci95": [
+        0.0,
+        0.018846005918320894
+      ],
+      "per_seed_success_rate": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "tree": "before",
+      "rate": 0.1,
+      "seeds": [
+        7,
+        11,
+        13,
+        17
+      ],
+      "recorded": 200,
+      "success": 175,
+      "wrong_completion": 0,
+      "honest_failure": 25,
+      "success_rate": 0.875,
+      "success_ci95": [
+        0.8219846471534161,
+        0.9138808484078432
+      ],
+      "wrong_completion_rate": 0.0,
+      "wrong_completion_ci95": [
+        0.0,
+        0.018846005918320894
+      ],
+      "per_seed_success_rate": [
+        0.8,
+        0.84,
+        0.98,
+        0.88
+      ]
+    },
+    {
+      "tree": "after",
+      "rate": 0.3,
+      "seeds": [
+        7,
+        11,
+        13,
+        17
+      ],
+      "recorded": 200,
+      "success": 197,
+      "wrong_completion": 0,
+      "honest_failure": 3,
+      "success_rate": 0.985,
+      "success_ci95": [
+        0.9568335194437211,
+        0.9948858548155076
+      ],
+      "wrong_completion_rate": 0.0,
+      "wrong_completion_ci95": [
+        0.0,
+        0.018846005918320894
+      ],
+      "per_seed_success_rate": [
+        1.0,
+        1.0,
+        0.96,
+        0.98
+      ]
+    },
+    {
+      "tree": "before",
+      "rate": 0.3,
+      "seeds": [
+        7,
+        11,
+        13,
+        17
+      ],
+      "recorded": 200,
+      "success": 115,
+      "wrong_completion": 0,
+      "honest_failure": 85,
+      "success_rate": 0.575,
+      "success_ci95": [
+        0.5057080512046821,
+        0.6414650479075696
+      ],
+      "wrong_completion_rate": 0.0,
+      "wrong_completion_ci95": [
+        0.0,
+        0.018846005918320894
+      ],
+      "per_seed_success_rate": [
+        0.54,
+        0.62,
+        0.5,
+        0.64
+      ]
+    },
+    {
+      "tree": "after",
+      "rate": 0.5,
+      "seeds": [
+        7,
+        11,
+        13,
+        17
+      ],
+      "recorded": 200,
+      "success": 172,
+      "wrong_completion": 0,
+      "honest_failure": 28,
+      "success_rate": 0.86,
+      "success_ci95": [
+        0.8051000619915237,
+        0.9013308137472852
+      ],
+      "wrong_completion_rate": 0.0,
+      "wrong_completion_ci95": [
+        0.0,
+        0.018846005918320894
+      ],
+      "per_seed_success_rate": [
+        0.8,
+        0.9,
+        0.84,
+        0.9
+      ]
+    },
+    {
+      "tree": "before",
+      "rate": 0.5,
+      "seeds": [
+        7,
+        11,
+        13,
+        17
+      ],
+      "recorded": 200,
+      "success": 72,
+      "wrong_completion": 0,
+      "honest_failure": 128,
+      "success_rate": 0.36,
+      "success_ci95": [
+        0.29669087731339805,
+        0.42858600434373184
+      ],
+      "wrong_completion_rate": 0.0,
+      "wrong_completion_ci95": [
+        0.0,
+        0.018846005918320894
+      ],
+      "per_seed_success_rate": [
+        0.4,
+        0.3,
+        0.26,
+        0.48
+      ]
+    }
+  ],
+  "cells": [
+    {
+      "tree": "after",
+      "commit": "97edcc1",
+      "rate": 0.0,
+      "seed": 7,
+      "recorded": 50,
+      "statuses": {
+        "COMPLETED": 50
+      },
+      "success": 50,
+      "wrong_completion": 0,
+      "zero_evidence_completed": 0,
+      "p50_ms": 923,
+      "p95_ms": 1101,
+      "model_calls": 250,
+      "wasted_model_calls": 0,
+      "embedding_requests": 75,
+      "embedding_failed": 0,
+      "wall_seconds": 24.7
+    },
+    {
+      "tree": "after",
+      "commit": "97edcc1",
+      "rate": 0.0,
+      "seed": 11,
+      "recorded": 50,
+      "statuses": {
+        "COMPLETED": 50
+      },
+      "success": 50,
+      "wrong_completion": 0,
+      "zero_evidence_completed": 0,
+      "p50_ms": 887,
+      "p95_ms": 1067,
+      "model_calls": 250,
+      "wasted_model_calls": 0,
+      "embedding_requests": 75,
+      "embedding_failed": 0,
+      "wall_seconds": 24.3
+    },
+    {
+      "tree": "after",
+      "commit": "97edcc1",
+      "rate": 0.0,
+      "seed": 13,
+      "recorded": 50,
+      "statuses": {
+        "COMPLETED": 50
+      },
+      "success": 50,
+      "wrong_completion": 0,
+      "zero_evidence_completed": 0,
+      "p50_ms": 1002,
+      "p95_ms": 1231,
+      "model_calls": 250,
+      "wasted_model_calls": 0,
+      "embedding_requests": 75,
+      "embedding_failed": 0,
+      "wall_seconds": 26.7
+    },
+    {
+      "tree": "after",
+      "commit": "97edcc1",
+      "rate": 0.0,
+      "seed": 17,
+      "recorded": 50,
+      "statuses": {
+        "COMPLETED": 50
+      },
+      "success": 50,
+      "wrong_completion": 0,
+      "zero_evidence_completed": 0,
+      "p50_ms": 905,
+      "p95_ms": 1077,
+      "model_calls": 250,
+      "wasted_model_calls": 0,
+      "embedding_requests": 75,
+      "embedding_failed": 0,
+      "wall_seconds": 24.7
+    },
+    {
+      "tree": "before",
+      "commit": "3381fa9",
+      "rate": 0.0,
+      "seed": 7,
+      "recorded": 50,
+      "statuses": {
+        "COMPLETED": 50
+      },
+      "success": 50,
+      "wrong_completion": 0,
+      "zero_evidence_completed": 0,
+      "p50_ms": 846,
+      "p95_ms": 1031,
+      "model_calls": 250,
+      "wasted_model_calls": 0,
+      "embedding_requests": 75,
+      "embedding_failed": 0,
+      "wall_seconds": 23.1
+    },
+    {
+      "tree": "before",
+      "commit": "3381fa9",
+      "rate": 0.0,
+      "seed": 11,
+      "recorded": 50,
+      "statuses": {
+        "COMPLETED": 50
+      },
+      "success": 50,
+      "wrong_completion": 0,
+      "zero_evidence_completed": 0,
+      "p50_ms": 920,
+      "p95_ms": 1080,
+      "model_calls": 250,
+      "wasted_model_calls": 0,
+      "embedding_requests": 75,
+      "embedding_failed": 0,
+      "wall_seconds": 25.1
+    },
+    {
+      "tree": "before",
+      "commit": "3381fa9",
+      "rate": 0.0,
+      "seed": 13,
+      "recorded": 50,
+      "statuses": {
+        "COMPLETED": 50
+      },
+      "success": 50,
+      "wrong_completion": 0,
+      "zero_evidence_completed": 0,
+      "p50_ms": 905,
+      "p95_ms": 1110,
+      "model_calls": 250,
+      "wasted_model_calls": 0,
+      "embedding_requests": 75,
+      "embedding_failed": 0,
+      "wall_seconds": 24.6
+    },
+    {
+      "tree": "before",
+      "commit": "3381fa9",
+      "rate": 0.0,
+      "seed": 17,
+      "recorded": 50,
+      "statuses": {
+        "COMPLETED": 50
+      },
+      "success": 50,
+      "wrong_completion": 0,
+      "zero_evidence_completed": 0,
+      "p50_ms": 861,
+      "p95_ms": 974,
+      "model_calls": 250,
+      "wasted_model_calls": 0,
+      "embedding_requests": 75,
+      "embedding_failed": 0,
+      "wall_seconds": 23.0
+    },
+    {
+      "tree": "after",
+      "commit": "97edcc1",
+      "rate": 0.1,
+      "seed": 7,
+      "recorded": 50,
+      "statuses": {
+        "COMPLETED": 50
+      },
+      "success": 50,
+      "wrong_completion": 0,
+      "zero_evidence_completed": 0,
+      "p50_ms": 951,
+      "p95_ms": 13506,
+      "model_calls": 252,
+      "wasted_model_calls": 0,
+      "embedding_requests": 85,
+      "embedding_failed": 10,
+      "wall_seconds": 96.4
+    },
+    {
+      "tree": "after",
+      "commit": "97edcc1",
+      "rate": 0.1,
+      "seed": 11,
+      "recorded": 50,
+      "statuses": {
+        "COMPLETED": 50
+      },
+      "success": 50,
+      "wrong_completion": 0,
+      "zero_evidence_completed": 0,
+      "p50_ms": 965,
+      "p95_ms": 13333,
+      "model_calls": 251,
+      "wasted_model_calls": 0,
+      "embedding_requests": 82,
+      "embedding_failed": 7,
+      "wall_seconds": 70.1
+    },
+    {
+      "tree": "after",
+      "commit": "97edcc1",
+      "rate": 0.1,
+      "seed": 13,
+      "recorded": 50,
+      "statuses": {
+        "COMPLETED": 50
+      },
+      "success": 50,
+      "wrong_completion": 0,
+      "zero_evidence_completed": 0,
+      "p50_ms": 1028,
+      "p95_ms": 1394,
+      "model_calls": 250,
+      "wasted_model_calls": 0,
+      "embedding_requests": 76,
+      "embedding_failed": 1,
+      "wall_seconds": 32.8
+    },
+    {
+      "tree": "after",
+      "commit": "97edcc1",
+      "rate": 0.1,
+      "seed": 17,
+      "recorded": 50,
+      "statuses": {
+        "COMPLETED": 50
+      },
+      "success": 50,
+      "wrong_completion": 0,
+      "zero_evidence_completed": 0,
+      "p50_ms": 960,
+      "p95_ms": 13319,
+      "model_calls": 251,
+      "wasted_model_calls": 0,
+      "embedding_requests": 81,
+      "embedding_failed": 6,
+      "wall_seconds": 64.1
+    },
+    {
+      "tree": "before",
+      "commit": "3381fa9",
+      "rate": 0.1,
+      "seed": 7,
+      "recorded": 50,
+      "statuses": {
+        "FAILED": 8,
+        "COMPLETED": 40,
+        "PARTIAL": 2
+      },
+      "success": 40,
+      "wrong_completion": 0,
+      "zero_evidence_completed": 0,
+      "p50_ms": 871,
+      "p95_ms": 30590,
+      "model_calls": 213,
+      "wasted_model_calls": 15,
+      "embedding_requests": 70,
+      "embedding_failed": 9,
+      "wall_seconds": 168.4
+    },
+    {
+      "tree": "before",
+      "commit": "3381fa9",
+      "rate": 0.1,
+      "seed": 11,
+      "recorded": 50,
+      "statuses": {
+        "COMPLETED": 42,
+        "FAILED": 3,
+        "PARTIAL": 5
+      },
+      "success": 42,
+      "wrong_completion": 0,
+      "zero_evidence_completed": 0,
+      "p50_ms": 894,
+      "p95_ms": 30578,
+      "model_calls": 227,
+      "wasted_model_calls": 23,
+      "embedding_requests": 73,
+      "embedding_failed": 8,
+      "wall_seconds": 147.9
+    },
+    {
+      "tree": "before",
+      "commit": "3381fa9",
+      "rate": 0.1,
+      "seed": 13,
+      "recorded": 50,
+      "statuses": {
+        "COMPLETED": 49,
+        "PARTIAL": 1
+      },
+      "success": 49,
+      "wrong_completion": 0,
+      "zero_evidence_completed": 0,
+      "p50_ms": 897,
+      "p95_ms": 1297,
+      "model_calls": 248,
+      "wasted_model_calls": 4,
+      "embedding_requests": 75,
+      "embedding_failed": 1,
+      "wall_seconds": 44.8
+    },
+    {
+      "tree": "before",
+      "commit": "3381fa9",
+      "rate": 0.1,
+      "seed": 17,
+      "recorded": 50,
+      "statuses": {
+        "COMPLETED": 44,
+        "FAILED": 5,
+        "PARTIAL": 1
+      },
+      "success": 44,
+      "wrong_completion": 0,
+      "zero_evidence_completed": 0,
+      "p50_ms": 900,
+      "p95_ms": 30147,
+      "model_calls": 227,
+      "wasted_model_calls": 9,
+      "embedding_requests": 72,
+      "embedding_failed": 6,
+      "wall_seconds": 113.4
+    },
+    {
+      "tree": "after",
+      "commit": "97edcc1",
+      "rate": 0.3,
+      "seed": 7,
+      "recorded": 50,
+      "statuses": {
+        "COMPLETED": 50
+      },
+      "success": 50,
+      "wrong_completion": 0,
+      "zero_evidence_completed": 0,
+      "p50_ms": 13026,
+      "p95_ms": 37722,
+      "model_calls": 260,
+      "wasted_model_calls": 0,
+      "embedding_requests": 124,
+      "embedding_failed": 49,
+      "wall_seconds": 336.2
+    },
+    {
+      "tree": "after",
+      "commit": "97edcc1",
+      "rate": 0.3,
+      "seed": 11,
+      "recorded": 50,
+      "statuses": {
+        "COMPLETED": 50
+      },
+      "success": 50,
+      "wrong_completion": 0,
+      "zero_evidence_completed": 0,
+      "p50_ms": 1021,
+      "p95_ms": 25586,
+      "model_calls": 254,
+      "wasted_model_calls": 0,
+      "embedding_requests": 103,
+      "embedding_failed": 28,
+      "wall_seconds": 197.8
+    },
+    {
+      "tree": "after",
+      "commit": "97edcc1",
+      "rate": 0.3,
+      "seed": 13,
+      "recorded": 50,
+      "statuses": {
+        "COMPLETED": 48,
+        "FAILED": 2
+      },
+      "success": 48,
+      "wrong_completion": 0,
+      "zero_evidence_completed": 0,
+      "p50_ms": 1128,
+      "p95_ms": 38054,
+      "model_calls": 256,
+      "wasted_model_calls": 7,
+      "embedding_requests": 115,
+      "embedding_failed": 43,
+      "wall_seconds": 295.2
+    },
+    {
+      "tree": "after",
+      "commit": "97edcc1",
+      "rate": 0.3,
+      "seed": 17,
+      "recorded": 50,
+      "statuses": {
+        "COMPLETED": 49,
+        "FAILED": 1
+      },
+      "success": 49,
+      "wrong_completion": 0,
+      "zero_evidence_completed": 0,
+      "p50_ms": 1020,
+      "p95_ms": 37654,
+      "model_calls": 256,
+      "wasted_model_calls": 4,
+      "embedding_requests": 106,
+      "embedding_failed": 33,
+      "wall_seconds": 232.8
+    },
+    {
+      "tree": "before",
+      "commit": "3381fa9",
+      "rate": 0.3,
+      "seed": 7,
+      "recorded": 50,
+      "statuses": {
+        "COMPLETED": 27,
+        "FAILED": 17,
+        "PARTIAL": 6
+      },
+      "success": 27,
+      "wrong_completion": 0,
+      "zero_evidence_completed": 0,
+      "p50_ms": 992,
+      "p95_ms": 30650,
+      "model_calls": 169,
+      "wasted_model_calls": 41,
+      "embedding_requests": 66,
+      "embedding_failed": 23,
+      "wall_seconds": 374.6
+    },
+    {
+      "tree": "before",
+      "commit": "3381fa9",
+      "rate": 0.3,
+      "seed": 11,
+      "recorded": 50,
+      "statuses": {
+        "COMPLETED": 31,
+        "FAILED": 17,
+        "PARTIAL": 2
+      },
+      "success": 31,
+      "wrong_completion": 0,
+      "zero_evidence_completed": 0,
+      "p50_ms": 976,
+      "p95_ms": 30618,
+      "model_calls": 181,
+      "wasted_model_calls": 25,
+      "embedding_requests": 68,
+      "embedding_failed": 19,
+      "wall_seconds": 315.8
+    },
+    {
+      "tree": "before",
+      "commit": "3381fa9",
+      "rate": 0.3,
+      "seed": 13,
+      "recorded": 50,
+      "statuses": {
+        "FAILED": 17,
+        "COMPLETED": 25,
+        "PARTIAL": 8
+      },
+      "success": 25,
+      "wrong_completion": 0,
+      "zero_evidence_completed": 0,
+      "p50_ms": 1108,
+      "p95_ms": 30682,
+      "model_calls": 167,
+      "wasted_model_calls": 49,
+      "embedding_requests": 67,
+      "embedding_failed": 25,
+      "wall_seconds": 405.5
+    },
+    {
+      "tree": "before",
+      "commit": "3381fa9",
+      "rate": 0.3,
+      "seed": 17,
+      "recorded": 50,
+      "statuses": {
+        "COMPLETED": 32,
+        "FAILED": 9,
+        "PARTIAL": 9
+      },
+      "success": 32,
+      "wrong_completion": 0,
+      "zero_evidence_completed": 0,
+      "p50_ms": 946,
+      "p95_ms": 30613,
+      "model_calls": 197,
+      "wasted_model_calls": 45,
+      "embedding_requests": 71,
+      "embedding_failed": 18,
+      "wall_seconds": 292.3
+    },
+    {
+      "tree": "after",
+      "commit": "97edcc1",
+      "rate": 0.5,
+      "seed": 7,
+      "recorded": 50,
+      "statuses": {
+        "COMPLETED": 40,
+        "FAILED": 4,
+        "PARTIAL": 6
+      },
+      "success": 40,
+      "wrong_completion": 0,
+      "zero_evidence_completed": 0,
+      "p50_ms": 13295,
+      "p95_ms": 62142,
+      "model_calls": 260,
+      "wasted_model_calls": 50,
+      "embedding_requests": 151,
+      "embedding_failed": 86,
+      "wall_seconds": 559.8
+    },
+    {
+      "tree": "after",
+      "commit": "97edcc1",
+      "rate": 0.5,
+      "seed": 11,
+      "recorded": 50,
+      "statuses": {
+        "COMPLETED": 45,
+        "FAILED": 4,
+        "PARTIAL": 1
+      },
+      "success": 45,
+      "wrong_completion": 0,
+      "zero_evidence_completed": 0,
+      "p50_ms": 12986,
+      "p95_ms": 49169,
+      "model_calls": 247,
+      "wasted_model_calls": 21,
+      "embedding_requests": 123,
+      "embedding_failed": 56,
+      "wall_seconds": 366.6
+    },
+    {
+      "tree": "after",
+      "commit": "97edcc1",
+      "rate": 0.5,
+      "seed": 13,
+      "recorded": 50,
+      "statuses": {
+        "COMPLETED": 42,
+        "FAILED": 6,
+        "PARTIAL": 2
+      },
+      "success": 42,
+      "wrong_completion": 0,
+      "zero_evidence_completed": 0,
+      "p50_ms": 13080,
+      "p95_ms": 62475,
+      "model_calls": 257,
+      "wasted_model_calls": 33,
+      "embedding_requests": 145,
+      "embedding_failed": 79,
+      "wall_seconds": 524.9
+    },
+    {
+      "tree": "after",
+      "commit": "97edcc1",
+      "rate": 0.5,
+      "seed": 17,
+      "recorded": 50,
+      "statuses": {
+        "COMPLETED": 45,
+        "FAILED": 5
+      },
+      "success": 45,
+      "wrong_completion": 0,
+      "zero_evidence_completed": 0,
+      "p50_ms": 13338,
+      "p95_ms": 49219,
+      "model_calls": 261,
+      "wasted_model_calls": 17,
+      "embedding_requests": 148,
+      "embedding_failed": 80,
+      "wall_seconds": 514.7
+    },
+    {
+      "tree": "before",
+      "commit": "3381fa9",
+      "rate": 0.5,
+      "seed": 7,
+      "recorded": 50,
+      "statuses": {
+        "FAILED": 23,
+        "COMPLETED": 20,
+        "PARTIAL": 7
+      },
+      "success": 20,
+      "wrong_completion": 0,
+      "zero_evidence_completed": 0,
+      "p50_ms": 30140,
+      "p95_ms": 30644,
+      "model_calls": 143,
+      "wasted_model_calls": 51,
+      "embedding_requests": 63,
+      "embedding_failed": 30,
+      "wall_seconds": 465.7
+    },
+    {
+      "tree": "before",
+      "commit": "3381fa9",
+      "rate": 0.5,
+      "seed": 11,
+      "recorded": 50,
+      "statuses": {
+        "COMPLETED": 15,
+        "FAILED": 27,
+        "PARTIAL": 8
+      },
+      "success": 15,
+      "wrong_completion": 0,
+      "zero_evidence_completed": 0,
+      "p50_ms": 30152,
+      "p95_ms": 30649,
+      "model_calls": 129,
+      "wasted_model_calls": 59,
+      "embedding_requests": 63,
+      "embedding_failed": 35,
+      "wall_seconds": 553.4
+    },
+    {
+      "tree": "before",
+      "commit": "3381fa9",
+      "rate": 0.5,
+      "seed": 13,
+      "recorded": 50,
+      "statuses": {
+        "FAILED": 32,
+        "COMPLETED": 13,
+        "PARTIAL": 5
+      },
+      "success": 13,
+      "wrong_completion": 0,
+      "zero_evidence_completed": 0,
+      "p50_ms": 30156,
+      "p95_ms": 30648,
+      "model_calls": 112,
+      "wasted_model_calls": 52,
+      "embedding_requests": 59,
+      "embedding_failed": 37,
+      "wall_seconds": 583.0
+    },
+    {
+      "tree": "before",
+      "commit": "3381fa9",
+      "rate": 0.5,
+      "seed": 17,
+      "recorded": 50,
+      "statuses": {
+        "COMPLETED": 24,
+        "FAILED": 16,
+        "PARTIAL": 10
+      },
+      "success": 24,
+      "wrong_completion": 0,
+      "zero_evidence_completed": 0,
+      "p50_ms": 30120,
+      "p95_ms": 30652,
+      "model_calls": 168,
+      "wasted_model_calls": 56,
+      "embedding_requests": 68,
+      "embedding_failed": 26,
+      "wall_seconds": 407.4
+    }
+  ]
+}

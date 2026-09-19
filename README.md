@@ -89,6 +89,5 @@ npm run dev
 ## 文档入口
 
 - [改动索引](docs/iron-ore-rag/changes/README.md)
-- [评测说明](eval/iron-ore/README.md)与[固定运行手册](eval/iron-ore/RUNBOOK.md)
 
 本仓库基于 `nageoffer/ragent` 的 `1.1.0` 和提交 `f64de341452c8998ebf64cd264e60ccad6a31631` 开展改造，上游历史保持不变，并继续遵循 [Apache License 2.0](LICENSE)。

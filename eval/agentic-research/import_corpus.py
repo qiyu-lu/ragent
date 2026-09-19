@@ -17,8 +17,7 @@ from datasetkit import canonical, sha256_file
 from verify_prepared import validate_dataset
 
 REPO = Path(__file__).resolve().parents[2]
-sys.path.append(str(REPO / 'eval/context-selection'))
-from start_pooled import idea_environment
+from sourcekit import idea_environment
 
 
 def prepare_job(prepared: Path, output: Path, profile: str, dimension: int, batch: int, retries: int) -> dict:

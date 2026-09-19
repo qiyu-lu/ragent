@@ -1,4 +1,0 @@
-[
-  {"_id":"dev-bridge","question":"Where is the maker of Tool X based?","answer":"York","type":"bridge","level":"easy","supporting_facts":[["Tool X",0],["Maker X",0]],"context":[["Tool X",["Tool X is made by Maker X."]],["Maker X",["Maker X is based in York."]],["Noise Three",["Noise text."]]]},
-  {"_id":"dev-comparison","question":"Which was founded first, Alpha or Beta?","answer":"Alpha","type":"comparison","level":"easy","supporting_facts":[["Alpha",0],["Beta",0]],"context":[["Alpha",["Alpha was founded in 1901."]],["Beta",["Beta was founded in 1911."]],["Noise Four",["Other text."]]]}
-]

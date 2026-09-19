@@ -5,13 +5,10 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
-import sys
 from pathlib import Path
 from typing import Any, Iterator
 
-# Reuse the existing streaming Parquet reader and file fingerprint helper.
-sys.path.append(str(Path(__file__).resolve().parents[1] / "context-selection"))
-from cs_evalkit import iter_source_rows, sha256_file  # noqa: E402
+from sourcekit import iter_source_rows, sha256_file
 
 CORPUS_SCHEMA = "research-corpus-v1"
 QUESTION_SCHEMA = "research-questions-v1"

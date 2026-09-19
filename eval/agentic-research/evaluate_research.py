@@ -15,8 +15,7 @@ import subprocess
 import sys
 
 REPO = Path(__file__).resolve().parents[2]
-sys.path.append(str(REPO / "eval/context-selection"))
-from start_pooled import idea_environment
+from sourcekit import idea_environment
 from datasetkit import QUERY_KEYS, iter_jsonl, sha256_file
 from scoring import aggregate, prediction, score_one
 

@@ -197,7 +197,7 @@ def prepare_dataset(dataset: str, split: str, data_root: Path, output: Path, var
                for path, item in zip(paths, inputs)):
             raise ValueError("raw source changed during preparation")
         code = [Path(__file__), Path(__file__).with_name("datasetkit.py"),
-                Path(__file__).resolve().parents[1] / "context-selection" / "cs_evalkit.py"]
+                Path(__file__).with_name("sourcekit.py")]
         manifest = {"schema_version": MANIFEST_SCHEMA, "dataset": dataset, "split": split,
                     "variant": variant if dataset == "musique" else None,
                     "source": SOURCES[dataset], "inputs": inputs,

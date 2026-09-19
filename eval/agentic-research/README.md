@@ -2,8 +2,6 @@
 
 这里实现离线转换、真实幂等摄取、原生研究与统一产物，以及 P7 固定 A/B/C 对照和应用原文核对。转换不调用模型；`import_corpus.py --execute` 复用项目分块、向量化和索引落点。真实评测的配置、逐题输出、trace、usage 和失败保存在独立批次，见执行记录与交接说明。
 
-P7 固定 regression 已全部记录 400 问题/1200 任务，MuSiQue 答案/支持的分母为 105 行可回答；完整质量和限制见对照报告。[P7 机器清单](manifests/research-p7-evaluation-2026-09-17.json)冻结配置、原始产物 SHA、调用资源、作者公式对齐、173/28 程序检查和实际委派案例；full 5839/17517 只准备，未付费执行。
-
 ## 来源与环境
 
 - QASPER v0.3：使用已下载的 HF Parquet train/validation 分片；[数据卡](https://huggingface.co/datasets/allenai/qasper)与[官方加载脚本](https://huggingface.co/datasets/allenai/qasper/blob/main/qasper.py)。署名 Dasigi 等（2021），CC BY 4.0。
@@ -37,9 +35,6 @@ python3 -m unittest discover -s eval/agentic-research/tests -v
 固定评测使用配置中的 `models_by_role`，填写实际供应商模型 ID，运行时严格绑定注册项并保存到 `runtime.json/modelsByRole`。没有此字段的 p7/r5 配置会把所有角色明确固定为旧 `model_id`，不继承在线默认值。新增 [career.json](configs/career.json) 保持旧预算、thinking=false、rerank=false，使用 Max/Flash/Max；A/B/C 的最终生成统一为 Max，C 的 worker 为 Flash，混合模型下的 B/C 差异同时包含模型分配差异，不能作为纯架构因果结论。`summary.json/resources/model_usage_by_role` 按实际角色、模型汇总请求、已知 token、失败和 unknown；混合模型不套用旧单模型价格表，默认金额估算关闭。
 
 ```bash
-# 独立秋招批次；少量流程联调不代表正式效果提升
-python3 eval/agentic-research/evaluate_applications.py --config eval/agentic-research/configs/career.json --case comparison-02 --case plan-06 --run-dir local-data/agentic-research/runs/<new-career-id> --execute
-
 # 首批固定 32 题/96 ABC 项；集中验收使用同一角色配置，禁止混入旧 R5 v2
 python3 eval/agentic-research/evaluate_research.py --profile regression --config eval/agentic-research/configs/career.json --case-ids eval/agentic-research/manifests/research-career-case-ids-2026-09-18.json --run-dir local-data/agentic-research/runs/<new-career-regression-id> --execute
 ```
@@ -53,63 +48,11 @@ python3 eval/agentic-research/evaluate_research.py --profile regression --config
 ```bash
 # 随机 PostgreSQL 隔离库与本地 HTTP 桩，无付费模型调用
 bash scripts/validate-agentic-research-p3.sh
-
-# 只生成 5 个请求与调用清单，不访问数据库或 API；run-dir 必须不存在
-python3 eval/agentic-research/smoke_research.py --run-dir local-data/agentic-research/runs/<new-id>
-
-# 真实供应商小规模联调，会消耗模型与 query embedding 额度
-python3 eval/agentic-research/smoke_research.py --run-dir local-data/agentic-research/runs/<new-id> --execute
 ```
 
 真实联调复用已导入的 `research_corpus_v1`，仅查询语料，将运行、证据和事件写入随机 `research_p3_*` 库并在结束时清理。参数可覆盖 prepared 路径、容器名和语料库名；使用 `--case waiting-and-resume` 等可只复测一条路径。凭证优先来自环境变量，也可复用既有 IDEA 配置，在子进程环境中传递，日志不输出其值。Java 命令复用现有向量检索；本阶段 smoke 不启用 rerank，不运行 A/B/C 或 EM/F1。
 
 每批保留 `run.json`、`job.json`、`predictions.jsonl`、`traces.jsonl`、`usage.jsonl`、`embedding-usage.jsonl`、`java.log` 和 `summary.json`。请求只读取 gold-free `queries.jsonl`；不读取评分用 questions。源码/配置/模板 hash、实际 model ID、请求类型、工具参数/结果及未知 usage 分开记录。退出码 0 表示命令完成；每个样例是否形成闭环必须检查 predictions 的状态，不能把失败样例从报告中删除。
-
-## P4 委派与复测
-
-`conduct_research` 参数为 `tasks` 数组，每项包含 `goal`、1—8 个 `dimensions`、`expectedOutput`，可选 `documentIds`。服务器分配 `worker-n` 身份，并校验文档存在、启用且位于父范围；省略列表继承父范围，不能清除已有限制。同批或已经委派的相同子目标拒绝重复启动，需要补查时提出具体的新子目标。worker 只接收自己的任务、范围和用户约束，不接收父/其他 worker 的工具历史。只允许阅读自己的检索候选，引用必须实际读过。
-
-默认专用 worker 池最多 2 个并发、每个运行累计最多 4 个 worker，每个 worker 最多 6 次模型请求（仍扣同一份全局额度）、180 秒（含排队）；模型并发继续共用全局配额 2。worker 额外保留一次主 Agent 整合调用，P5 的 2 次生成预留不被研究消耗。人工输入恢复保留 worker 累计数和已提交的压缩结果。worker-v2 在有未读候选时要求先进行一次原生阅读，随后可补查；提示词与工具选择共同约束阅读节奏，不能把候选摘要当作已读依据。
-
-父任务收到的是 `SubtaskResult` 列表。`state.subtasks` 保存每个任务的范围、状态、已读 ID 与压缩结果；事件通过 `taskId` 区分。主 Agent 自己阅读的 ID 位于 `readEvidenceIds`，worker findings 中经验证的引用位于 `acceptedWorkerEvidenceIds`。后者允许引用，但不代表主 Agent 看过 worker 原文或完整历史。失败/超时保留其他 worker 成功结果；取消、过期 epoch、已结束子任务后的重复回调均不能覆盖已提交结果。重启和主任务提前结束会关闭仍在运行的子状态，保留已有快照。
-
-```bash
-# 研究核心故障测试已并入 P7 回归；复用 P3 helper 的随机 research_p3_* 隔离库和清理
-bash scripts/validate-agentic-research-p7.sh
-
-# 4 个 P4 请求：跨文档比较、PLAN 研究、串行多跳、两个 worker 在途取消；无 API 调用
-python3 eval/agentic-research/smoke_research.py --phase p4 --run-dir local-data/agentic-research/runs/<new-id>
-
-# 只付费复测指定的两条路径；--case 可重复
-python3 eval/agentic-research/smoke_research.py --phase p4 --case comparison-workers --case plan-workers --run-dir local-data/agentic-research/runs/<new-id> --execute
-```
-
-跨文档样例从 gold-free queries 选择两份不同文档，`[[DOC_n]]` 由 Java 入口替换为真实 docId，不用 gold 选择材料或拆解任务。比较和 PLAN 是应用联调样例，不是 QASPER 问答分数。`--phase p3` 保留旧五个样例集合，但使用当前版本运行器；历史 P3 回放应检出 `20b1133`。批次 A/B 等名称表示开发复测，不是 P7 的架构 A/B/C。清单见 [P4 smoke manifest](manifests/research-p4-smoke-2026-09-17.json)。
-
-## P5/P6 统一产物与浏览器验收
-
-当前聊天页面的普通问答仍调用 `/rag/v3/chat`；深入分析和生成计划均创建研究任务，以 REPORT/PLAN 区分产物。创建需 clientRequestId、goal、outputType、allowedKbIds；省略 conversationId 时，首次幂等请求同时建立会话。GET `/rag/research/runs?conversationId=...` 恢复记录；GET `/{runId}/sources` 返回该任务已经实际读取的快照。终态任务 POST `/{runId}/regenerate` 携带新 clientRequestId，复用同一研究流程。
-
-GET `/{runId}/events` 按 Accept 返回分页 JSON 或 `text/event-stream`。SSE 发送 progress、artifact 和 snapshot，支持 after / Last-Event-ID；订阅、刷新及重连只读持久记录，不创建模型执行。主动 cancel 才取消研究。最终生成使用预留的两次调用，结构与已读引用校验后原子提交 artifact 和事件；生成失败保留研究摘要、落 FAILED，不发布非法结果。计划未知参数保留待确认，用户约束标为 user_input。
-
-```bash
-# 本地模型 HTTP 和随机 PostgreSQL 隔离库回归（已并入 P7），不消耗供应商额度
-bash scripts/validate-agentic-research-p7.sh
-
-# P5 完整生成 smoke 请求准备；不加 --execute 时无付费请求
-python3 eval/agentic-research/smoke_research.py --phase p5 --case comparison-workers --case plan-workers --run-dir local-data/agentic-research/runs/<new-id>
-
-# 浏览器 fixture 需要现有 Chrome、Python websocket-client、frontend/node_modules 和开发 PostgreSQL
-./mvnw -o -pl bootstrap -am test-compile -DskipTests
-./mvnw -o -pl bootstrap dependency:build-classpath -Dmdep.outputFile=/tmp/agentic-p6-classpath.txt
-python3 eval/agentic-research/browser_research.py --run-dir local-data/agentic-research/runs/<new-id>
-```
-
-浏览器 fixture 使用真实 React、研究 HTTP/服务、SDK 原生工具协议和随机 PostgreSQL；认证、检索、原文读取、模型回答和普通问答响应受控。它核对三种入口、来源映射、重新生成、刷新不增加调用、等待输入、取消无产物及断线重连不重复创建，退出后清理测试库与进程。不会读取模型凭证或访问供应商；不能据此声称真实 RAG 检索、登录、文档预览下载或引用语义质量通过。程序与页面验证清单见 [P5 manifest](manifests/research-p5-validation-2026-09-17.json) 和 [P6 manifest](manifests/research-p6-validation-2026-09-17.json)。
-
-P5/P6 初次交付时付费联调被自动审批拒绝，用户后续已明确授权两条 REPORT/PLAN 开发样例；实际失败、修复和原文核对见 [artifact smoke manifest](manifests/research-p5-artifact-smoke-2026-09-17.json)。
-
-`--phase p5` 的计划样例将 500 条标注上限作为独立用户约束传入；当时生成使用 research-artifact-v3，当前模板为 research-artifact-v5；研究 embedding 单次上限 12 秒、最多两次，内层截止早于 30 秒工具期限。产物校验错误包含字段位置，内部最多保存 16000 个 Java 字符的失败生成输出，SSE 不发送该原始草稿；不得把引用身份检查当成语义支持。
 
 ## 产物与标注隔离
 
@@ -161,8 +104,6 @@ python3 eval/agentic-research/import_corpus.py --prepared local-data/agentic-res
 
 2026-09-17 已完成 QASPER train/validation 与 MuSiQue Full train/dev 全量导入：共 122,620 文档、182,768 来源段落、182,896 实际块/向量。每个 split 的三条真实 scoped search/read 和拒绝检查通过，最终库存、正文 hash、来源映射、标注隔离及标准摄取配置审计通过。真实 test 未转换/入库，未运行答案生成或质量评分。
 
-转换条数和指纹见[转换清单](manifests/prepared-development-2026-09-17.json)；实际主键、库存、源码/产物指纹及 usage 摘要见[导入清单](manifests/imported-development-2026-09-17.json)，失败和验证边界见验证报告。大文件和原始日志留在忽略目录。
-
 ## P7 固定 A/B/C 质量对照
 
 `evaluate_research.py` 使用同一份 gold-free query、允许范围、模型和检索配置，默认执行三个模式。A 对原问题做一次 scoped search、固定 top 10 后阅读，再使用共享生成器；这是复用项目组件的控制变量基线，不代表普通聊天的改写、意图、历史、MCP 和候选回退全链路。B 不注册委派工具，C 使用在线主 Agent 的按需委派逻辑；B/C 共用相同的全局研究额度，实际 worker 数单独报告。A 的 toolCalls 统计固定检索阶段，命中块读取是该阶段的正文装配；B/C 的 toolCalls 是原生工具调用数，两者不能直接当作相同粒度的数据库 I/O 次数。
@@ -182,8 +123,6 @@ python3 eval/agentic-research/evaluate_research.py --run-dir local-data/agentic-
 python3 eval/agentic-research/evaluate_research.py --run-dir local-data/agentic-research/runs/<existing-id> --profile regression --resume --execute
 # 只重新计算该批次已有输出的离线分数
 python3 eval/agentic-research/evaluate_research.py --run-dir local-data/agentic-research/runs/<existing-id> --profile regression --resume --score-only
-# 已有逐题分数与真实 trace 的失败分类，不调用模型、不覆盖原始预测
-python3 eval/agentic-research/diagnose_research.py --run-dir local-data/agentic-research/runs/<existing-id> --output local-data/agentic-research/runs/<existing-id>/diagnostics.json
 # 原失败题复测：case-ids.json 是预先固定的唯一题目 ID 数组，另开新批次保留失败
 python3 eval/agentic-research/evaluate_research.py --run-dir local-data/agentic-research/runs/<new-replay-id> --profile regression --case-ids <case-ids.json> --execute
 ```
@@ -194,27 +133,13 @@ python3 eval/agentic-research/evaluate_research.py --run-dir local-data/agentic-
 
 QASPER 答案按作者归一化 token F1、多标注取最大值；证据使用准备语料中的段落文本身份，单独多标注取最大值，未映射的标注仍留在分母，图表 FLOAT 标注忽略。块与邻块经 source_paragraph_id 映射为段落选择，选中一个块不代表模型看到整个段落；实际交付正文、extent 与截断字段保留。报告另给 EM 和逐题可回答性诊断，它们不是作者论文的新增官方指标。MuSiQue 的答案 EM/F1 与支持证据 F1 只对 answerable 记录计算，可回答性按全部记录计算。固定抽样不是完整成对记录，不报告作者 paired sufficiency。引用/已读段落覆盖都不能证明语义支持。
 
-可用[作者公式对齐工具](check_scorer_alignment.py)对独立下载的官方脚本核对归一化、空答案约定与支持证据公式，输出记录实际作者脚本 SHA-256。P7 对齐了 196 组答案和 49 组支持集合；数据适配、程序测试与真实质量结果分开记录。
-
-## 应用原文核对与演示
-
-[应用配置](configs/applications.json)冻结 12 个双资料比较和 12 个计划任务，来源为 QASPER validation 的固定 regression scope；使用查询与语料，不读取标准答案。任务覆盖条件、补查、缺资料、适用性、用户输入和参数缺失，实际没有矛盾时不强称冲突。`prepare_applications.py` 可从同一 prepared 快照复建配置；案例一经运行后不要在原目录改题。
+## 回归
 
 ```bash
-python3 eval/agentic-research/evaluate_applications.py --run-dir local-data/agentic-research/runs/<new-app-id>
-python3 eval/agentic-research/evaluate_applications.py --run-dir local-data/agentic-research/runs/<new-app-id> --execute
-# 新批次只复测两个冻结样例；不能改名成 24 项回归
-python3 eval/agentic-research/evaluate_applications.py --run-dir local-data/agentic-research/runs/<new-demo-id> --case comparison-03 --case plan-02 --execute
 # 程序行为与既有链回归：随机隔离数据库、本地 HTTP 桩，不调用付费模型
 bash scripts/validate-agentic-research-p7.sh
 bash scripts/validate-agentic-research-p2-database.sh
 ```
-
-应用输出的 `source-review.md` 保存完整产物和每条实际引用正文，供逐项独立核对；自动汇总只统计状态、引用文档、缺口与追问，不自动宣告语义通过。演示脚本冻结两道一次检索问题、comparison-05 的 Agatha/Bayesian SRI 比较 REPORT 和 plan-06 的 AMR 摘要复现 PLAN（要求缺失 batch/window 参数保持 null/待确认），默认不调用 API。执行模式贯通实际语料、研究 SDK、供应商 HTTP、隔离 PostgreSQL 状态和产物，尚不包含生产账号登录与真实页面验收；浏览器夹具的受控组件见 `browser_research.py`。
-
-当前最终生成只传已读正文、引用身份、extent/截断及原文章节/表格上下文；语料版本、数据集托管名和 split 不进入此证据投影，服务端引用快照仍完整保留。v4 输入隔离通过程序检查，但真实两例复测仍出现残缺公式过度解释和 PLAN 必填数组缺失；这不是语义可靠性的保证。24 项源文核对记录见 [P7 应用核对清单](manifests/p7-application-source-review.json)，核对者为 Codex 原文检查，没有独立盲评或裁判模型 API。
-
-P8 四请求演示已真实记录 2 COMPLETED/2 PARTIAL，10 条引用原文核对见[P8 清单](manifests/research-p8-handoff-2026-09-18.json)。一次检索未完成多跳命名问题，比较没有读到第二篇，PLAN 的 batch/window 只有待确认项而无请求要求的 null 条目；这些负结果保留，没有替换完整回归。原始输出、runtime、trace/usage、semantic-review.json 和执行库清理位于 `local-data/agentic-research/runs/20260917T192824_P8_demo_v4/`。
 
 ## 提示缓存与调用延迟报告（秋招 W1）
 

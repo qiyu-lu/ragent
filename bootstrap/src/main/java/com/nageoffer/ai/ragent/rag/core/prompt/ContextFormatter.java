@@ -18,10 +18,8 @@
 package com.nageoffer.ai.ragent.rag.core.prompt;
 
 import com.nageoffer.ai.ragent.framework.convention.RetrievedChunk;
-import com.nageoffer.ai.ragent.rag.core.intent.NodeScore;
 
 import java.util.List;
-import java.util.Set;
 
 /**
  * 上下文格式化器，负责将知识库检索结果格式化为可嵌入 Prompt 的文本
@@ -31,14 +29,9 @@ public interface ContextFormatter {
     /**
      * 格式化知识库检索上下文
      *
-     * @param kbIntents         知识库意图节点及其得分列表
-     * @param eligibleIntentIds 允许注入回答规则的意图 ID
-     * @param rerankedChunks    后处理后的有序文档块
-     * @param contextTopK       最终进 LLM 的文档块条数上限（检索预算的 contextTopK 段）
+     * @param rerankedChunks 后处理后的有序文档块
+     * @param contextTopK    最终进 LLM 的文档块条数上限（检索预算的 contextTopK 段）
      * @return 格式化后的知识库上下文文本
      */
-    String formatKbContext(List<NodeScore> kbIntents,
-                           Set<String> eligibleIntentIds,
-                           List<RetrievedChunk> rerankedChunks,
-                           int contextTopK);
+    String formatKbContext(List<RetrievedChunk> rerankedChunks, int contextTopK);
 }

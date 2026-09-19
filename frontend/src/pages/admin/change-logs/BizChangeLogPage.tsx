@@ -8,7 +8,6 @@ import {
   FileText,
   ListChecks,
   MessagesSquare,
-  Network,
   Orbit,
   ScrollText,
   Search,
@@ -93,7 +92,6 @@ const BIZ_TYPE_OPTIONS = [
   { value: "KNOWLEDGE_CHUNK", label: "文档分块" },
   { value: "INGESTION_PIPELINE", label: "数据通道" },
   { value: "INGESTION_TASK", label: "采集任务" },
-  { value: "INTENT_TREE", label: "意图树" },
   { value: "QUERY_TERM_MAPPING", label: "关键词映射" },
   { value: "SAMPLE_QUESTION", label: "示例问题" },
   { value: "USER", label: "用户" }
@@ -138,7 +136,6 @@ const BIZ_TYPE_META: Record<string, { icon: LucideIcon; className: string }> = {
   KNOWLEDGE_CHUNK: { icon: Boxes, className: "bg-[#e6fffb] text-[#13C2C2]" },
   INGESTION_PIPELINE: { icon: Workflow, className: "bg-[#fff7e6] text-[#FA8C16]" },
   INGESTION_TASK: { icon: ListChecks, className: "bg-[#fffbe6] text-[#D48806]" },
-  INTENT_TREE: { icon: Network, className: "bg-[#f9f0ff] text-[#722ED1]" },
   QUERY_TERM_MAPPING: { icon: Tags, className: "bg-[#fff0f6] text-[#EB2F96]" },
   SAMPLE_QUESTION: { icon: MessagesSquare, className: "bg-[#f6ffed] text-[#52C41A]" },
   USER: { icon: User, className: "bg-[#fff2e8] text-[#FA541C]" }

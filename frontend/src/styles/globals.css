@@ -3067,14 +3067,6 @@ textarea {
     @apply flex items-center justify-center self-center text-slate-300;
   }
 
-  .admin-layout .settings-scope {
-    @apply mt-4 grid gap-3 rounded-lg border border-slate-200/70 bg-slate-50 p-4 sm:grid-cols-3;
-  }
-
-  .admin-layout .settings-scope-note {
-    @apply text-[11px] leading-4 text-slate-400 sm:col-span-3;
-  }
-
   .admin-layout .settings-kv {
     @apply flex flex-col gap-0.5;
   }

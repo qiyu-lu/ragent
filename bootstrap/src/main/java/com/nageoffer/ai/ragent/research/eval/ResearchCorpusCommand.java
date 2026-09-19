@@ -225,7 +225,7 @@ public class ResearchCorpusCommand {
                                EmbeddingService embedding, ExecutorService workers, Path run) throws Exception {
         var properties = new SearchChannelProperties(); properties.getChannels().setTimeoutMs(120000L);
         var channel = new VectorSearchChannel(new PgVectorRetrieverService(jdbc, embedding), properties, workers);
-        var engine = new MultiChannelRetrievalEngine(List.of(channel), List.of(), new RetrievalScopeResolver(properties, new KbCollectionProvider(bases), new com.nageoffer.ai.ragent.knowledge.service.KnowledgeAccessService(jdbc)), workers, properties);
+        var engine = new MultiChannelRetrievalEngine(List.of(channel), List.of(), new RetrievalScopeResolver(new KbCollectionProvider(bases), new com.nageoffer.ai.ragent.knowledge.service.KnowledgeAccessService(jdbc)), workers, properties);
         var store = new ResearchEvidenceStore(jdbc, JSON);
         var search = new KnowledgeSearchService(engine, bases, docs, catalog, store, JSON);
         var reader = new SourceReader(store, catalog, new EvidenceSnapshotFactory(JSON));

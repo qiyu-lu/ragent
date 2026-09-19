@@ -16,7 +16,3 @@ rag:
     excel-description-prompt: >-
       请用中文客观描述图片中的设备、容器、工具、摆放关系和可见状态；若图中存在清晰文字，请逐字列出。
       不要根据图片推断操作步骤、参数、质量结论或安全规则。
-  search:
-    scope:
-      fallback-mode: empty
-      supplement-ratio: 0

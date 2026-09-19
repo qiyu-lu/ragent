@@ -18,13 +18,8 @@
 package com.nageoffer.ai.ragent.rag.core.prompt;
 
 import com.nageoffer.ai.ragent.rag.config.RAGConfigProperties;
-import com.nageoffer.ai.ragent.rag.core.intent.IntentNode;
-import com.nageoffer.ai.ragent.rag.core.intent.NodeScore;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.DefaultResourceLoader;
-
-import java.util.List;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -36,7 +31,7 @@ class RAGPromptServiceTest {
 
     /**
      * 基础模板已迁入 DB 由管理员可编辑，故此处只桩一段带标记的假模板
-     * 断言落在本类的职责（选模板、清理、追加引用规则）上，不再断言模板正文内容
+     * 断言落在本类的职责（清理、追加引用规则）上，不再断言模板正文内容
      */
     private static final String STUB_BASE_TEMPLATE = "# 桩基础模板\n\n正文占位";
 
@@ -53,8 +48,6 @@ class RAGPromptServiceTest {
     private static PromptContext kbContext() {
         return PromptContext.builder()
                 .kbContext("<content ref=\"1\">资料</content>")
-                .kbIntents(List.of())
-                .eligibleIntentIds(Set.of())
                 .build();
     }
 
@@ -93,114 +86,10 @@ class RAGPromptServiceTest {
 
     @Test
     void usesResolvedTemplateAsBase() {
-        // 无自定义意图模板时，基础模板整段取自 AgentPromptResolver
+        // 基础模板整段取自 AgentPromptResolver
         for (boolean citationEnabled : new boolean[]{true, false}) {
             String result = service(citationEnabled).buildSystemPrompt(kbContext());
             assertTrue(result.startsWith(STUB_BASE_TEMPLATE));
         }
-    }
-
-    @Test
-    void appendsOnlyCitationRulesToCustomIntentTemplate() {
-        PromptContext context = PromptContext.builder()
-                .kbContext("<content>资料</content>")
-                .kbIntents(List.of(intentWithTemplate("# 自定义意图模板")))
-                .eligibleIntentIds(Set.of("intent-1"))
-                .build();
-
-        String result = service(true).buildSystemPrompt(context);
-
-        assertTrue(result.contains("# 自定义意图模板"));
-        assertFalse(result.contains("# 桩基础模板"), "意图模板整份替换基础模板");
-        assertTrue(result.contains("# 行内引用规则"));
-        assertTrue(result.indexOf("# 自定义意图模板") < result.indexOf("# 行内引用规则"));
-    }
-
-    @Test
-    void usesSingleCandidateTemplateForGlobalEvidence() {
-        PromptContext context = PromptContext.builder()
-                .kbContext("<content>全局资料</content>")
-                .kbIntents(List.of(intentWithTemplate("intent-1", "# 单意图模板")))
-                .eligibleIntentIds(Set.of("intent-1"))
-                .build();
-
-        String result = service(false).buildSystemPrompt(context);
-
-        assertTrue(result.startsWith("# 单意图模板"));
-        assertFalse(result.contains(STUB_BASE_TEMPLATE));
-    }
-
-    @Test
-    void directedMissUsesDefaultTemplate() {
-        PromptContext context = PromptContext.builder()
-                .kbContext("<content>补充资料</content>")
-                .kbIntents(List.of(intentWithTemplate("intent-1", "# 未命中模板")))
-                .eligibleIntentIds(Set.of())
-                .build();
-
-        String result = service(false).buildSystemPrompt(context);
-
-        assertTrue(result.startsWith(STUB_BASE_TEMPLATE));
-        assertFalse(result.contains("# 未命中模板"));
-    }
-
-    @Test
-    void usesOnlyEligibleIntentTemplateAmongCandidates() {
-        PromptContext context = PromptContext.builder()
-                .kbContext("<content>意图资料</content>")
-                .kbIntents(List.of(
-                        intentWithTemplate("intent-1", "# 未命中模板"),
-                        intentWithTemplate("intent-2", "# 命中模板")))
-                .eligibleIntentIds(Set.of("intent-2"))
-                .build();
-
-        String result = service(false).buildSystemPrompt(context);
-
-        assertTrue(result.startsWith("# 命中模板"));
-        assertFalse(result.contains("# 未命中模板"));
-    }
-
-    @Test
-    void usesDefaultTemplateForMultipleCandidatesWithGlobalEvidence() {
-        PromptContext context = PromptContext.builder()
-                .kbContext("<content>全局资料</content>")
-                .kbIntents(List.of(
-                        intentWithTemplate("intent-1", "# 候选模板一"),
-                        intentWithTemplate("intent-2", "# 候选模板二")))
-                .eligibleIntentIds(Set.of("intent-1", "intent-2"))
-                .build();
-
-        String result = service(false).buildSystemPrompt(context);
-
-        assertTrue(result.startsWith(STUB_BASE_TEMPLATE));
-        assertFalse(result.contains("# 候选模板一"));
-        assertFalse(result.contains("# 候选模板二"));
-    }
-
-    @Test
-    void usesTemplateWhenDuplicateCandidatesShareEligibleId() {
-        PromptContext context = PromptContext.builder()
-                .kbContext("<content>意图资料</content>")
-                .kbIntents(List.of(
-                        intentWithTemplate("intent-1", "# 单意图模板"),
-                        intentWithTemplate("intent-1", "# 单意图模板")))
-                .eligibleIntentIds(Set.of("intent-1"))
-                .build();
-
-        String result = service(false).buildSystemPrompt(context);
-
-        assertTrue(result.startsWith("# 单意图模板"));
-    }
-
-    private static NodeScore intentWithTemplate(String template) {
-        return intentWithTemplate("intent-1", template);
-    }
-
-    private static NodeScore intentWithTemplate(String id, String template) {
-        IntentNode node = IntentNode.builder()
-                .id(id)
-                .promptTemplate(template)
-                .build();
-        return NodeScore.builder().node(node).build();
     }
 }

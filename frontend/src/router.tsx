@@ -11,9 +11,6 @@ import { KnowledgeListPage } from "@/pages/admin/knowledge/KnowledgeListPage";
 import { KnowledgeDocumentsPage } from "@/pages/admin/knowledge/KnowledgeDocumentsPage";
 import { KnowledgeChunksPage } from "@/pages/admin/knowledge/KnowledgeChunksPage";
 import { BizChangeLogPage } from "@/pages/admin/change-logs/BizChangeLogPage";
-import { IntentTreePage } from "@/pages/admin/intent-tree/IntentTreePage";
-import { IntentListPage } from "@/pages/admin/intent-tree/IntentListPage";
-import { IntentEditPage } from "@/pages/admin/intent-tree/IntentEditPage";
 import { IngestionPage } from "@/pages/admin/ingestion/IngestionPage";
 import { RagTracePage } from "@/pages/admin/traces/RagTracePage";
 import { RagTraceDetailPage } from "@/pages/admin/traces/RagTraceDetailPage";
@@ -133,18 +130,6 @@ export const router = createBrowserRouter([
       {
         path: "knowledge/:kbId/docs/:docId",
         element: <KnowledgeChunksPage />
-      },
-      {
-        path: "intent-tree",
-        element: <IntentTreePage />
-      },
-      {
-        path: "intent-list",
-        element: <IntentListPage />
-      },
-      {
-        path: "intent-list/:id/edit",
-        element: <IntentEditPage />
       },
       {
         path: "ingestion",

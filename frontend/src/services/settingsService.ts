@@ -34,11 +34,6 @@ export interface SystemSettings {
     search: {
       defaultTopK: number;
       recallBudget: number;
-      scope: {
-        minIntentScore: number;
-        confidenceThreshold: number;
-        supplementRatio: number;
-      };
       channels: {
         timeoutMs: number;
         vector: RetrievalChannel;

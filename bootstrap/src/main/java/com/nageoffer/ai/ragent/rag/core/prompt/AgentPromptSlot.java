@@ -33,11 +33,6 @@ import java.util.Set;
 @Getter
 public enum AgentPromptSlot {
 
-    SYSTEM_CHAT("闲聊 / 关于助手", Group.WORKFLOW,
-            Set.of(OrchestrationMode.WORKFLOW),
-            "Agent 模式下由主 Agent 直接应答",
-            Set.of()),
-
     AGENT_MAIN("Agent 人设", Group.AGENT,
             Set.of(OrchestrationMode.AGENT),
             "WorkFlow 模式不经过 ReAct 架构",

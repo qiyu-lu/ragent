@@ -133,7 +133,7 @@ public class StreamChatTraceRunner {
 
     /**
      * 记录用户感知首包 TTFT：从 run 开始（pipeline 入口）到推给前端第一个字
-     * 反映完整链路前置开销（路由 / 改写 / 意图 / 检索 / LLM 首包等）
+     * 反映完整链路前置开销（路由 / 改写 / 检索 / LLM 首包等）
      */
     private void recordUserTtft(String traceId, Date runStartTime, long startMillis) {
         long now = System.currentTimeMillis();

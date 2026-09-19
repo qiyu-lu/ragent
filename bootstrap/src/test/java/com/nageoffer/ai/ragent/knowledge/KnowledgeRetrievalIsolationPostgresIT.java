@@ -22,7 +22,6 @@ import com.nageoffer.ai.ragent.framework.context.UserContext;
 import com.nageoffer.ai.ragent.framework.convention.RetrievedChunk;
 import com.nageoffer.ai.ragent.infra.embedding.EmbeddingService;
 import com.nageoffer.ai.ragent.knowledge.service.KnowledgeAccessService;
-import com.nageoffer.ai.ragent.rag.config.SearchChannelProperties;
 import com.nageoffer.ai.ragent.rag.core.retrieval.RetrieveRequest;
 import com.nageoffer.ai.ragent.rag.core.retrieval.channel.KbCollectionProvider;
 import com.nageoffer.ai.ragent.rag.core.retrieval.channel.RetrievalScope;
@@ -104,7 +103,7 @@ class KnowledgeRetrievalIsolationPostgresIT {
 
         // 没有登录身份时作用域为空，检索不发 SQL 也不返回任何块
         UserContext.clear();
-        RetrievalScope anonymous = resolver().resolve(List.of());
+        RetrievalScope anonymous = resolver().resolve();
         assertEquals(List.of(), fixtureOnly(anonymous.targetCollections()));
         System.out.printf("W4 retrieval isolation: owner top-1 %s (score %.3f); reader top-1 %s (score %.3f)%n",
                 ownerTop.get(0).getCollectionName(), ownerTop.get(0).getScore(),
@@ -113,13 +112,13 @@ class KnowledgeRetrievalIsolationPostgresIT {
 
     private RetrievalScope scopeFor(String userId, String role) {
         UserContext.set(LoginUser.builder().userId(userId).username(userId).role(role).build());
-        return resolver().resolve(List.of());
+        return resolver().resolve();
     }
 
     private RetrievalScopeResolver resolver() {
         KbCollectionProvider active = mock(KbCollectionProvider.class);
         when(active.listActiveCollections()).thenReturn(List.of(secret, open));
-        return new RetrievalScopeResolver(new SearchChannelProperties(), active, new KnowledgeAccessService(jdbc));
+        return new RetrievalScopeResolver(active, new KnowledgeAccessService(jdbc));
     }
 
     private List<String> fixtureOnly(List<String> collections) {

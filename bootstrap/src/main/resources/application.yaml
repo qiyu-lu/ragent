@@ -121,13 +121,6 @@ rag:
     default-top-k: 10           # ③ 最终进 LLM 的条数（产品语义的 topK）
     recall-budget: 20           # ① 每通道召回条数（绝对值，各通道共用）；须 ≥ default-top-k，0=回退 default-top-k
     request-level-refill-enabled: false # 多子问题请求级去重与公平回填；重复评测通过门槛后再默认开启
-    # 检索作用域：本次请求该看哪些知识库，与用什么模态检索无关，故与 channels 平级、三条通道共读
-    # 判定只看 KB 意图最高分，不看意图个数；关掉任一通道都不影响其余通道的作用域
-    scope:
-      fallback-mode: global       # global=兼容模式，empty=无有效KB意图时不检索任何库
-      min-intent-score: 0.4        # 低于此分的意图节点不参与「是否收窄」的判定
-      confidence-threshold: 0.6    # KB 意图最高分低于此值 → 退化为全库检索
-      supplement-ratio: 0.25       # 定向时各通道从自身产出额度划给「未命中库」的保底比例，兜住意图判错；0=关闭补充路，命中库已覆盖全库时自动不补
     channels:
       timeout-ms: 15000     # 单通道查询超时上限（毫秒）
       vector:

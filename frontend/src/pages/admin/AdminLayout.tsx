@@ -8,9 +8,7 @@ import {
   ChevronsRight,
   ClipboardList,
   Database,
-  GitBranch,
   Github,
-  Layers,
   LayoutDashboard,
   Lightbulb,
   LogOut,
@@ -91,24 +89,6 @@ const menuGroups: MenuGroup[] = [
         icon: Database
       },
       {
-        id: "intent",
-        path: "/admin/intent-tree",
-        label: "意图管理",
-        icon: Layers,
-        children: [
-          {
-            path: "/admin/intent-tree",
-            label: "意图树配置",
-            icon: GitBranch
-          },
-          {
-            path: "/admin/intent-list",
-            label: "意图列表",
-            icon: ClipboardList
-          }
-        ]
-      },
-      {
         id: "ingestion",
         path: "/admin/ingestion",
         label: "数据通道",
@@ -171,8 +151,6 @@ const breadcrumbMap: Record<string, string> = {
   dashboard: "Dashboard",
   agents: "智能体管理",
   knowledge: "知识库管理",
-  "intent-tree": "意图树配置",
-  "intent-list": "意图列表",
   ingestion: "数据通道",
   traces: "链路追踪",
   "change-logs": "审计日志",
@@ -195,7 +173,7 @@ export function AdminLayout() {
     confirmPassword: ""
   });
   const [starCount, setStarCount] = useState<number | null>(null);
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ ingestion: true, intent: true });
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ ingestion: true });
   const [kbQuery, setKbQuery] = useState("");
   const [kbOptions, setKbOptions] = useState<KnowledgeBase[]>([]);
   const [docOptions, setDocOptions] = useState<KnowledgeDocumentSearchItem[]>([]);
@@ -279,30 +257,10 @@ export function AdminLayout() {
     if (segments[0] !== "admin") return items;
     const section = segments[1];
     if (section) {
-      if (section === "intent-tree" || section === "intent-list") {
-        items.push({
-          label: "意图管理",
-          to: "/admin/intent-tree"
-        });
-        if (section === "intent-list" && segments.includes("edit")) {
-          items.push({
-            label: breadcrumbMap[section] || section,
-            to: "/admin/intent-list"
-          });
-          items.push({
-            label: "编辑节点"
-          });
-        } else {
-          items.push({
-            label: breadcrumbMap[section] || section
-          });
-        }
-      } else {
-        items.push({
-          label: breadcrumbMap[section] || section,
-          to: `/admin/${section}`
-        });
-      }
+      items.push({
+        label: breadcrumbMap[section] || section,
+        to: `/admin/${section}`
+      });
     }
 
     if (section === "ingestion") {
@@ -345,16 +303,13 @@ export function AdminLayout() {
     return `${text}k`;
   }, [starCount]);
   const isIngestionActive = location.pathname.startsWith("/admin/ingestion");
-  const isIntentActive =
-    location.pathname.startsWith("/admin/intent-tree") || location.pathname.startsWith("/admin/intent-list");
 
   useEffect(() => {
     setOpenGroups((prev) => ({
       ...prev,
-      ingestion: prev.ingestion || isIngestionActive,
-      intent: prev.intent || isIntentActive
+      ingestion: prev.ingestion || isIngestionActive
     }));
-  }, [isIngestionActive, isIntentActive]);
+  }, [isIngestionActive]);
 
   const handlePasswordSubmit = async () => {
     if (!passwordForm.currentPassword || !passwordForm.newPassword) {

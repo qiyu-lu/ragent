@@ -20,9 +20,7 @@ package com.nageoffer.ai.ragent.rag.service.pipeline;
 import com.nageoffer.ai.ragent.framework.convention.RetrievedChunk;
 import com.nageoffer.ai.ragent.infra.chat.LLMService;
 import com.nageoffer.ai.ragent.infra.chat.StreamCallback;
-import com.nageoffer.ai.ragent.rag.core.intent.IntentResolver;
 import com.nageoffer.ai.ragent.rag.core.memory.ConversationMemoryService;
-import com.nageoffer.ai.ragent.rag.core.prompt.AgentPromptResolver;
 import com.nageoffer.ai.ragent.rag.core.prompt.PromptContext;
 import com.nageoffer.ai.ragent.rag.core.prompt.RAGPromptService;
 import com.nageoffer.ai.ragent.rag.core.retrieval.RetrievalEngine;
@@ -31,9 +29,7 @@ import com.nageoffer.ai.ragent.rag.core.rewrite.RewriteResult;
 import com.nageoffer.ai.ragent.rag.core.source.CitationContextEnricher;
 import com.nageoffer.ai.ragent.rag.core.source.GroundingChunksAssembler;
 import com.nageoffer.ai.ragent.rag.core.source.SourcesAssembler;
-import com.nageoffer.ai.ragent.rag.dto.IntentGroup;
 import com.nageoffer.ai.ragent.rag.dto.RetrievalContext;
-import com.nageoffer.ai.ragent.rag.dto.SubQuestionIntent;
 import com.nageoffer.ai.ragent.rag.service.handler.StreamTaskManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -43,8 +39,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
@@ -61,15 +55,11 @@ class StreamChatPipelineTest {
     @Mock
     private QueryRewriteService queryRewriteService;
     @Mock
-    private IntentResolver intentResolver;
-    @Mock
     private RetrievalEngine retrievalEngine;
     @Mock
     private LLMService llmService;
     @Mock
     private RAGPromptService promptBuilder;
-    @Mock
-    private AgentPromptResolver agentPromptResolver;
     @Mock
     private StreamTaskManager taskManager;
     @Mock
@@ -83,27 +73,20 @@ class StreamChatPipelineTest {
     private StreamChatPipeline pipeline;
 
     @Test
-    void passesEligibleIntentIdsToPromptContext() {
+    void retrievesEverySubQuestionAndUsesFinalChunksForSources() {
         StreamCallback callback = org.mockito.Mockito.mock(StreamCallback.class);
-        RewriteResult rewriteResult = new RewriteResult("改写问题", List.of("改写问题"));
-        List<SubQuestionIntent> subIntents = List.of(new SubQuestionIntent("改写问题", List.of()));
-        Set<String> eligibleIntentIds = Set.of("intent-1");
+        List<String> subQuestions = List.of("子问题一", "子问题二");
+        RewriteResult rewriteResult = new RewriteResult("改写问题", subQuestions);
         RetrievedChunk finalChunk = RetrievedChunk.builder().id("final").text("最终资料").build();
-        RetrievedChunk staleChunk = RetrievedChunk.builder().id("stale").text("候选池尾部").build();
         RetrievalContext retrievalContext = RetrievalContext.builder()
                 .kbContext("<content>资料</content>")
                 .kbChunks(List.of(finalChunk))
-                .intentChunks(Map.of("intent-1", List.of(staleChunk)))
-                .eligibleIntentIds(eligibleIntentIds)
                 .build();
 
         when(memoryService.load("conversation-1", "user-1")).thenReturn(List.of());
         when(memoryService.append(any(), any(), any())).thenReturn("message-1");
         when(queryRewriteService.rewriteWithSplit("原问题", List.of())).thenReturn(rewriteResult);
-        when(intentResolver.resolve(rewriteResult)).thenReturn(subIntents);
-        when(intentResolver.isSystemOnly(anyList())).thenReturn(false);
-        when(retrievalEngine.retrieve(subIntents)).thenReturn(retrievalContext);
-        when(intentResolver.mergeIntentGroup(subIntents)).thenReturn(new IntentGroup(List.of(), List.of()));
+        when(retrievalEngine.retrieve(subQuestions)).thenReturn(retrievalContext);
         when(citationContextEnricher.enrich("<content>资料</content>", List.of()))
                 .thenReturn("<content>资料</content>");
         when(promptBuilder.buildStructuredMessages(any(), anyList(), any(), anyList())).thenReturn(List.of());
@@ -120,6 +103,6 @@ class StreamChatPipelineTest {
         verify(promptBuilder).buildStructuredMessages(promptContext.capture(), anyList(), any(), anyList());
         verify(sourcesAssembler).assemble(eq(List.of(finalChunk)));
         verify(groundingChunksAssembler).assemble(eq(List.of(finalChunk)));
-        assertEquals(eligibleIntentIds, promptContext.getValue().getEligibleIntentIds());
+        assertEquals("<content>资料</content>", promptContext.getValue().getKbContext());
     }
 }

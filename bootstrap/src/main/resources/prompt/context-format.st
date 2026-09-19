@@ -1,5 +1,5 @@
 --- section: kb-section ---
-{snippet_section}{doc_blocks}
+{doc_blocks}
 
 --- section: kb-doc-block ---
 <content data-ragent-doc-id="{doc_id}">
@@ -10,11 +10,6 @@
 <content>
 {chunks}
 </content>
-
---- section: snippet-rules ---
-<rules>
-{rules}
-</rules>
 
 --- section: sub-question-kb-wrapper ---
 <document index="{index}">

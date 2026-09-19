@@ -21,17 +21,12 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.nageoffer.ai.ragent.framework.convention.ChatMessage;
 import com.nageoffer.ai.ragent.rag.config.RAGConfigProperties;
-import com.nageoffer.ai.ragent.rag.core.intent.IntentNode;
-import com.nageoffer.ai.ragent.rag.core.intent.NodeScore;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -55,10 +50,8 @@ public class RAGPromptService {
      * 生成系统提示词，并对模板格式做清理
      */
     public String buildSystemPrompt(PromptContext context) {
-        PromptBuildPlan plan = plan(context);
-        String template = StrUtil.isNotBlank(plan.getBaseTemplate())
-                ? plan.getBaseTemplate()
-                : defaultTemplate(plan.getScene());
+        // 空检索由 StreamChatPipeline 在组装提示词之前短路，这里只剩知识库场景
+        String template = agentPromptResolver.resolve(AgentPromptSlot.KB_ANSWER);
         String systemPrompt = StrUtil.isBlank(template) ? "" : PromptTemplateUtils.cleanupPrompt(template);
         if (!context.hasKb() || !Boolean.TRUE.equals(ragConfigProperties.getCitationEnabled())) {
             return systemPrompt;
@@ -104,54 +97,6 @@ public class RAGPromptService {
         }
 
         return messages;
-    }
-
-    private PromptPlan planPrompt(List<NodeScore> intents, Set<String> eligibleIntentIds) {
-        List<NodeScore> safeIntents = intents == null ? Collections.emptyList() : intents;
-        Map<String, NodeScore> eligibleById = new LinkedHashMap<>();
-        for (NodeScore intent : safeIntents) {
-            if (intent == null || intent.getNode() == null) {
-                continue;
-            }
-            String intentId = intent.getNode().getId();
-            if (!eligibleIntentIds.contains(intentId)) {
-                continue;
-            }
-            eligibleById.putIfAbsent(intentId, intent);
-        }
-        List<NodeScore> eligibleIntents = new ArrayList<>(eligibleById.values());
-
-        if (eligibleIntents.isEmpty()) {
-            return new PromptPlan(Collections.emptyList(), null);
-        }
-
-        if (eligibleIntents.size() == 1) {
-            IntentNode only = eligibleIntents.get(0).getNode();
-            String tpl = StrUtil.emptyIfNull(only.getPromptTemplate()).trim();
-            if (StrUtil.isNotBlank(tpl)) {
-                return new PromptPlan(eligibleIntents, tpl);
-            }
-        }
-        return new PromptPlan(eligibleIntents, null);
-    }
-
-    /**
-     * 空检索由 StreamChatPipeline 在组装提示词之前短路，这里只剩知识库场景
-     */
-    private PromptBuildPlan plan(PromptContext context) {
-        PromptPlan plan = planPrompt(context.getKbIntents(), context.getEligibleIntentIds());
-        return PromptBuildPlan.builder()
-                .scene(PromptScene.KB_ONLY)
-                .baseTemplate(plan.getBaseTemplate())
-                .kbContext(context.getKbContext())
-                .question(context.getQuestion())
-                .build();
-    }
-
-    private String defaultTemplate(PromptScene scene) {
-        return switch (scene) {
-            case KB_ONLY -> agentPromptResolver.resolve(AgentPromptSlot.KB_ANSWER);
-        };
     }
 
     private String buildUserQuestion(String question, List<String> subQuestions) {

@@ -23,30 +23,23 @@ import com.nageoffer.ai.ragent.framework.convention.RetrievedChunk;
 import com.nageoffer.ai.ragent.framework.convention.RetrievedChunkKey;
 import com.nageoffer.ai.ragent.framework.trace.RagTraceNode;
 import com.nageoffer.ai.ragent.rag.config.SearchChannelProperties;
-import com.nageoffer.ai.ragent.rag.core.intent.NodeScore;
-import com.nageoffer.ai.ragent.rag.core.intent.NodeScoreFilters;
 import com.nageoffer.ai.ragent.rag.core.prompt.ContextFormatter;
 import com.nageoffer.ai.ragent.rag.core.prompt.PromptTemplateLoader;
 import com.nageoffer.ai.ragent.rag.dto.RetrievalContext;
 import com.nageoffer.ai.ragent.rag.dto.RetrievalSelectionDiagnostics;
-import com.nageoffer.ai.ragent.rag.dto.SubQuestionIntent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
-import java.util.stream.Collectors;
 
 import static com.nageoffer.ai.ragent.rag.constant.RAGConstant.CONTEXT_FORMAT_PATH;
-import static com.nageoffer.ai.ragent.rag.constant.RAGConstant.MULTI_CHANNEL_KEY;
 
 /**
  * 检索引擎
@@ -64,18 +57,17 @@ public class RetrievalEngine {
     private final Executor ragContextExecutor;
 
     /**
-     * 检索方法：根据子问题意图列表执行知识库检索
+     * 检索方法：对每个子问题在当前用户可读的全部知识库上执行检索
      */
     @RagTraceNode(name = "retrieval-engine", type = "RETRIEVE")
-    public RetrievalContext retrieve(List<SubQuestionIntent> subIntents) {
-        return retrieve(subIntents, null);
+    public RetrievalContext retrieve(List<String> subQuestions) {
+        return retrieve(subQuestions, null);
     }
 
-    public RetrievalContext retrieve(List<SubQuestionIntent> subIntents, RetrievalCapture capture) {
-        if (CollUtil.isEmpty(subIntents)) {
+    public RetrievalContext retrieve(List<String> subQuestions, RetrievalCapture capture) {
+        if (CollUtil.isEmpty(subQuestions)) {
             return RetrievalContext.builder()
                     .kbChunks(List.of())
-                    .intentChunks(Map.of())
                     .build();
         }
 
@@ -88,11 +80,11 @@ public class RetrievalEngine {
                 searchProperties.getFusion().getRerankCandidateLimit(),
                 contextTopK
         );
-        List<RetrievalBudget> questionBudgets = allocateQuestionBudgets(requestBudget, subIntents.size());
+        List<RetrievalBudget> questionBudgets = allocateQuestionBudgets(requestBudget, subQuestions.size());
         boolean fairRefillEnabled = searchProperties.isRequestLevelRefillEnabled();
-        List<CompletableFuture<SubQuestionContext>> tasks = new ArrayList<>(subIntents.size());
-        for (int i = 0; i < subIntents.size(); i++) {
-            SubQuestionIntent subIntent = subIntents.get(i);
+        List<CompletableFuture<SubQuestionContext>> tasks = new ArrayList<>(subQuestions.size());
+        for (int i = 0; i < subQuestions.size(); i++) {
+            String subQuestion = subQuestions.get(i);
             RetrievalBudget questionBudget = questionBudgets.get(i);
             boolean kbSkipped = questionBudget.contextTopK() <= 0;
             RetrievalBudget candidateBudget = fairRefillEnabled && !kbSkipped
@@ -101,14 +93,14 @@ public class RetrievalEngine {
             tasks.add(CompletableFuture.supplyAsync(
                         () -> {
                             try {
-                                return buildSubQuestionContext(subIntent, candidateBudget, kbSkipped, capture);
+                                return buildSubQuestionContext(subQuestion, candidateBudget, kbSkipped, capture);
                             } catch (Exception e) {
                                 if (capture != null) {
-                                    capture.record(subIntent.subQuestion(), "subquestion-failed", List.of(), 0,
+                                    capture.record(subQuestion, "subquestion-failed", List.of(), 0,
                                             e.getClass().getSimpleName());
                                 }
-                                log.error("子问题上下文构建失败，降级为空上下文，question：{}", subIntent.subQuestion(), e);
-                                return new SubQuestionContext(subIntent, KnowledgeRetrievalResult.empty(), false);
+                                log.error("子问题上下文构建失败，降级为空上下文，question：{}", subQuestion, e);
+                                return new SubQuestionContext(subQuestion, KnowledgeRetrievalResult.empty());
                             }
                         },
                         ragContextExecutor
@@ -130,33 +122,13 @@ public class RetrievalEngine {
         if (capture != null) {
             capture.record("", "request-final", kbChunks, 0, null);
         }
-        Set<String> selectedKeys = kbChunks.stream()
-                .map(RetrievedChunkKey::of)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
-        Map<String, Set<String>> attributionByChunkKey = mergeSelectedAttribution(contexts, selectedKeys);
-        Map<String, List<RetrievedChunk>> mergedIntentChunks = new KnowledgeRetrievalResult(
-                kbChunks, attributionByChunkKey, Set.of()).groupByIntent(MULTI_CHANNEL_KEY);
-
-        Set<String> eligibleIntentIds = new LinkedHashSet<>();
         List<RenderedSubQuestion> renderedContexts = new ArrayList<>(contexts.size());
         for (int i = 0; i < contexts.size(); i++) {
-            SubQuestionContext context = contexts.get(i);
-            List<NodeScore> kbIntents = NodeScoreFilters.kb(context.intent().nodeScores());
             List<RetrievedChunk> selectedForQuestion = requestSelection.selectedByQuestion().get(i);
-            List<RetrievedChunk> eligibilityEvidence = fairRefillEnabled
-                    ? context.retrievalResult().chunks().stream()
-                            .filter(chunk -> selectedKeys.contains(RetrievedChunkKey.of(chunk)))
-                            .toList()
-                    : selectedForQuestion;
-            Set<String> questionEligible = context.kbSkipped()
-                    ? Set.of()
-                    : context.retrievalResult().retainChunks(eligibilityEvidence).eligibleIntentIds(kbIntents);
-            eligibleIntentIds.addAll(questionEligible);
             String formattedKb = CollUtil.isEmpty(selectedForQuestion)
                     ? ""
-                    : contextFormatter.formatKbContext(
-                            kbIntents, questionEligible, selectedForQuestion, selectedForQuestion.size());
-            renderedContexts.add(new RenderedSubQuestion(context.intent().subQuestion(), formattedKb));
+                    : contextFormatter.formatKbContext(selectedForQuestion, selectedForQuestion.size());
+            renderedContexts.add(new RenderedSubQuestion(contexts.get(i).question(), formattedKb));
         }
 
         boolean singleQuestion = renderedContexts.size() == 1;
@@ -179,27 +151,25 @@ public class RetrievalEngine {
         return RetrievalContext.builder()
                 .kbContext(kbContext)
                 .kbChunks(kbChunks)
-                .intentChunks(mergedIntentChunks)
-                .eligibleIntentIds(Set.copyOf(eligibleIntentIds))
                 .retrievalDiagnostics(requestSelection.diagnostics())
                 .build();
     }
 
-    private SubQuestionContext buildSubQuestionContext(SubQuestionIntent intent,
+    private SubQuestionContext buildSubQuestionContext(String question,
                                                        RetrievalBudget candidateBudget,
                                                        boolean kbSkipped,
                                                        RetrievalCapture capture) {
         KnowledgeRetrievalResult retrievalResult;
         if (kbSkipped) {
-            log.warn("子问题超出请求级上下文额度，跳过 KB 检索，question={}", intent.subQuestion());
+            log.warn("子问题超出请求级上下文额度，跳过 KB 检索，question={}", question);
             retrievalResult = KnowledgeRetrievalResult.empty();
         } else {
             retrievalResult = capture == null
-                    ? multiChannelRetrievalEngine.retrieveKnowledgeChannels(intent, candidateBudget)
-                    : multiChannelRetrievalEngine.retrieveKnowledgeChannels(intent, candidateBudget, capture);
+                    ? multiChannelRetrievalEngine.retrieveKnowledgeChannels(question, candidateBudget)
+                    : multiChannelRetrievalEngine.retrieveKnowledgeChannels(question, candidateBudget, capture);
         }
 
-        return new SubQuestionContext(intent, retrievalResult, kbSkipped);
+        return new SubQuestionContext(question, retrievalResult);
     }
 
     private void appendSection(StringBuilder builder, String section, int index, String question, String context) {
@@ -321,26 +291,8 @@ public class RetrievalEngine {
         return List.copyOf(distinct.values());
     }
 
-    /**
-     * 同一最终分片可以在多个子问题中命中不同意图；此处汇总它的全部归因，但正文只渲染一次。
-     */
-    private Map<String, Set<String>> mergeSelectedAttribution(List<SubQuestionContext> contexts,
-                                                              Set<String> selectedKeys) {
-        Map<String, Set<String>> merged = new LinkedHashMap<>();
-        for (SubQuestionContext context : contexts) {
-            context.retrievalResult().intentIdsByChunkKey().forEach((chunkKey, intentIds) -> {
-                if (!selectedKeys.contains(chunkKey) || CollUtil.isEmpty(intentIds)) {
-                    return;
-                }
-                merged.computeIfAbsent(chunkKey, ignored -> new LinkedHashSet<>()).addAll(intentIds);
-            });
-        }
-        return merged;
-    }
-
-    private record SubQuestionContext(SubQuestionIntent intent,
-                                      KnowledgeRetrievalResult retrievalResult,
-                                      boolean kbSkipped) {
+    private record SubQuestionContext(String question,
+                                      KnowledgeRetrievalResult retrievalResult) {
     }
 
     private record RenderedSubQuestion(String question, String kbContext) {

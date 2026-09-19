@@ -152,7 +152,7 @@ class ResearchEvidenceToolsTest {
     void outOfScopeIndexResultCannotBecomeEvidence() {
         when(engine.retrieveScopedKnowledgeChannels(anyString(), any(), anyList()))
                 .thenReturn(new KnowledgeRetrievalResult(List.of(
-                        RetrievedChunk.builder().id("chunk-a").collectionName("other").build()), Map.of(), java.util.Set.of()));
+                        RetrievedChunk.builder().id("chunk-a").collectionName("other").build())));
         assertThrows(ClientException.class, () ->
                 search.search("run-a", "owner", "main", "query", null, 10));
         verify(store, never()).save(anyString(), any());
@@ -422,7 +422,7 @@ class ResearchEvidenceToolsTest {
         var results = java.util.Arrays.stream(ids).map(id -> RetrievedChunk.builder().id(id)
                 .collectionName("collection-a").docId(chunkRows.get(id).getDocId()).build()).toList();
         when(engine.retrieveScopedKnowledgeChannels(anyString(), any(), anyList(), anyList()))
-                .thenReturn(new KnowledgeRetrievalResult(results, Map.of(), java.util.Set.of()));
+                .thenReturn(new KnowledgeRetrievalResult(results));
     }
 
     private void neighboringSources(String seed, String before, String after) {
@@ -455,6 +455,6 @@ class ResearchEvidenceToolsTest {
         var results = java.util.Arrays.stream(ids).map(id -> RetrievedChunk.builder().id(id)
                 .text("fictional index excerpt").collectionName("collection-a").build()).toList();
         when(engine.retrieveScopedKnowledgeChannels(anyString(), any(), anyList()))
-                .thenReturn(new KnowledgeRetrievalResult(results, Map.of(), java.util.Set.of()));
+                .thenReturn(new KnowledgeRetrievalResult(results));
     }
 }

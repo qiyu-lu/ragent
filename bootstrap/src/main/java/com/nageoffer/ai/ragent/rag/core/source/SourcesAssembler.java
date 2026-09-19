@@ -54,24 +54,7 @@ public class SourcesAssembler {
     private final KnowledgeDocumentMapper documentMapper;
 
     /**
-     * 由检索上下文的意图分片装配文档级来源列表
-     *
-     * @param intentChunks 意图 ID -> 命中片段（KB）
-     * @return 文档级来源列表 无来源返回空列表
-     */
-    public List<SourceRef> assemble(Map<String, List<RetrievedChunk>> intentChunks) {
-        if (CollUtil.isEmpty(intentChunks)) {
-            return List.of();
-        }
-
-        return assemble(intentChunks.values().stream()
-                .filter(CollUtil::isNotEmpty)
-                .flatMap(List::stream)
-                .toList());
-    }
-
-    /**
-     * 由请求级最终分片列表装配来源，避免再从意图分组反推实际进入 Prompt 的证据集合。
+     * 由请求级最终分片列表装配来源。
      */
     public List<SourceRef> assemble(List<RetrievedChunk> chunks) {
         if (CollUtil.isEmpty(chunks)) {

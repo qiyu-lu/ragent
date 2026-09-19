@@ -142,7 +142,7 @@ public final class ResearchExecutorCommand {
             @Override public Subject ofUser(String userId) { return new Subject(userId, "user"); }
         };
         var engine = new MultiChannelRetrievalEngine(List.of(vector), List.of(),
-                new RetrievalScopeResolver(searchProperties, new KbCollectionProvider(bases), access), retrieval, searchProperties);
+                new RetrievalScopeResolver(new KbCollectionProvider(bases), access), retrieval, searchProperties);
         var search = new KnowledgeSearchService(engine, bases, docs, catalog, evidence, JSON);
         var reader = new SourceReader(evidence, catalog, new EvidenceSnapshotFactory(JSON));
         var modelFactory = new ResearchModelFactory(models, properties);

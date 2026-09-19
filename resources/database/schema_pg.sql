@@ -426,35 +426,8 @@ CREATE INDEX idx_doc_id_exec ON t_knowledge_document_schedule_exec (doc_id);
 COMMENT ON TABLE t_knowledge_document_schedule_exec IS '知识库文档定时刷新执行记录';
 
 -- ============================================
--- RAG Intent & Query Tables
+-- RAG Query Tables
 -- ============================================
-
-CREATE TABLE t_intent_node (
-    id                    VARCHAR(20)       NOT NULL PRIMARY KEY,
-    kb_id                 VARCHAR(20),
-    intent_code           VARCHAR(64)  NOT NULL,
-    name                  VARCHAR(64)  NOT NULL,
-    level                 SMALLINT     NOT NULL,
-    parent_code           VARCHAR(64),
-    description           VARCHAR(512),
-    examples              TEXT,
-    collection_name       VARCHAR(128),
-    collection_names      JSONB        NOT NULL DEFAULT '[]'::jsonb,
-    top_k                 INTEGER,
-    mcp_tool_id           VARCHAR(128),
-    kind                  SMALLINT     NOT NULL DEFAULT 0,
-    prompt_snippet        TEXT,
-    prompt_template       TEXT,
-    param_prompt_template TEXT,
-    sort_order            INTEGER      NOT NULL DEFAULT 0,
-    enabled               SMALLINT     NOT NULL DEFAULT 1,
-    create_by             VARCHAR(20),
-    update_by             VARCHAR(20),
-    create_time           TIMESTAMP  NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_time           TIMESTAMP  NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted               SMALLINT     NOT NULL DEFAULT 0
-);
-COMMENT ON TABLE t_intent_node IS '意图树节点配置表';
 
 CREATE TABLE t_query_term_mapping (
     id          VARCHAR(20)       NOT NULL PRIMARY KEY,
@@ -821,30 +794,6 @@ COMMENT ON COLUMN t_knowledge_document_schedule_exec.last_modified IS '最后修
 COMMENT ON COLUMN t_knowledge_document_schedule_exec.create_time IS '创建时间';
 COMMENT ON COLUMN t_knowledge_document_schedule_exec.update_time IS '更新时间';
 
--- t_intent_node
-COMMENT ON COLUMN t_intent_node.id IS '自增主键';
-COMMENT ON COLUMN t_intent_node.kb_id IS '知识库ID';
-COMMENT ON COLUMN t_intent_node.intent_code IS '业务唯一标识';
-COMMENT ON COLUMN t_intent_node.name IS '展示名称';
-COMMENT ON COLUMN t_intent_node.level IS '层级 0：DOMAIN 1：CATEGORY 2：TOPIC';
-COMMENT ON COLUMN t_intent_node.parent_code IS '父节点标识';
-COMMENT ON COLUMN t_intent_node.description IS '语义描述';
-COMMENT ON COLUMN t_intent_node.examples IS '示例问题';
-COMMENT ON COLUMN t_intent_node.collection_name IS '兼容旧版本，后续删除';
-COMMENT ON COLUMN t_intent_node.collection_names IS '知识库Collection集合';
-COMMENT ON COLUMN t_intent_node.top_k IS '知识库检索TopK';
-COMMENT ON COLUMN t_intent_node.mcp_tool_id IS 'MCP工具ID';
-COMMENT ON COLUMN t_intent_node.kind IS '类型 0：RAG知识库类 1：SYSTEM系统交互类';
-COMMENT ON COLUMN t_intent_node.prompt_snippet IS '提示词片段';
-COMMENT ON COLUMN t_intent_node.prompt_template IS '提示词模板';
-COMMENT ON COLUMN t_intent_node.param_prompt_template IS '参数提取提示词模板（MCP模式专属）';
-COMMENT ON COLUMN t_intent_node.sort_order IS '排序字段';
-COMMENT ON COLUMN t_intent_node.enabled IS '是否启用 1：启用 0：禁用';
-COMMENT ON COLUMN t_intent_node.create_by IS '创建人';
-COMMENT ON COLUMN t_intent_node.update_by IS '修改人';
-COMMENT ON COLUMN t_intent_node.create_time IS '创建时间';
-COMMENT ON COLUMN t_intent_node.update_time IS '修改时间';
-COMMENT ON COLUMN t_intent_node.deleted IS '是否删除 0：正常 1：删除';
 
 -- t_query_term_mapping
 COMMENT ON COLUMN t_query_term_mapping.id IS 'ID';

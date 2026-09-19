@@ -49,23 +49,6 @@ public class GroundingChunksAssembler {
     private static final int MAX_CHUNKS = 8;
 
     /**
-     * 由检索上下文的意图分片装配 grounding 片段列表
-     *
-     * @param intentChunks 意图 ID -> 命中片段（KB）
-     * @return grounding 片段列表 无命中返回空列表
-     */
-    public List<GroundingChunk> assemble(Map<String, List<RetrievedChunk>> intentChunks) {
-        if (CollUtil.isEmpty(intentChunks)) {
-            return List.of();
-        }
-
-        return assemble(intentChunks.values().stream()
-                .filter(CollUtil::isNotEmpty)
-                .flatMap(List::stream)
-                .toList());
-    }
-
-    /**
      * 由请求级最终分片列表装配 grounding，确保未入选的候选池尾部不会进入后续生成。
      */
     public List<GroundingChunk> assemble(List<RetrievedChunk> chunks) {

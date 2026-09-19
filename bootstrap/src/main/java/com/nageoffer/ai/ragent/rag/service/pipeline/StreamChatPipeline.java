@@ -18,17 +18,13 @@
 package com.nageoffer.ai.ragent.rag.service.pipeline;
 
 import cn.hutool.core.collection.CollUtil;
-import cn.hutool.core.util.StrUtil;
 import com.nageoffer.ai.ragent.framework.convention.ChatMessage;
 import com.nageoffer.ai.ragent.framework.convention.ChatRequest;
 import com.nageoffer.ai.ragent.framework.convention.SourceRef;
 import com.nageoffer.ai.ragent.infra.chat.LLMService;
 import com.nageoffer.ai.ragent.infra.chat.StreamCallback;
 import com.nageoffer.ai.ragent.infra.chat.StreamCancellationHandle;
-import com.nageoffer.ai.ragent.rag.core.intent.IntentResolver;
 import com.nageoffer.ai.ragent.rag.core.memory.ConversationMemoryService;
-import com.nageoffer.ai.ragent.rag.core.prompt.AgentPromptResolver;
-import com.nageoffer.ai.ragent.rag.core.prompt.AgentPromptSlot;
 import com.nageoffer.ai.ragent.rag.core.prompt.PromptContext;
 import com.nageoffer.ai.ragent.rag.core.prompt.RAGPromptService;
 import com.nageoffer.ai.ragent.rag.core.retrieval.RetrievalEngine;
@@ -37,22 +33,19 @@ import com.nageoffer.ai.ragent.rag.core.rewrite.RewriteResult;
 import com.nageoffer.ai.ragent.rag.core.source.CitationContextEnricher;
 import com.nageoffer.ai.ragent.rag.core.source.GroundingChunksAssembler;
 import com.nageoffer.ai.ragent.rag.core.source.SourcesAssembler;
-import com.nageoffer.ai.ragent.rag.dto.IntentGroup;
 import com.nageoffer.ai.ragent.rag.dto.RetrievalContext;
-import com.nageoffer.ai.ragent.rag.dto.SubQuestionIntent;
 import com.nageoffer.ai.ragent.rag.service.handler.StreamTaskManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
  * 流式对话流水线
  * <p>
  * 承载从 RAGChatServiceImpl 提取的业务编排逻辑：
- * 记忆加载 -> 改写拆分 -> 意图解析 -> 系统响应 / 检索 -> Prompt 组装 -> 流式输出
+ * 记忆加载 -> 改写拆分 -> 检索（当前用户可读的全部知识库）-> Prompt 组装 -> 流式输出
  * <p>
  * 流水线模式：通过私有方法 + boolean 返回值（handleXxx 返回 true 表示已处理并短路）
  */
@@ -63,11 +56,9 @@ public class StreamChatPipeline {
 
     private final ConversationMemoryService memoryService;
     private final QueryRewriteService queryRewriteService;
-    private final IntentResolver intentResolver;
     private final RetrievalEngine retrievalEngine;
     private final LLMService llmService;
     private final RAGPromptService promptBuilder;
-    private final AgentPromptResolver agentPromptResolver;
     private final StreamTaskManager taskManager;
     private final SourcesAssembler sourcesAssembler;
     private final GroundingChunksAssembler groundingChunksAssembler;
@@ -79,11 +70,6 @@ public class StreamChatPipeline {
     public void execute(StreamChatContext ctx) {
         loadMemory(ctx);
         rewriteQuery(ctx);
-        resolveIntents(ctx);
-
-        if (handleSystemOnly(ctx)) {
-            return;
-        }
 
         RetrievalContext retrievalCtx = retrieve(ctx);
         if (handleEmptyRetrieval(ctx, retrievalCtx)) {
@@ -108,36 +94,12 @@ public class StreamChatPipeline {
         ctx.setRewriteResult(rewriteResult);
     }
 
-    private void resolveIntents(StreamChatContext ctx) {
-        List<SubQuestionIntent> subIntents = intentResolver.resolve(ctx.getRewriteResult());
-        ctx.setSubIntents(subIntents);
-    }
-
-    private boolean handleSystemOnly(StreamChatContext ctx) {
-        List<SubQuestionIntent> subIntents = ctx.getSubIntents();
-        boolean allSystemOnly = subIntents.stream()
-                .allMatch(si -> intentResolver.isSystemOnly(si.nodeScores()));
-        if (!allSystemOnly) {
-            return false;
-        }
-        String customPrompt = subIntents.stream()
-                .flatMap(si -> si.nodeScores().stream())
-                .map(ns -> ns.getNode().getPromptTemplate())
-                .filter(StrUtil::isNotBlank)
-                .findFirst()
-                .orElse(null);
-        StreamCancellationHandle handle = streamSystemResponse(
-                ctx.getRewriteResult().rewrittenQuestion(),
-                ctx.getHistory(),
-                customPrompt,
-                ctx.getCallback()
-        );
-        taskManager.bindHandle(ctx.getTaskId(), handle);
-        return true;
-    }
-
     private RetrievalContext retrieve(StreamChatContext ctx) {
-        return retrievalEngine.retrieve(ctx.getSubIntents());
+        RewriteResult rewriteResult = ctx.getRewriteResult();
+        List<String> subQuestions = CollUtil.isNotEmpty(rewriteResult.subQuestions())
+                ? rewriteResult.subQuestions()
+                : List.of(rewriteResult.rewrittenQuestion());
+        return retrievalEngine.retrieve(subQuestions);
     }
 
     private boolean handleEmptyRetrieval(StreamChatContext ctx, RetrievalContext retrievalCtx) {
@@ -151,9 +113,6 @@ public class StreamChatPipeline {
     }
 
     private void streamRagResponse(StreamChatContext ctx, RetrievalContext retrievalCtx) {
-        // 聚合所有意图用于 prompt 规划
-        IntentGroup mergedGroup = intentResolver.mergeIntentGroup(ctx.getSubIntents());
-
         // 检索完成后建立唯一来源编号：同一列表用于完成事件、来源面板与消息落库，开启引用时还作为行内角标编号
         List<SourceRef> sources = sourcesAssembler.assemble(retrievalCtx.effectiveKbChunks());
         ctx.getCallback().onSources(sources);
@@ -166,7 +125,6 @@ public class StreamChatPipeline {
         StreamCancellationHandle handle = streamLLMResponse(
                 ctx.getRewriteResult(),
                 retrievalCtx,
-                mergedGroup,
                 ctx.getHistory(),
                 ctx.isDeepThinking(),
                 ctx.getCallback()
@@ -176,35 +134,12 @@ public class StreamChatPipeline {
 
     // ==================== LLM 响应 ====================
 
-    private StreamCancellationHandle streamSystemResponse(String question, List<ChatMessage> history,
-                                                          String customPrompt, StreamCallback callback) {
-        String systemPrompt = StrUtil.isNotBlank(customPrompt)
-                ? customPrompt
-                : agentPromptResolver.resolve(AgentPromptSlot.SYSTEM_CHAT);
-
-        List<ChatMessage> messages = new ArrayList<>();
-        messages.add(ChatMessage.system(systemPrompt));
-        if (CollUtil.isNotEmpty(history)) {
-            messages.addAll(history);
-        }
-        messages.add(ChatMessage.user(question));
-
-        ChatRequest req = ChatRequest.builder()
-                .messages(messages)
-                .temperature(0.7D)
-                .thinking(false)
-                .build();
-        return llmService.streamChat(req, callback);
-    }
-
     private StreamCancellationHandle streamLLMResponse(RewriteResult rewriteResult, RetrievalContext ctx,
-                                                       IntentGroup intentGroup, List<ChatMessage> history,
+                                                       List<ChatMessage> history,
                                                        boolean deepThinking, StreamCallback callback) {
         PromptContext promptContext = PromptContext.builder()
                 .question(rewriteResult.rewrittenQuestion())
                 .kbContext(ctx.getKbContext())
-                .kbIntents(intentGroup.kbIntents())
-                .eligibleIntentIds(ctx.getEligibleIntentIds())
                 .build();
 
         List<ChatMessage> messages = promptBuilder.buildStructuredMessages(

@@ -107,9 +107,9 @@ class AgentPromptResolverTest {
     @Test
     void usesBuiltinWhenNoActiveProfile() {
         stubProfiles(profile(BUILTIN_ID, 1, 0), null);
-        stubPromptCalls(List.of(prompt(BUILTIN_ID, AgentPromptSlot.SYSTEM_CHAT, "内置闲聊")));
+        stubPromptCalls(List.of(prompt(BUILTIN_ID, AgentPromptSlot.CONVERSATION_SUMMARY, "内置摘要")));
 
-        assertEquals("内置闲聊", resolver.resolveAll().get(AgentPromptSlot.SYSTEM_CHAT.name()));
+        assertEquals("内置摘要", resolver.resolveAll().get(AgentPromptSlot.CONVERSATION_SUMMARY.name()));
     }
 
     /**

@@ -18,32 +18,24 @@
 package com.nageoffer.ai.ragent.rag.core.retrieval;
 
 import com.nageoffer.ai.ragent.framework.convention.RetrievedChunk;
-import com.nageoffer.ai.ragent.framework.convention.RetrievedChunkKey;
 import com.nageoffer.ai.ragent.rag.config.SearchChannelProperties;
-import com.nageoffer.ai.ragent.rag.core.intent.IntentNode;
-import com.nageoffer.ai.ragent.rag.core.intent.NodeScore;
 import com.nageoffer.ai.ragent.rag.core.prompt.ContextFormatter;
-import com.nageoffer.ai.ragent.rag.core.prompt.DefaultContextFormatter;
 import com.nageoffer.ai.ragent.rag.core.prompt.PromptTemplateLoader;
 import com.nageoffer.ai.ragent.rag.dto.RetrievalContext;
-import com.nageoffer.ai.ragent.rag.dto.SubQuestionIntent;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.core.io.DefaultResourceLoader;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static com.nageoffer.ai.ragent.rag.constant.RAGConstant.MULTI_CHANNEL_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -53,121 +45,34 @@ import static org.mockito.Mockito.when;
 class RetrievalEngineTest {
 
     @Test
-    void returnsOnlyActualIntentMatchesAndIndependentGlobalEvidence() {
+    void singleQuestionFormatsItsSelectedChunks() {
         RetrievedChunk chunkA = chunk("a", "A资料");
-        RetrievedChunk globalChunk = chunk("global", "全局资料");
+        RetrievedChunk chunkB = chunk("b", "B资料");
         MultiChannelRetrievalEngine multiChannel = mock(MultiChannelRetrievalEngine.class);
         ContextFormatter contextFormatter = mock(ContextFormatter.class);
-        when(multiChannel.retrieveKnowledgeChannels(
-                any(SubQuestionIntent.class), any(RetrievalBudget.class)))
-                .thenReturn(new KnowledgeRetrievalResult(
-                        List.of(chunkA, globalChunk),
-                        Map.of(RetrievedChunkKey.of(chunkA), Set.of("A")),
-                        Set.of("A", "B")
-                ));
+        when(multiChannel.retrieveKnowledgeChannels(anyString(), any(RetrievalBudget.class)))
+                .thenReturn(new KnowledgeRetrievalResult(List.of(chunkA, chunkB)));
+        when(contextFormatter.formatKbContext(anyList(), anyInt())).thenReturn("上下文");
 
-        RetrievalContext result = engine(multiChannel, contextFormatter).retrieve(List.of(
-                new SubQuestionIntent("问题", List.of(intent("A"), intent("B")))
-        ));
+        RetrievalContext result = engine(multiChannel, contextFormatter).retrieve(List.of("问题"));
 
-        assertEquals(Map.of(
-                "A", List.of(chunkA),
-                MULTI_CHANNEL_KEY, List.of(globalChunk)
-        ), result.getIntentChunks());
-        assertEquals(Set.of("A"), result.getEligibleIntentIds());
-        verify(contextFormatter).formatKbContext(anyList(), eq(Set.of("A")), eq(List.of(chunkA, globalChunk)), anyInt());
+        assertEquals(List.of(chunkA, chunkB), result.getKbChunks());
+        assertEquals("上下文", result.getKbContext());
+        verify(contextFormatter).formatKbContext(eq(List.of(chunkA, chunkB)), anyInt());
     }
 
     @Test
-    void globalEvidenceKeepsCandidatesEligible() {
-        RetrievedChunk globalChunk = chunk("global", "全局资料");
+    void failedSubQuestionDegradesToEmptyContext() {
+        RetrievedChunk chunk = chunk("b", "B资料");
         MultiChannelRetrievalEngine multiChannel = mock(MultiChannelRetrievalEngine.class);
         ContextFormatter contextFormatter = mock(ContextFormatter.class);
-        when(multiChannel.retrieveKnowledgeChannels(
-                any(SubQuestionIntent.class), any(RetrievalBudget.class)))
-                .thenReturn(new KnowledgeRetrievalResult(List.of(globalChunk), Map.of(), Set.of()));
-
-        RetrievalContext result = engine(multiChannel, contextFormatter).retrieve(List.of(
-                new SubQuestionIntent("问题", List.of(intent("A"), intent("B")))
-        ));
-
-        assertEquals(Set.of("A", "B"), result.getEligibleIntentIds());
-        verify(contextFormatter).formatKbContext(
-                anyList(), eq(Set.of("A", "B")), eq(List.of(globalChunk)), anyInt());
-    }
-
-    @Test
-    void globalFallbackInjectsBothLowConfidenceCandidateSnippets() {
-        RetrievedChunk globalChunk = chunk("global", "全局资料");
-        MultiChannelRetrievalEngine multiChannel = mock(MultiChannelRetrievalEngine.class);
-        when(multiChannel.retrieveKnowledgeChannels(
-                any(SubQuestionIntent.class), any(RetrievalBudget.class)))
-                .thenReturn(new KnowledgeRetrievalResult(List.of(globalChunk), Map.of(), Set.of()));
-        ContextFormatter contextFormatter = new DefaultContextFormatter(
-                new PromptTemplateLoader(new DefaultResourceLoader()));
-
-        RetrievalContext result = engine(multiChannel, contextFormatter).retrieve(List.of(
-                new SubQuestionIntent("问题", List.of(
-                        lowConfidenceIntentWithSnippet("A", "SNIPPET_A"),
-                        lowConfidenceIntentWithSnippet("B", "SNIPPET_B")))
-        ));
-
-        assertEquals(Set.of("A", "B"), result.getEligibleIntentIds());
-        assertTrue(result.getKbContext().contains("SNIPPET_A"));
-        assertTrue(result.getKbContext().contains("SNIPPET_B"));
-        assertTrue(result.getKbContext().contains("全局资料"));
-    }
-
-    @Test
-    void directedMissKeepsEvidenceWithoutEligibleIntent() {
-        RetrievedChunk supplement = chunk("supplement", "补充资料");
-        MultiChannelRetrievalEngine multiChannel = mock(MultiChannelRetrievalEngine.class);
-        ContextFormatter contextFormatter = mock(ContextFormatter.class);
-        when(multiChannel.retrieveKnowledgeChannels(
-                any(SubQuestionIntent.class), any(RetrievalBudget.class)))
-                .thenReturn(new KnowledgeRetrievalResult(List.of(supplement), Map.of(), Set.of("A")));
-        when(contextFormatter.formatKbContext(anyList(), any(), anyList(), anyInt()))
-                .thenReturn("补充资料上下文");
-
-        RetrievalContext result = engine(multiChannel, contextFormatter).retrieve(List.of(
-                new SubQuestionIntent("问题", List.of(intent("A")))
-        ));
-
-        assertTrue(result.getEligibleIntentIds().isEmpty());
-        assertEquals("补充资料上下文", result.getKbContext());
-        assertEquals(List.of(supplement), result.getIntentChunks().get(MULTI_CHANNEL_KEY));
-        verify(contextFormatter).formatKbContext(anyList(), eq(Set.of()), eq(List.of(supplement)), anyInt());
-    }
-
-    @Test
-    void multiQuestionEligibilityUsesEachQuestionOutcome() {
-        RetrievedChunk hitChunk = chunk("hit", "A资料");
-        KnowledgeRetrievalResult unknown = KnowledgeRetrievalResult.empty();
-        KnowledgeRetrievalResult hit = new KnowledgeRetrievalResult(
-                List.of(hitChunk), Map.of(RetrievedChunkKey.of(hitChunk), Set.of("A")), Set.of("A"));
-        KnowledgeRetrievalResult miss = new KnowledgeRetrievalResult(List.of(), Map.of(), Set.of("A"));
-
-        assertEquals(Set.of("A"), eligibleAfterTwoQuestions(unknown, miss));
-        assertEquals(Set.of("A"), eligibleAfterTwoQuestions(hit, miss));
-        assertTrue(eligibleAfterTwoQuestions(miss, miss).isEmpty());
-    }
-
-    @Test
-    void failedSubQuestionKeepsCandidateUnevaluated() {
-        MultiChannelRetrievalEngine multiChannel = mock(MultiChannelRetrievalEngine.class);
-        ContextFormatter contextFormatter = mock(ContextFormatter.class);
-        KnowledgeRetrievalResult miss = new KnowledgeRetrievalResult(List.of(), Map.of(), Set.of("A"));
-        when(multiChannel.retrieveKnowledgeChannels(
-                any(SubQuestionIntent.class), any(RetrievalBudget.class)))
+        when(multiChannel.retrieveKnowledgeChannels(anyString(), any(RetrievalBudget.class)))
                 .thenThrow(new IllegalStateException("retrieval unavailable"))
-                .thenReturn(miss);
+                .thenReturn(new KnowledgeRetrievalResult(List.of(chunk)));
 
-        RetrievalContext result = engine(multiChannel, contextFormatter).retrieve(List.of(
-                new SubQuestionIntent("问题一", List.of(intent("A"))),
-                new SubQuestionIntent("问题二", List.of(intent("A")))
-        ));
+        RetrievalContext result = engine(multiChannel, contextFormatter).retrieve(List.of("问题一", "问题二"));
 
-        assertEquals(Set.of("A"), result.getEligibleIntentIds());
+        assertEquals(List.of(chunk), result.getKbChunks());
     }
 
     @Test
@@ -176,7 +81,7 @@ class RetrievalEngineTest {
         ContextFormatter contextFormatter = mock(ContextFormatter.class);
         AtomicInteger callIndex = new AtomicInteger();
         when(multiChannel.retrieveKnowledgeChannels(
-                any(SubQuestionIntent.class), any(RetrievalBudget.class)))
+                anyString(), any(RetrievalBudget.class)))
                 .thenAnswer(invocation -> {
                     RetrievalBudget budget = invocation.getArgument(1);
                     int prefix = callIndex.getAndIncrement();
@@ -184,21 +89,17 @@ class RetrievalEngineTest {
                     for (int i = 0; i < budget.contextTopK(); i++) {
                         chunks.add(chunk(prefix + "-" + i, "资料" + prefix + "-" + i));
                     }
-                    return new KnowledgeRetrievalResult(chunks, Map.of(), Set.of());
+                    return new KnowledgeRetrievalResult(chunks);
                 });
 
-        RetrievalContext result = engine(multiChannel, contextFormatter).retrieve(List.of(
-                new SubQuestionIntent("问题一", List.of()),
-                new SubQuestionIntent("问题二", List.of()),
-                new SubQuestionIntent("问题三", List.of())
-        ));
+        RetrievalContext result = engine(multiChannel, contextFormatter).retrieve(List.of("问题一", "问题二", "问题三"));
 
         ArgumentCaptor<RetrievalBudget> budgets = ArgumentCaptor.forClass(RetrievalBudget.class);
         verify(multiChannel, times(3)).retrieveKnowledgeChannels(
-                any(SubQuestionIntent.class), budgets.capture());
+                anyString(), budgets.capture());
         assertEquals(List.of(4, 3, 3),
                 budgets.getAllValues().stream().map(RetrievalBudget::contextTopK).toList());
-        assertEquals(10, result.getIntentChunks().get(MULTI_CHANNEL_KEY).size(),
+        assertEquals(10, result.getKbChunks().size(),
                 "拆成三个子问题后，最终证据总数仍不得超过请求级 TopK");
     }
 
@@ -222,21 +123,18 @@ class RetrievalEngineTest {
         MultiChannelRetrievalEngine multiChannel = mock(MultiChannelRetrievalEngine.class);
         ContextFormatter contextFormatter = mock(ContextFormatter.class);
         when(multiChannel.retrieveKnowledgeChannels(
-                any(SubQuestionIntent.class), any(RetrievalBudget.class)))
+                anyString(), any(RetrievalBudget.class)))
                 .thenReturn(
-                        new KnowledgeRetrievalResult(first, Map.of(), Set.of()),
-                        new KnowledgeRetrievalResult(second, Map.of(), Set.of()));
+                        new KnowledgeRetrievalResult(first),
+                        new KnowledgeRetrievalResult(second));
         SearchChannelProperties properties = new SearchChannelProperties();
         properties.setRequestLevelRefillEnabled(true);
 
-        RetrievalContext result = engine(properties, multiChannel, contextFormatter).retrieve(List.of(
-                new SubQuestionIntent("问题一", List.of()),
-                new SubQuestionIntent("问题二", List.of())
-        ));
+        RetrievalContext result = engine(properties, multiChannel, contextFormatter).retrieve(List.of("问题一", "问题二"));
 
         ArgumentCaptor<RetrievalBudget> budgets = ArgumentCaptor.forClass(RetrievalBudget.class);
         verify(multiChannel, times(2)).retrieveKnowledgeChannels(
-                any(SubQuestionIntent.class), budgets.capture());
+                anyString(), budgets.capture());
         assertEquals(List.of(10, 10),
                 budgets.getAllValues().stream().map(RetrievalBudget::contextTopK).toList());
         assertEquals(10, result.getKbChunks().size());
@@ -249,15 +147,13 @@ class RetrievalEngineTest {
                 "canonical 顺序应与按子问题分组渲染的 Prompt 顺序一致");
 
         ArgumentCaptor<List<RetrievedChunk>> formatted = ArgumentCaptor.forClass((Class) List.class);
-        verify(contextFormatter, times(2)).formatKbContext(
-                anyList(), any(), formatted.capture(), anyInt());
+        verify(contextFormatter, times(2)).formatKbContext(formatted.capture(), anyInt());
         Set<String> formattedIds = formatted.getAllValues().stream()
                 .flatMap(List::stream)
                 .map(RetrievedChunk::getId)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
         assertEquals(result.getKbChunks().stream().map(RetrievedChunk::getId)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new)), formattedIds);
-        assertEquals(result.getKbChunks(), result.getIntentChunks().get(MULTI_CHANNEL_KEY));
     }
 
     @Test
@@ -280,15 +176,12 @@ class RetrievalEngineTest {
         MultiChannelRetrievalEngine multiChannel = mock(MultiChannelRetrievalEngine.class);
         ContextFormatter contextFormatter = mock(ContextFormatter.class);
         when(multiChannel.retrieveKnowledgeChannels(
-                any(SubQuestionIntent.class), any(RetrievalBudget.class)))
+                anyString(), any(RetrievalBudget.class)))
                 .thenReturn(
-                        new KnowledgeRetrievalResult(first, Map.of(), Set.of()),
-                        new KnowledgeRetrievalResult(second, Map.of(), Set.of()));
+                        new KnowledgeRetrievalResult(first),
+                        new KnowledgeRetrievalResult(second));
 
-        RetrievalContext result = engine(multiChannel, contextFormatter).retrieve(List.of(
-                new SubQuestionIntent("问题一", List.of()),
-                new SubQuestionIntent("问题二", List.of())
-        ));
+        RetrievalContext result = engine(multiChannel, contextFormatter).retrieve(List.of("问题一", "问题二"));
 
         assertEquals(List.of("shared", "a1", "a2", "a3", "a4", "b1", "b2", "b3", "b4"),
                 result.getKbChunks().stream().map(RetrievedChunk::getId).toList());
@@ -296,20 +189,6 @@ class RetrievalEngineTest {
         assertEquals(0, result.getRetrievalDiagnostics().refillAdded());
         assertEquals(9, result.getRetrievalDiagnostics().finalUniqueCount());
         assertEquals(1, result.getRetrievalDiagnostics().unfilledSlots());
-    }
-
-    private Set<String> eligibleAfterTwoQuestions(KnowledgeRetrievalResult first,
-                                                   KnowledgeRetrievalResult second) {
-        MultiChannelRetrievalEngine multiChannel = mock(MultiChannelRetrievalEngine.class);
-        ContextFormatter contextFormatter = mock(ContextFormatter.class);
-        when(multiChannel.retrieveKnowledgeChannels(
-                any(SubQuestionIntent.class), any(RetrievalBudget.class)))
-                .thenReturn(first, second);
-
-        return engine(multiChannel, contextFormatter).retrieve(List.of(
-                new SubQuestionIntent("问题一", List.of(intent("A"))),
-                new SubQuestionIntent("问题二", List.of(intent("A")))
-        )).getEligibleIntentIds();
     }
 
     private RetrievalEngine engine(MultiChannelRetrievalEngine multiChannel, ContextFormatter contextFormatter) {
@@ -326,17 +205,6 @@ class RetrievalEngineTest {
                 multiChannel,
                 Runnable::run
         );
-    }
-
-    private NodeScore intent(String id) {
-        return NodeScore.builder().node(IntentNode.builder().id(id).build()).score(0.9).build();
-    }
-
-    private NodeScore lowConfidenceIntentWithSnippet(String id, String snippet) {
-        return NodeScore.builder()
-                .node(IntentNode.builder().id(id).promptSnippet(snippet).build())
-                .score(0.5)
-                .build();
     }
 
     private RetrievedChunk chunk(String id, String text) {

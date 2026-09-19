@@ -43,7 +43,8 @@ p2_catalog_sql="SELECT table_name, column_name, udt_name, is_nullable, column_de
   ORDER BY conrelid::regclass::text, conname;
   SELECT tablename, indexname, indexdef FROM pg_indexes
   WHERE schemaname = 'public' AND tablename IN ('t_research_run', 't_research_evidence', 't_research_event', 't_research_corpus_document', 't_knowledge_vector', 't_knowledge_base', 't_knowledge_base_grant', 't_embedding_cache', 't_knowledge_document_chunk_log')
-  ORDER BY tablename, indexname;"
+  ORDER BY tablename, indexname;
+  SELECT 't_intent_node retired', to_regclass('public.t_intent_node') IS NULL;"
 psql_p2 -Atc "$p2_catalog_sql" > "$p2_scratch/fresh-catalog.txt"
 
 # Recreate the historical schema only inside this random database. The current
@@ -75,6 +76,10 @@ SELECT 'p2-legacy-kb', 'legacy', 'fixture', 'p2_legacy', username FROM t_user OR
 DROP TABLE t_embedding_cache;
 ALTER TABLE t_knowledge_document_chunk_log DROP COLUMN embed_cache_hits;
 ALTER TABLE t_knowledge_document_chunk_log DROP COLUMN embed_cache_misses;
+
+-- Intent tree: existing deployments still carry the node table.
+CREATE TABLE t_intent_node (id VARCHAR(20) NOT NULL PRIMARY KEY, intent_code VARCHAR(64) NOT NULL);
+INSERT INTO t_intent_node (id, intent_code) VALUES ('p2-intent', 'legacy');
 SQL
 psql_p2 < resources/database/upgrades/v1.1.0/260917_02_research_evidence.sql
 psql_p2 < resources/database/upgrades/v1.1.0/260917_03_research_neighbors.sql
@@ -88,6 +93,8 @@ psql_p2 < resources/database/upgrades/v1.1.0/260918_02_knowledge_base_access.sql
 psql_p2 < resources/database/upgrades/v1.1.0/260918_02_knowledge_base_access.sql
 psql_p2 < resources/database/upgrades/v1.1.0/260918_03_embedding_cache.sql
 psql_p2 < resources/database/upgrades/v1.1.0/260918_03_embedding_cache.sql
+psql_p2 < resources/database/upgrades/v1.1.0/260919_01_drop_intent_node.sql
+psql_p2 < resources/database/upgrades/v1.1.0/260919_01_drop_intent_node.sql
 psql_p2 -Atc "$p2_catalog_sql" > "$p2_scratch/upgraded-catalog.txt"
 diff -u "$p2_scratch/fresh-catalog.txt" "$p2_scratch/upgraded-catalog.txt"
 

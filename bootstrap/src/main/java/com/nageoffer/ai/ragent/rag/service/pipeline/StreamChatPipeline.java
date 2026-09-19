@@ -202,9 +202,7 @@ public class StreamChatPipeline {
                                                        boolean deepThinking, StreamCallback callback) {
         PromptContext promptContext = PromptContext.builder()
                 .question(rewriteResult.rewrittenQuestion())
-                .mcpContext(ctx.getMcpContext())
                 .kbContext(ctx.getKbContext())
-                .mcpIntents(intentGroup.mcpIntents())
                 .kbIntents(intentGroup.kbIntents())
                 .eligibleIntentIds(ctx.getEligibleIntentIds())
                 .build();
@@ -218,8 +216,8 @@ public class StreamChatPipeline {
         ChatRequest chatRequest = ChatRequest.builder()
                 .messages(messages)
                 .thinking(deepThinking)
-                .temperature(ctx.hasMcp() ? 0.3D : 0D)  // MCP 场景稍微放宽温度
-                .topP(ctx.hasMcp() ? 0.8D : 1D)
+                .temperature(0D)
+                .topP(1D)
                 .build();
 
         return llmService.streamChat(chatRequest, callback);

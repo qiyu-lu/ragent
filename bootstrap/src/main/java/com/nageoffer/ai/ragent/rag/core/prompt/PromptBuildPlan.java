@@ -28,8 +28,6 @@ public class PromptBuildPlan {
 
     private String baseTemplate;
 
-    private String mcpContext;
-
     private String kbContext;
 
     private String question;

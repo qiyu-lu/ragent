@@ -41,7 +41,7 @@ import static com.nageoffer.ai.ragent.rag.constant.RAGConstant.CONTEXT_FORMAT_PA
 /**
  * RAG Prompt 编排服务
  * <p>
- * 根据检索结果场景（KB / MCP / Mixed）选择模板，并构造最终发送给 LLM 的消息序列
+ * 根据知识库检索结果选择模板，并构造最终发送给 LLM 的消息序列
  */
 @Service
 @RequiredArgsConstructor
@@ -135,54 +135,14 @@ public class RAGPromptService {
         return new PromptPlan(eligibleIntents, null);
     }
 
+    /**
+     * 空检索由 StreamChatPipeline 在组装提示词之前短路，这里只剩知识库场景
+     */
     private PromptBuildPlan plan(PromptContext context) {
-        if (context.hasMcp() && !context.hasKb()) {
-            return planMcpOnly(context);
-        }
-        if (!context.hasMcp() && context.hasKb()) {
-            return planKbOnly(context);
-        }
-        if (context.hasMcp() && context.hasKb()) {
-            return planMixed(context);
-        }
-        throw new IllegalStateException("PromptContext requires MCP or KB context.");
-    }
-
-    private PromptBuildPlan planKbOnly(PromptContext context) {
         PromptPlan plan = planPrompt(context.getKbIntents(), context.getEligibleIntentIds());
         return PromptBuildPlan.builder()
                 .scene(PromptScene.KB_ONLY)
                 .baseTemplate(plan.getBaseTemplate())
-                .mcpContext(context.getMcpContext())
-                .kbContext(context.getKbContext())
-                .question(context.getQuestion())
-                .build();
-    }
-
-    private PromptBuildPlan planMcpOnly(PromptContext context) {
-        List<NodeScore> intents = context.getMcpIntents();
-        String baseTemplate = null;
-        if (CollUtil.isNotEmpty(intents) && intents.size() == 1) {
-            IntentNode node = intents.get(0).getNode();
-            String tpl = StrUtil.emptyIfNull(node.getPromptTemplate()).trim();
-            if (StrUtil.isNotBlank(tpl)) {
-                baseTemplate = tpl;
-            }
-        }
-
-        return PromptBuildPlan.builder()
-                .scene(PromptScene.MCP_ONLY)
-                .baseTemplate(baseTemplate)
-                .mcpContext(context.getMcpContext())
-                .kbContext(context.getKbContext())
-                .question(context.getQuestion())
-                .build();
-    }
-
-    private PromptBuildPlan planMixed(PromptContext context) {
-        return PromptBuildPlan.builder()
-                .scene(PromptScene.MIXED)
-                .mcpContext(context.getMcpContext())
                 .kbContext(context.getKbContext())
                 .question(context.getQuestion())
                 .build();
@@ -191,9 +151,6 @@ public class RAGPromptService {
     private String defaultTemplate(PromptScene scene) {
         return switch (scene) {
             case KB_ONLY -> agentPromptResolver.resolve(AgentPromptSlot.KB_ANSWER);
-            case MCP_ONLY -> agentPromptResolver.resolve(AgentPromptSlot.MCP_ANSWER);
-            case MIXED -> agentPromptResolver.resolve(AgentPromptSlot.MIXED_ANSWER);
-            case EMPTY -> "";
         };
     }
 
@@ -221,20 +178,13 @@ public class RAGPromptService {
     }
 
     /**
-     * 将 MCP 和 KB 证据合并为一个文本块，各自有值时用对应 section 渲染
+     * 用 kb-evidence section 渲染知识库证据
      */
     private String buildEvidenceBody(PromptContext context) {
-        StringBuilder sb = new StringBuilder();
-        if (StrUtil.isNotBlank(context.getMcpContext())) {
-            sb.append(renderSection("mcp-evidence", Map.of("body", context.getMcpContext().trim())));
+        if (StrUtil.isBlank(context.getKbContext())) {
+            return "";
         }
-        if (StrUtil.isNotBlank(context.getKbContext())) {
-            if (!sb.isEmpty()) {
-                sb.append("\n\n");
-            }
-            sb.append(renderSection("kb-evidence", Map.of("body", context.getKbContext().trim())));
-        }
-        return sb.toString().trim();
+        return renderSection("kb-evidence", Map.of("body", context.getKbContext().trim())).trim();
     }
 
     private String renderSection(String section, Map<String, String> slots) {

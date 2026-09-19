@@ -116,11 +116,6 @@ rag:
       batch-size: 20
       min-interval-seconds: 60
 
-  mcp:
-    servers:
-      - name: default
-        url: http://localhost:9099
-
   search:
     # 检索漏斗三段预算，各自独立、单调收窄，启动时校验 recall-budget ≥ default-top-k 且 rerank-candidate-limit ≥ default-top-k
     default-top-k: 10           # ③ 最终进 LLM 的条数（产品语义的 topK）

@@ -1,0 +1,272 @@
+{
+  "experiment": "X1b W1 answer-quality guardrail (career sprint W6)",
+  "date": "2026-09-19",
+  "finished": "2026-09-19 21:24:02",
+  "upstream": "real Bailian qwen3.7-flash-2026-07-15 (all roles) + SiliconFlow Qwen3-Embedding-8B; not a simulated upstream",
+  "before": {
+    "commit": "65c99c7",
+    "tag": "career-v0-baseline"
+  },
+  "after": {
+    "commit": "61d37d8",
+    "note": "research code of the W1-W5 and slim-down head; later commits touch docs only"
+  },
+  "workload": {
+    "caseIds": {
+      "eval/agentic-research/manifests/career-w6-case-ids-1.json": "d6c57118017baae46aa6e897f5785d840318e6b2fe2bc5d197351c01583e22e0",
+      "eval/agentic-research/manifests/career-w6-case-ids-2.json": "acb71e60d023b8146d7ba40f7354e4ac2c9959fbb9452a2a1333e27bc6235fdc",
+      "eval/agentic-research/manifests/career-w6-case-ids-3.json": "6224498520aacba13a1c7310432a264d9ef7c54651a48303b15d905b2c2359b8",
+      "eval/agentic-research/manifests/career-w6-case-ids-4.json": "42774c725b2e87e70e3e73fe73922491bbf4ac692ddff3b58a54aca52b854301"
+    },
+    "sampling": "MuSiQue dev full queries ordered by SHA256(20260919, question id); regression profile and sibling versions excluded; first version per source_question_id; answers and answerability labels not read (w6_case_ids.py)",
+    "questions": "400 unseen MuSiQue dev questions (196 answerable) in 4 blocks of 100",
+    "order": "before1 after1 after2 before2 before3 after3 after4 before4, 17:54-21:24; mode C; config eval/agentic-research/configs/career-x1.json; concurrency 2; corpus research_corpus_v1 (migration 260918_02 applied 2026-09-19)",
+    "command": "scripts/career-x1.sh --profile full --blocks eval/agentic-research/manifests/career-w6-case-ids (X1_STAMP=career_W6_x1b, X1_MODES=C)"
+  },
+  "decisionRule": "fixed before the run (plan section 5 W6 step 4): CI includes 0 and |mean| < 0.03 -> no measurable change; CI excludes 0 -> one bounded fix. The primary result fell between the two (CI includes 0, |mean| 0.034); the user chose on 2026-09-19 to treat the new 400 as the primary sample and close W6 without a fix, reporting the pooled result alongside.",
+  "derivation": "quality_diff.py (paired answer F1 over answerable questions, percentile bootstrap seed 20260918, 10000 resamples); cache_report.py for hit ratio and billed input (implicit hit 0.2, explicit hit 0.1, explicit write 1.25 of input price)",
+  "cache": {
+    "before": {
+      "tasks": 400,
+      "modelCalls": 4362,
+      "inputTokens": 30881159,
+      "cachedTokens": 44800,
+      "hitRatio": 0.0015,
+      "billedInputPerTask": 77113
+    },
+    "after": {
+      "tasks": 400,
+      "modelCalls": 4229,
+      "inputTokens": 28365131,
+      "cachedTokens": 22802398,
+      "hitRatio": 0.8039,
+      "billedInputPerTask": 21436,
+      "note": "one task recorded no model call; per-task figures divide by 400"
+    },
+    "billedInputPerTaskChange": -0.722,
+    "perBlockHitRatio": {
+      "before": "0.06%-0.23%",
+      "after": "80.18%-80.47%"
+    }
+  },
+  "statuses": {
+    "before": {
+      "C_1": {
+        "COMPLETED": 96,
+        "FAILED": 2,
+        "PARTIAL": 2
+      },
+      "C_2": {
+        "COMPLETED": 96,
+        "PARTIAL": 4
+      },
+      "C_3": {
+        "COMPLETED": 99,
+        "FAILED": 1
+      },
+      "C_4": {
+        "COMPLETED": 98,
+        "FAILED": 1,
+        "PARTIAL": 1
+      }
+    },
+    "after": {
+      "C_1": {
+        "COMPLETED": 100
+      },
+      "C_2": {
+        "COMPLETED": 98,
+        "FAILED": 2
+      },
+      "C_3": {
+        "COMPLETED": 98,
+        "FAILED": 2
+      },
+      "C_4": {
+        "COMPLETED": 97,
+        "FAILED": 2,
+        "PARTIAL": 1
+      }
+    }
+  },
+  "guardrails400": {
+    "before": {
+      "answerF1": 0.4932,
+      "answerEM": 0.352,
+      "evidenceF1Answerable": 0.6531,
+      "answerabilityAccuracy": 0.605,
+      "abstainedOnAnswerable": 47
+    },
+    "after": {
+      "answerF1": 0.4591,
+      "answerEM": 0.2908,
+      "evidenceF1Answerable": 0.6496,
+      "answerabilityAccuracy": 0.6275,
+      "abstainedOnAnswerable": 47
+    },
+    "contextCompactedTasks": {
+      "before": 0,
+      "after": 0
+    }
+  },
+  "pairedAnswerF1": {
+    "new400": {
+      "paired": 196,
+      "meanDiff": -0.0341,
+      "bootstrap95": [
+        -0.0798,
+        0.0107
+      ],
+      "up": 41,
+      "down": 48,
+      "dropClasses": {
+        "failed": 1,
+        "abstained": 15,
+        "still_abstained": 5,
+        "format": 23,
+        "wrong": 4
+      },
+      "before": {
+        "answerF1": 0.4932,
+        "answerEM": 0.352,
+        "abstained": 47,
+        "compactedTasks": 0
+      },
+      "after": {
+        "answerF1": 0.4591,
+        "answerEM": 0.2908,
+        "abstained": 47,
+        "compactedTasks": 0
+      }
+    },
+    "new400PerBlock": {
+      "1": {
+        "n": 55,
+        "meanDiff": 0.0226
+      },
+      "2": {
+        "n": 47,
+        "meanDiff": -0.1236
+      },
+      "3": {
+        "n": 47,
+        "meanDiff": -0.0597
+      },
+      "4": {
+        "n": 47,
+        "meanDiff": 0.0146
+      }
+    },
+    "pooled400plus45": {
+      "paired": 241,
+      "meanDiff": -0.0446,
+      "bootstrap95": [
+        -0.0876,
+        -0.0021
+      ],
+      "up": 51,
+      "down": 63,
+      "dropClasses": {
+        "failed": 1,
+        "abstained": 21,
+        "still_abstained": 9,
+        "format": 27,
+        "wrong": 5
+      },
+      "before": {
+        "answerF1": 0.4838,
+        "answerEM": 0.3402,
+        "abstained": 60,
+        "compactedTasks": 0
+      },
+      "after": {
+        "answerF1": 0.4392,
+        "answerEM": 0.2656,
+        "abstained": 63,
+        "compactedTasks": 0
+      }
+    },
+    "noiseBaseline": {
+      "paired": 45,
+      "meanDiff": 0.0592,
+      "bootstrap95": [
+        -0.0317,
+        0.1582
+      ],
+      "up": 13,
+      "down": 12,
+      "dropClasses": {
+        "failed": 0,
+        "abstained": 4,
+        "still_abstained": 4,
+        "format": 3,
+        "wrong": 1
+      },
+      "before": {
+        "answerF1": 0.3522,
+        "answerEM": 0.1556,
+        "abstained": 16,
+        "compactedTasks": 0
+      },
+      "after": {
+        "answerF1": 0.4113,
+        "answerEM": 0.2444,
+        "abstained": 17,
+        "compactedTasks": 0
+      },
+      "pair": "career_X1_mq80_after_C (73deab5) vs career_W6_noise_after_C (61d37d8), same 80 questions, mode C; not byte-identical code (W2-W5 and slim-down in between); 4 noise-run tasks failed on embedding NETWORK_ERROR"
+    },
+    "mq80Attribution": {
+      "paired": 45,
+      "meanDiff": -0.0905,
+      "bootstrap95": [
+        -0.207,
+        0.017
+      ],
+      "up": 10,
+      "down": 15,
+      "dropClasses": {
+        "failed": 0,
+        "abstained": 6,
+        "still_abstained": 4,
+        "format": 4,
+        "wrong": 1
+      },
+      "before": {
+        "answerF1": 0.4427,
+        "answerEM": 0.2889,
+        "abstained": 13,
+        "compactedTasks": 0
+      },
+      "after": {
+        "answerF1": 0.3522,
+        "answerEM": 0.1556,
+        "abstained": 16,
+        "compactedTasks": 0
+      }
+    }
+  },
+  "dropContributionNew400": {
+    "abstainedFlips": {
+      "down": 15,
+      "meanContribution": -0.056
+    },
+    "unabstainedFlips": {
+      "up": 11,
+      "meanContribution": 0.0254
+    },
+    "formatDown": -0.0318,
+    "formatUp": 0.0237
+  },
+  "runDirs": [
+    "local-data/agentic-research/runs/career_W6_x1b_{before,after}_C_{1..4}",
+    "local-data/agentic-research/runs/career_W6_noise_after_C"
+  ],
+  "conclusion": [
+    "Cost result holds at scale: hit ratio 0.15% -> 80.4%, billed input per task 77,113 -> 21,436 (-72%) on 400 unseen questions, same in every block.",
+    "No statistically significant answer-quality change on the 400 new questions: paired F1 -0.034, 95% CI [-0.080, +0.011]; a drop of up to about 0.08 cannot be excluded. EM 0.352 -> 0.291.",
+    "Pooled with the 45 questions that raised the concern: -0.045, CI [-0.088, -0.002]; that sample is biased toward a drop because it prompted the check.",
+    "Run-to-run noise on 45 questions is of the same size: re-running the after arm moved F1 by +0.059 (CI [-0.032, +0.158]); block means on the new 400 range from -0.12 to +0.02.",
+    "Where the loss sits: 15 questions switched from answered to 'sources do not ...' (-0.056 of the mean) against 11 the other way (+0.025); abstention count unchanged (47 -> 47). Format changes roughly cancel. Context compaction never triggered, so the compaction stub is not a cause."
+  ]
+}

@@ -36,12 +36,6 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
-        <!-- 关键词检索（可选）：仅 rag.keyword.type=es 时使用，版本由 Spring Boot BOM 管理 -->
-        <dependency>
-            <groupId>co.elastic.clients</groupId>
-            <artifactId>elasticsearch-java</artifactId>
-        </dependency>
-
         <!-- 解析 PDF / DOC / DOCX / Markdown 等 -->
         <dependency>
             <groupId>org.apache.tika</groupId>
@@ -113,7 +107,7 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- LightRAG 客户端归属/删除谓词的 HTTP 桩测试，版本与 okhttp 对齐 -->
+        <!-- 研究侧 HTTP 桩测试，版本与 okhttp 对齐 -->
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>
             <artifactId>mockwebserver</artifactId>

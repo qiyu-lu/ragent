@@ -186,19 +186,9 @@ public class SearchChannelProperties implements InitializingBean {
         private Vector vector = new Vector();
 
         /**
-         * 关键词检索配置
-         */
-        private Keyword keyword = new Keyword();
-
-        /**
          * 联网检索配置（You.com Search）
          */
         private WebSearch webSearch = new WebSearch();
-
-        /**
-         * 知识图谱检索配置
-         */
-        private Graph graph = new Graph();
     }
 
     @Data
@@ -209,26 +199,6 @@ public class SearchChannelProperties implements InitializingBean {
          * 一条向量通道一个总开关；关闭即全站无向量召回
          */
         private boolean enabled = true;
-    }
-
-    @Data
-    public static class Keyword {
-
-        /**
-         * 是否启用
-         * 仅当 rag.keyword.type != none（存在关键词检索实现）时才会真正生效
-         */
-        private boolean enabled = false;
-    }
-
-    @Data
-    public static class Graph {
-
-        /**
-         * 是否启用
-         * 仅当开启图谱后端（rag.graph.type != none）时才会真正生效
-         */
-        private boolean enabled = false;
     }
 
     @Data
@@ -305,18 +275,6 @@ public class SearchChannelProperties implements InitializingBean {
          * 向量模态最可信；意图定向与全局同属这一条通道，共用一个权重
          */
         private double vector = 1.0;
-
-        /**
-         * 关键词（BM25）权重
-         */
-        private double keyword = 1.0;
-
-        /**
-         * 图谱权重
-         * 图谱为新接入通道、跑在单一全局图上、证据仅经结果侧过滤，默认降权，
-         * 待归因日志验证其 Rerank 存活率后再上调；存活率长期为 0 说明当前是纯成本
-         */
-        private double graph = 0.5;
 
         /**
          * 联网检索权重

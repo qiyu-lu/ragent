@@ -300,10 +300,6 @@ html.dark *::-webkit-scrollbar-thumb:hover {
     @apply mx-auto w-full max-w-[1600px] px-8 py-8;
   }
 
-  .admin-layout .admin-content--full {
-    @apply min-h-0 max-w-none flex-1 px-0 py-0;
-  }
-
   .admin-layout .admin-topbar {
     @apply sticky top-0 z-20 border-b border-slate-200/70 bg-white/80 backdrop-blur;
   }

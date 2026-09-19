@@ -77,10 +77,8 @@ class MultiChannelRetrievalEngineTest {
                 channelResult(SearchChannelType.VECTOR, "vector", chunk("1", "body", "allowed", 0.9F)));
         SearchChannel web = channel("web", SearchChannelType.WEB_SEARCH,
                 channelResult(SearchChannelType.WEB_SEARCH, "web", chunk("web", "web body", 1F)));
-        SearchChannel graph = channel("graph", SearchChannelType.GRAPH,
-                channelResult(SearchChannelType.GRAPH, "graph", chunk("graph", "summary", 1F)));
         RetrievalScopeResolver resolver = mock(RetrievalScopeResolver.class);
-        var engine = new MultiChannelRetrievalEngine(List.of(vector, web, graph), List.of(),
+        var engine = new MultiChannelRetrievalEngine(List.of(vector, web), List.of(),
                 resolver, Runnable::run, new SearchChannelProperties());
 
         var result = engine.retrieveScopedKnowledgeChannels("query", RetrievalBudget.uniform(10),
@@ -92,7 +90,6 @@ class MultiChannelRetrievalEngineTest {
         assertEquals(1, result.chunks().size());
         verifyNoInteractions(resolver);
         verify(web, never()).search(any());
-        verify(graph, never()).search(any());
     }
 
     @Test
@@ -116,33 +113,33 @@ class MultiChannelRetrievalEngineTest {
 
     @Test
     void derivesAttributionFromFinalChunksByCollection() {
-        // 归属按「chunk 的库 ∈ 意图绑定库」推导，与到达通道无关：关键词证据同样获得归属，
+        // 归属按「chunk 的库 ∈ 意图绑定库」推导，与到达通道无关：联网通道证据同样获得归属，
         // 补充库证据不在任何命中意图绑定里、天然无归属，被后处理淘汰的证据不参与推导
         RetrievedChunk vectorChunk = chunk("v1", "A资料", "kb-a", 0.9F);
         RetrievedChunk discarded = chunk("v2", "被淘汰的A资料", "kb-a", 0.8F);
-        RetrievedChunk keywordChunk = chunk("k1", "B资料", "kb-b", 0.7F);
+        RetrievedChunk webChunk = chunk("k1", "B资料", "kb-b", 0.7F);
         RetrievedChunk supplementChunk = chunk("s1", "补充库资料", "kb-c", 0.6F);
 
         SearchChannel vector = channel("vector", SearchChannelType.VECTOR,
                 channelResult(SearchChannelType.VECTOR, "vector", vectorChunk, discarded));
-        SearchChannel keyword = channel("keyword", SearchChannelType.KEYWORD,
-                channelResult(SearchChannelType.KEYWORD, "keyword", keywordChunk, supplementChunk));
+        SearchChannel web = channel("web", SearchChannelType.WEB_SEARCH,
+                channelResult(SearchChannelType.WEB_SEARCH, "web", webChunk, supplementChunk));
 
         SearchResultPostProcessor finalSelection = mock(SearchResultPostProcessor.class);
         when(finalSelection.getOrder()).thenReturn(1);
         when(finalSelection.isEnabled(any(SearchContext.class))).thenReturn(true);
         when(finalSelection.process(anyList(), anyList(), any(SearchContext.class)))
-                .thenReturn(List.of(keywordChunk, vectorChunk, supplementChunk));
+                .thenReturn(List.of(webChunk, vectorChunk, supplementChunk));
 
-        KnowledgeRetrievalResult result = engine(List.of(vector, keyword), List.of(finalSelection),
+        KnowledgeRetrievalResult result = engine(List.of(vector, web), List.of(finalSelection),
                 directedScope(List.of(intent("A", "kb-a"), intent("B", "kb-b")),
                         List.of("kb-a", "kb-b"), List.of("kb-c")))
                 .retrieveKnowledgeChannels(new SubQuestionIntent("问题", List.of()), RetrievalBudget.uniform(10));
         Map<String, List<RetrievedChunk>> grouped = result.groupByIntent("multi_channel");
 
-        assertEquals(List.of(keywordChunk, vectorChunk, supplementChunk), result.chunks(), "不得改变最终后处理顺序");
+        assertEquals(List.of(webChunk, vectorChunk, supplementChunk), result.chunks(), "不得改变最终后处理顺序");
         assertEquals(List.of(vectorChunk), grouped.get("A"));
-        assertEquals(List.of(keywordChunk), grouped.get("B"), "关键词证据按库获得归属");
+        assertEquals(List.of(webChunk), grouped.get("B"), "联网通道证据按库获得归属");
         assertEquals(List.of(supplementChunk), grouped.get("multi_channel"));
         assertEquals(Set.of("A", "B"), result.retrievedIntentIds());
         assertEquals(Set.of("A", "B"), result.directedIntentIds());
@@ -229,8 +226,8 @@ class MultiChannelRetrievalEngineTest {
                         .build()
         );
         SearchChannel slow = mock(SearchChannel.class);
-        when(slow.getName()).thenReturn("graph");
-        when(slow.getType()).thenReturn(SearchChannelType.GRAPH);
+        when(slow.getName()).thenReturn("web");
+        when(slow.getType()).thenReturn(SearchChannelType.WEB_SEARCH);
         when(slow.isEnabled(any(SearchContext.class))).thenReturn(true);
         // Mockito 对接口 default 方法默认桩为 null，会被引擎的 nonNull 过滤悄悄吞掉——
         // 那样本测试只证明快通道无恙，降级出口本身反而没被测到，必须真调 default 实现
@@ -238,8 +235,8 @@ class MultiChannelRetrievalEngineTest {
         when(slow.search(any(SearchContext.class))).thenAnswer(invocation -> {
             Thread.sleep(1_000);
             return SearchChannelResult.builder()
-                    .channelType(SearchChannelType.GRAPH)
-                    .channelName("graph")
+                    .channelType(SearchChannelType.WEB_SEARCH)
+                    .channelName("web")
                     .chunks(List.of(chunk("slow", "慢通道资料", 0.8F)))
                     .build();
         });

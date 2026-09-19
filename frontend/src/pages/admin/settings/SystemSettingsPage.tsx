@@ -9,10 +9,8 @@ import {
   Database,
   Globe,
   HardDrive,
-  KeyRound,
   Minus,
-  RefreshCw,
-  Share2
+  RefreshCw
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -45,16 +43,6 @@ const VECTOR_CAPTIONS: Record<string, string> = {
 // 通道行空间紧凑，用短名
 const VECTOR_SHORT_CAPTIONS: Record<string, string> = {
   pg: "pgvector"
-};
-
-const KEYWORD_CAPTIONS: Record<string, string> = {
-  none: "未接入",
-  es: "Elasticsearch"
-};
-
-const GRAPH_CAPTIONS: Record<string, string> = {
-  none: "未接入",
-  lightrag: "LightRAG"
 };
 
 const STORAGE_CAPTIONS: Record<string, string> = {
@@ -122,19 +110,17 @@ function ArchCard({
   tone,
   label,
   value,
-  caption,
-  off
+  caption
 }: {
   icon: ComponentType<{ className?: string }>;
   tone: Tone;
   label: string;
   value: string;
   caption: string;
-  off?: boolean;
 }) {
   return (
-    <div className={cn("settings-arch-card", off && "is-off")}>
-      <span className={cn("settings-icon", off ? "is-slate" : `is-${tone}`)}>
+    <div className="settings-arch-card">
+      <span className={cn("settings-icon", `is-${tone}`)}>
         <Icon className="h-[18px] w-[18px]" />
       </span>
       <div className="min-w-0">
@@ -151,15 +137,13 @@ function ChannelRow({
   tone,
   name,
   meta,
-  channel,
-  backendMissing
+  channel
 }: {
   icon: ComponentType<{ className?: string }>;
   tone: Tone;
   name: string;
   meta: string;
   channel: RetrievalChannel;
-  backendMissing?: boolean;
 }) {
   return (
     <div className={cn("settings-channel", !channel.enabled && "is-off")}>
@@ -173,11 +157,7 @@ function ChannelRow({
         </div>
       </div>
       <span className="settings-channel-weight">权重 {channel.weight.toFixed(1)}</span>
-      {channel.enabled && backendMissing ? (
-        <span className="settings-tag shrink-0 bg-amber-50 text-amber-600">后端未接入</span>
-      ) : (
-        <StateTag on={channel.enabled} />
-      )}
+      <StateTag on={channel.enabled} />
     </div>
   );
 }
@@ -370,12 +350,8 @@ export function SystemSettingsPage() {
   const { search, features } = rag;
   const { channels, fusion, scope } = search;
 
-  const keywordMissing = backends.keyword.type === "none";
-  const graphMissing = backends.graph.type === "none";
   const enabledChannelCount = [
     channels.vector.enabled,
-    channels.keyword.enabled,
-    channels.graph.enabled,
     channels.webSearch.enabled
   ].filter(Boolean).length;
 
@@ -402,7 +378,7 @@ export function SystemSettingsPage() {
         </div>
       </div>
 
-      <Section title="架构选型" hint="引擎与四类后端组件，切换需修改 yaml 并重启">
+      <Section title="架构选型" hint="引擎与后端组件，切换需修改 yaml 并重启">
         <div className="settings-arch-grid">
           <ArchCard
             icon={Cpu}
@@ -419,22 +395,6 @@ export function SystemSettingsPage() {
             caption={VECTOR_CAPTIONS[backends.vector.type] ?? backends.vector.type}
           />
           <ArchCard
-            icon={KeyRound}
-            tone="amber"
-            label="关键词引擎"
-            value={backends.keyword.type}
-            caption={KEYWORD_CAPTIONS[backends.keyword.type] ?? backends.keyword.type}
-            off={keywordMissing}
-          />
-          <ArchCard
-            icon={Share2}
-            tone="emerald"
-            label="知识图谱"
-            value={backends.graph.type}
-            caption={GRAPH_CAPTIONS[backends.graph.type] ?? backends.graph.type}
-            off={graphMissing}
-          />
-          <ArchCard
             icon={HardDrive}
             tone="sky"
             label="对象存储"
@@ -444,7 +404,7 @@ export function SystemSettingsPage() {
         </div>
       </Section>
 
-      <Section title="检索管线" hint={`${enabledChannelCount} / 4 通道启用 · 单通道超时 ${formatDurationMs(channels.timeoutMs)}`}>
+      <Section title="检索管线" hint={`${enabledChannelCount} / 2 通道启用 · 单通道超时 ${formatDurationMs(channels.timeoutMs)}`}>
         <div className="settings-card">
           <div className="settings-pipeline">
             <div>
@@ -459,22 +419,6 @@ export function SystemSettingsPage() {
                   name="向量检索"
                   meta={VECTOR_SHORT_CAPTIONS[backends.vector.type] ?? backends.vector.type}
                   channel={channels.vector}
-                />
-                <ChannelRow
-                  icon={KeyRound}
-                  tone="amber"
-                  name="关键词检索"
-                  meta={keywordMissing ? "后端未接入" : `Elasticsearch · ${backends.keyword.index}`}
-                  channel={channels.keyword}
-                  backendMissing={keywordMissing}
-                />
-                <ChannelRow
-                  icon={Share2}
-                  tone="emerald"
-                  name="图谱检索"
-                  meta={graphMissing ? "后端未接入" : `LightRAG · ${backends.graph.queryMode}`}
-                  channel={channels.graph}
-                  backendMissing={graphMissing}
                 />
                 <ChannelRow
                   icon={Globe}
@@ -714,27 +658,6 @@ export function SystemSettingsPage() {
               <KV label="资产桶（公共读）" value={backends.storage.assetBucket} mono />
             </div>
           </div>
-          {!keywordMissing ? (
-            <div className="settings-card">
-              <div className="settings-card-title">Elasticsearch</div>
-              <div className="settings-kv-grid">
-                <KV label="地址" value={backends.keyword.uris ?? "—"} mono />
-                <KV label="共享索引" value={backends.keyword.index ?? "—"} mono />
-                <KV label="写入分词器" value={backends.keyword.analyzer ?? "—"} mono />
-                <KV label="查询分词器" value={backends.keyword.searchAnalyzer ?? "—"} mono />
-              </div>
-            </div>
-          ) : null}
-          {!graphMissing ? (
-            <div className="settings-card">
-              <div className="settings-card-title">LightRAG</div>
-              <div className="settings-kv-grid">
-                <KV label="服务地址" value={backends.graph.baseUrl ?? "—"} mono />
-                <KV label="查询模式" value={backends.graph.queryMode ?? "—"} mono />
-                <KV label="Embedding 模型" value={backends.graph.embeddingModel || "—"} mono />
-              </div>
-            </div>
-          ) : null}
           <div className="settings-card">
             <div className="settings-card-title">上传限额</div>
             <div className="settings-kv-grid">

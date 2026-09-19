@@ -192,8 +192,7 @@ public class MultiChannelRetrievalEngine {
         // 按通道类型枚举序做稳定排序：通道并行执行、下游融合（RRF）与归因均与顺序无关，
         // 这里排序仅为日志/派发顺序稳定可复现，不承载任何检索优先级语义
         List<SearchChannel> enabledChannels = searchChannels.stream()
-                .filter(channel -> !sourceBound || channel.getType() == SearchChannelType.VECTOR
-                        || channel.getType() == SearchChannelType.KEYWORD)
+                .filter(channel -> !sourceBound || channel.getType() == SearchChannelType.VECTOR)
                 .filter(channel -> channel.isEnabled(context))
                 .sorted(Comparator.comparingInt(channel -> channel.getType().ordinal()))
                 .toList();

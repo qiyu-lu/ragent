@@ -56,15 +56,13 @@ public class SystemSettingsVO {
     }
 
     /**
-     * 后端组件选型，对应 yaml 里 rag.storage/vector/keyword/graph 四个 type 开关
+     * 后端组件选型，存储取 yaml 里 rag.storage.type，向量固定为 pgvector
      */
     @Data
     @Builder
     public static class BackendSettings {
         private StorageBackend storage;
         private VectorBackend vector;
-        private KeywordBackend keyword;
-        private GraphBackend graph;
 
         @Data
         @Builder
@@ -89,33 +87,6 @@ public class SystemSettingsVO {
              * 固定为 pg（pgvector）
              */
             private String type;
-        }
-
-        @Data
-        @Builder
-        public static class KeywordBackend {
-
-            /**
-             * none / es，es 连接信息仅 type=es 时有意义
-             */
-            private String type;
-            private String uris;
-            private String index;
-            private String analyzer;
-            private String searchAnalyzer;
-        }
-
-        @Data
-        @Builder
-        public static class GraphBackend {
-
-            /**
-             * none / lightrag
-             */
-            private String type;
-            private String baseUrl;
-            private String queryMode;
-            private String embeddingModel;
         }
     }
 
@@ -178,8 +149,6 @@ public class SystemSettingsVO {
         public static class ChannelSettings {
             private Long timeoutMs;
             private Channel vector;
-            private Channel keyword;
-            private Channel graph;
             private WebSearchChannel webSearch;
         }
 

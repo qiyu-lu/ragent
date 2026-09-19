@@ -50,8 +50,8 @@ class DeduplicationPostProcessorTest {
 
     private List<SearchChannelResult> singleChannel(List<RetrievedChunk> chunks) {
         return List.of(SearchChannelResult.builder()
-                .channelType(SearchChannelType.KEYWORD)
-                .channelName("Keyword")
+                .channelType(SearchChannelType.VECTOR)
+                .channelName("Vector")
                 .chunks(chunks)
                 .latencyMs(1)
                 .build());

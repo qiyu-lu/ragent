@@ -16,19 +16,6 @@ export interface SystemSettings {
     vector: {
       type: string;
     };
-    keyword: {
-      type: string;
-      uris?: string | null;
-      index?: string | null;
-      analyzer?: string | null;
-      searchAnalyzer?: string | null;
-    };
-    graph: {
-      type: string;
-      baseUrl?: string | null;
-      queryMode?: string | null;
-      embeddingModel?: string | null;
-    };
   };
   rag: {
     default: {
@@ -55,8 +42,6 @@ export interface SystemSettings {
       channels: {
         timeoutMs: number;
         vector: RetrievalChannel;
-        keyword: RetrievalChannel;
-        graph: RetrievalChannel;
         webSearch: RetrievalChannel & {
           count: number;
           timeoutSeconds: number;

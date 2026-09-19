@@ -81,20 +81,7 @@ final class ChannelAttribution {
     }
 
     /**
-     * 命中给定通道的 chunk 数，用于「图谱存活率」这类单通道口径的前后对比
-     */
-    static long countOfChannel(List<RetrievedChunk> chunks,
-                               Map<String, Set<SearchChannelType>> index,
-                               SearchChannelType channel) {
-        return chunks.stream()
-                .map(RetrievedChunkKey::of)
-                .map(index::get)
-                .filter(set -> set != null && set.contains(channel))
-                .count();
-    }
-
-    /**
-     * 通道分布转中文可读串，如「意图定向=4 图谱=8 关键词=6」
+     * 通道分布转中文可读串，如「向量=4 联网=2」
      */
     static String format(Map<SearchChannelType, Integer> counts) {
         if (counts.isEmpty()) {
@@ -111,8 +98,6 @@ final class ChannelAttribution {
     static String label(SearchChannelType type) {
         return switch (type) {
             case VECTOR -> "向量";
-            case KEYWORD -> "关键词";
-            case GRAPH -> "图谱";
             case WEB_SEARCH -> "联网";
             case HYBRID -> "混合";
         };

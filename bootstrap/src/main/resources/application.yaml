@@ -68,21 +68,6 @@ rag:
       region: cn-hangzhou
       public-url:  # 虚拟主机式基址（含 bucket 子域），如 https://ragent-assets.oss-cn-hangzhou.aliyuncs.com；留空由 endpoint 推导
 
-  keyword:
-    type: none  # 可选 none / es
-    es:
-      uris: http://127.0.0.1:9200
-      index: rag_keyword_store  # 全库共享索引，按 collection_name 字段区分知识库
-      analyzer: ik_max_word
-      search-analyzer: ik_smart
-
-  graph:
-    type: none  # 图谱后端总开关，可选 none / lightrag。lightrag 即接入后端供「后台可视化 / 检索读取」；是否参与检索、是否写入分别由 rag.search.channels.graph.enabled 与下方 ingestion.enabled 独立控制
-    lightrag:
-      base-url: http://127.0.0.1:9621
-      query-mode: hybrid
-    embedding-model: qwen-emb-8b  # 与 LightRAG 的 SiliconFlow Qwen3-Embedding-8B 配置一致
-
   default:
     collection-name: rag_default_store
     dimension: 1536
@@ -139,7 +124,7 @@ rag:
   search:
     # 检索漏斗三段预算，各自独立、单调收窄，启动时校验 recall-budget ≥ default-top-k 且 rerank-candidate-limit ≥ default-top-k
     default-top-k: 10           # ③ 最终进 LLM 的条数（产品语义的 topK）
-    recall-budget: 20           # ① 每通道召回条数（绝对值，向量意图路/关键词/图谱共用）；须 ≥ default-top-k，0=回退 default-top-k
+    recall-budget: 20           # ① 每通道召回条数（绝对值，各通道共用）；须 ≥ default-top-k，0=回退 default-top-k
     request-level-refill-enabled: false # 多子问题请求级去重与公平回填；重复评测通过门槛后再默认开启
     # 检索作用域：本次请求该看哪些知识库，与用什么模态检索无关，故与 channels 平级、三条通道共读
     # 判定只看 KB 意图最高分，不看意图个数；关掉任一通道都不影响其余通道的作用域
@@ -152,10 +137,6 @@ rag:
       timeout-ms: 15000     # 单通道查询超时上限（毫秒）
       vector:
         enabled: true       # 向量通道总开关
-      keyword:
-        enabled: false      # 检索范围读引擎解析好的作用域，与向量通道同源
-      graph:
-        enabled: false    # 图谱检索通道开关：false 不参与问答召回（后端仍在，后台可视化照常）；置 true 前需先开 rag.graph.type=lightrag
       web-search:
         enabled: false
         count: 5
@@ -167,8 +148,6 @@ rag:
       rerank-candidate-limit: 40  # ② RRF 融合后送入 Rerank 的候选池上限，<=0 不截断（经验值 40~100）
       channel-weights:
         vector: 1.0
-        keyword: 1.0
-        graph: 0.8
         web-search: 0.5
 
   trace:

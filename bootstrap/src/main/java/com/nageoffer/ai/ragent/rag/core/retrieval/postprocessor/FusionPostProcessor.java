@@ -154,8 +154,6 @@ public class FusionPostProcessor implements SearchResultPostProcessor {
         SearchChannelProperties.ChannelWeights w = properties.getFusion().getChannelWeights();
         return switch (type) {
             case VECTOR -> w.getVector();
-            case KEYWORD -> w.getKeyword();
-            case GRAPH -> w.getGraph();
             case WEB_SEARCH -> w.getWebSearch();
             case HYBRID -> w.getDefaultWeight();
         };

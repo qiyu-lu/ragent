@@ -111,10 +111,7 @@ public class RerankPostProcessor implements SearchResultPostProcessor {
     }
 
     /**
-     * 归因日志：对比 Rerank 前后各通道的候选数，重点是「图谱证据存活率」
-     * <p>
-     * 若图谱大量进入 Rerank 却几乎不存活，说明其当前是纯成本（塞候选、占名额、被淘汰），
-     * 应下调图谱权重（{@code fusion.channel-weights.graph}）或先优化其长证据的可排性，再决定去留
+     * 归因日志：对比 Rerank 前后各通道的候选数
      */
     private void logAttribution(List<RetrievedChunk> before,
                                 List<RetrievedChunk> after,
@@ -127,15 +124,5 @@ public class RerankPostProcessor implements SearchResultPostProcessor {
                 ChannelAttribution.format(ChannelAttribution.countByChannel(before, index)),
                 after.size(),
                 ChannelAttribution.format(ChannelAttribution.countByChannel(after, index)));
-
-        // 按图谱通道在场判断而非 graphIn > 0：0/0 恰是最需要看见的形态——图谱召回了却在融合截断处全军覆没，
-        // 按输入量守门会让这行日志在事故发生时恒沉默
-        boolean graphChannelPresent = results.stream()
-                .anyMatch(result -> result.getChannelType() == SearchChannelType.GRAPH);
-        if (graphChannelPresent) {
-            long graphIn = ChannelAttribution.countOfChannel(before, index, SearchChannelType.GRAPH);
-            long graphOut = ChannelAttribution.countOfChannel(after, index, SearchChannelType.GRAPH);
-            log.info("检索归因 - 图谱证据存活: {}/{}", graphOut, graphIn);
-        }
     }
 }

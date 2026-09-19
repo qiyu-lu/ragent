@@ -20,8 +20,6 @@ package com.nageoffer.ai.ragent.rag.controller;
 import com.nageoffer.ai.ragent.framework.convention.Result;
 import com.nageoffer.ai.ragent.framework.web.Results;
 import com.nageoffer.ai.ragent.infra.config.AIModelProperties;
-import com.nageoffer.ai.ragent.rag.config.GraphProperties;
-import com.nageoffer.ai.ragent.rag.config.KeywordProperties;
 import com.nageoffer.ai.ragent.rag.config.MemoryProperties;
 import com.nageoffer.ai.ragent.rag.config.OrchestrationProperties;
 import com.nageoffer.ai.ragent.rag.config.RAGConfigProperties;
@@ -55,8 +53,6 @@ public class RAGSettingsController {
 
     private final OrchestrationProperties orchestrationProperties;
     private final RagStorageProperties ragStorageProperties;
-    private final KeywordProperties keywordProperties;
-    private final GraphProperties graphProperties;
     private final RAGDefaultProperties ragDefaultProperties;
     private final RAGConfigProperties ragConfigProperties;
     private final RagTraceProperties ragTraceProperties;
@@ -96,19 +92,6 @@ public class RAGSettingsController {
                 .storage(toStorageBackend(ragStorageProperties))
                 .vector(BackendSettings.VectorBackend.builder()
                         .type("pg")
-                        .build())
-                .keyword(BackendSettings.KeywordBackend.builder()
-                        .type(keywordProperties.getType())
-                        .uris(keywordProperties.getEs().getUris())
-                        .index(keywordProperties.getEs().getIndex())
-                        .analyzer(keywordProperties.getEs().getAnalyzer())
-                        .searchAnalyzer(keywordProperties.getEs().getSearchAnalyzer())
-                        .build())
-                .graph(BackendSettings.GraphBackend.builder()
-                        .type(graphProperties.getType())
-                        .baseUrl(graphProperties.getLightrag().getBaseUrl())
-                        .queryMode(graphProperties.getLightrag().getQueryMode())
-                        .embeddingModel(graphProperties.getEmbeddingModel())
                         .build())
                 .build();
     }
@@ -176,14 +159,6 @@ public class RAGSettingsController {
                         .vector(SearchSettings.Channel.builder()
                                 .enabled(channels.getVector().isEnabled())
                                 .weight(weights.getVector())
-                                .build())
-                        .keyword(SearchSettings.Channel.builder()
-                                .enabled(channels.getKeyword().isEnabled())
-                                .weight(weights.getKeyword())
-                                .build())
-                        .graph(SearchSettings.Channel.builder()
-                                .enabled(channels.getGraph().isEnabled())
-                                .weight(weights.getGraph())
                                 .build())
                         .webSearch(SearchSettings.WebSearchChannel.builder()
                                 .enabled(channels.getWebSearch().isEnabled())

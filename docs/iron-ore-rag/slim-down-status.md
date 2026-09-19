@@ -31,8 +31,7 @@
 | --- | --- | --- | --- | --- | --- |
 | 基线 | 1275（含计划两文件） | 60,349 | 407 | Py 41、Java 13 + 260 | `20c5951` |
 | `slim-1` | 1052 | 60,349 | 407 | Py 41、Java 13 + 260 | `cc83b83` |
-
-jar 数口径：`./mvnw -o -pl bootstrap -am dependency:list` 输出去重后的 `group:artifact:jar` 个数（B1—B5 未改 pom，基线同值）。
+- jar 数口径：`./mvnw -o -pl bootstrap -am dependency:list` 输出去重后的 `group:artifact:jar` 个数（B1—B5 未改 pom，基线同值）。
 
 ## 遗留问题与计划外发现
 

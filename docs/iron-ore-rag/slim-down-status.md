@@ -30,7 +30,7 @@
 - 冒烟做法（B6 起每批，全部通过）：用 `schema_pg.sql` + `init_data_pg.sql` 建临时库 `slim_smoke`、Redis 用 db 7，`stub-upstream.sh` + `--spring.profiles.active=stub` 起应用，登录 → 建库 → 上传 → 切块 → 问答 → 研究任务 → 删库，结束删临时库。本机 `ragent` 库缺研究表（`t_research_run`），不能直接做研究冒烟。
 
 ## 遗留问题与计划外发现
-- B11：X2 v2 跑在瘦身后的代码上，同时算作 W2 的回归。T1 有 1 次重复在注入故障前执行者卡住（驱动 120 s 超时，库已删、无线程转储，原因未查明），已如实写进改动说明；要查就在驱动超时时先 `jstack`。X3 单种子的“30% 时治理后 100%”经 4 个种子合并为 98.5%。`../ragent-x1`、`../ragent-x3` 工作树未移除（实验脚本按需重建）。
+- B11：X2 v2 跑在瘦身后的代码上，同时算作 W2 的回归。T1 有 1 次重复在注入故障前执行者卡住（驱动 120 s 超时，库已删、无线程转储，原因未查明），已如实写进改动说明；要查就在驱动超时时先 `jstack`。X3 单种子的“30% 时治理后 100%”经 4 个种子合并为 98.5%。`../ragent-x1`、`../ragent-x3` 工作树已移除（用户同意；`career-x1.sh`、`career-x3.sh` 下次运行时自动重建）。
 - B10 本地清理（用户同意）：本机 `ragent` 已执行 `260919_01_drop_intent_node.sql`（`t_intent_node` 4 行），删 Redis db 0 的 `ragent:intent:tree`，删 `t_agent_prompt` 中 `SYSTEM_CHAT`、`MCP_ANSWER`、`MIXED_ANSWER` 3 行残留。B10 计划外：`iron-ore-demo` profile 的 `fallback-mode: empty` 随配置项删除，该 profile 现检索全部可读库；`KB_ANSWER` 种子提示词里仍描述“意图补充规则 `<rules>`”（DB 可编辑内容，未改）；`RetrievalCapture` 与 `retrieve(..., capture)` 重载在 B9 后已无调用方，未删；前端 `traceUtils.ts` 的 `intent-resolve` 展示映射保留（旧链路记录仍可显示）。`rag/` 现 189 个文件 / 1.8 万行。
 - **待用户决定（B8）**：MCP SDK 仍经 `agentscope-core 2.0.1` 传递引入；此前根 pom 把它钉在 1.1.2，删版本管理后研究运行时改用 agentscope 自带的 0.17.0（jar 数因此只 −1）。回归与研究冒烟通过；要保持 W1—W5 时的 classpath 就在根 pom 加回 1.1.2 的版本钉。B8 计划外：`MIXED_ANSWER`（KB + MCP 场景）随 `MCP_ANSWER` 一并删槽位与种子行；本地库残留的两行已于 B10 清理时删除。前端 `traces/traceUtils.ts` 里 `GUIDANCE` / `guidance-detect` 的展示映射未动（计划本批不动前端）。
 - 本地未跟踪目录未删（自动审批拦截了 `rm -rf`，待用户手动或授权）：`.agents/`、`.codex/`（空）、根 `.vite/`（12 KB）、`robot-gateway/ros1_ws/`（3.7 MB，只有 catkin 构建产物，`src/` 无文件）；另有 `eval/context-selection/`、`eval/iron-ore/` 下残留的 `__pycache__/`。`ros1_ws` 删除后可去掉 `.gitignore` 里 5 行 `/robot-gateway/ros1_ws/*`。

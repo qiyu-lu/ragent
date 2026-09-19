@@ -4,11 +4,11 @@
 
 | 项 | 值 |
 | --- | --- |
-| 更新时间 | 2026-09-19（W6 完成，标签 `career-w6`；按用户决定以新 400 题为准结项，未修） |
-| 当前工作项 | **W7**（尚未开始；可砍），之后 S6 |
+| 更新时间 | 2026-09-19（W7 代码已提交 `804ecbf`，X6 全量运行中；W6 已完成，标签 `career-w6`） |
+| 当前工作项 | **W7**（X6 全量运行中，21:47 起约 3 小时；待写结论与标签），之后 S6 |
 | 分支 / 提交 | `feat/llm-backend-hardening`；标签 `career-w1`、`career-w3`、`career-w2`、`career-w4`、`career-w5`、`career-w6` |
-| 回归通过数 | `bash scripts/validate-agentic-research-p7.sh`：W6 准备后 Python 53/53（W5 后 41）、Java 13 + 260（W4 后 13 + 247），约 40 s；另有 `validate-agentic-research-p2-database.sh` 结构校验 |
-| 最近的运行目录 | X2：`local-data/agentic-research/runs/career_X2_v2/`（重复 20 次；单次 `career_X2_v1/`）；X3：`runs/career_X3_v2/`（4 个种子；单种子 `career_X3_v1/`）；X1：`runs/career_X1_v1_*`；W6：`runs/career_W6_x1b_{before,after}_C_{1..4}`、噪声基线 `career_W6_noise_after_C`、归因 `career_W6_*_quality_diff.{md,json}` 与 `career_X1_mq80_quality_diff.*`；X5：`runs/career_X5_real_v1/`（模拟上游 `career_X5_stub_v1/`） |
+| 回归通过数 | `bash scripts/validate-agentic-research-p7.sh`：W7 后 Python 53/53、Java 13 + 211（记录过的 260 早于删除测试的重构 `e2e7e5c`、`6120945` 等，未逐项核对），约 40 s；另有 `validate-agentic-research-p2-database.sh` 结构校验 |
+| 最近的运行目录 | X6：`runs/career_X6_v1/`（日志 `runs/career_X6_v1.log`）；X2：`local-data/agentic-research/runs/career_X2_v2/`（重复 20 次；单次 `career_X2_v1/`）；X3：`runs/career_X3_v2/`（4 个种子；单种子 `career_X3_v1/`）；X1：`runs/career_X1_v1_*`；W6：`runs/career_W6_x1b_{before,after}_C_{1..4}`、噪声基线 `career_W6_noise_after_C`、归因 `career_W6_*_quality_diff.{md,json}` 与 `career_X1_mq80_quality_diff.*`；X5：`runs/career_X5_real_v1/`（模拟上游 `career_X5_stub_v1/`） |
 
 ## 进度
 
@@ -32,7 +32,7 @@
 
 ## 下一步（下个会话）
 
-按计划 §5 的 W7：复用 W3 模拟上游与 `x2_takeover.py` 的多 JVM 启动，新增 `x6_capacity.py` 与 `scripts/career-x6.sh`，300 个积压任务 × 1/2/3 实例 × 3 次；零接口费。时间不够可砍，直接做 S6。临时工作树 `../ragent-w6`（before @ `65c99c7`、after @ `61d37d8`）可用 `git worktree remove` 删除。
+X6 跑完后（`runs/career_X6_v1/x6-report.md` 存在；若中断，用 `X6_STAMP=career_X6_v1 bash scripts/career-x6.sh` 续跑，已完成的格跳过）：写 `manifests/career-x6-2026-09-19.json`，在 W2 改动说明追加“容量”一节，打标签 `career-w7`，然后 S6。试跑（40 任务 × 3 实例、轮询 1 s）：吞吐 37.3 条/分钟，槽位上限 41.6；拒绝 0，不变量 0 失败。临时工作树 `../ragent-w6` 可 `git worktree remove`。
 
 ## 已知事实与遗留问题
 

@@ -4,9 +4,9 @@
 
 | 项 | 值 |
 | --- | --- |
-| 更新时间 | 2026-09-20（S6 三个会话全部完成：README 已重写并提交；复习笔记 11 篇与面试问答 1 篇在 `docs/iron-ore-rag/notes/`，按计划留在工作区不提交） |
-| 当前工作项 | **S6**（简历条目、README、面试卡；结构见计划 §10） |
-| 分支 / 提交 | `feat/llm-backend-hardening`；标签 `career-w1`、`career-w3`、`career-w2`、`career-w4`、`career-w5`、`career-w6`、`career-w7` |
+| 更新时间 | 2026-09-20（**冲刺已收尾**：W1—W7 与 S6 全部完成，笔记与面试问答已入库，两条分支已推送到 `origin`） |
+| 当前工作项 | **无**。冲刺结束，后续改动另起计划 |
+| 分支 / 提交 | `feat/llm-backend-hardening` 与 `research/iron-ore-rag` 同为收尾提交，均已推送；标签 `career-w1`—`career-w7`、收尾标签 `career-done`（另有基线 `career-v0-baseline`） |
 | 回归通过数 | `bash scripts/validate-agentic-research-p7.sh`：W7 后 Python 53/53、Java 13 + 211（记录过的 260 早于删除测试的重构 `e2e7e5c`、`6120945` 等，未逐项核对），约 40 s；另有 `validate-agentic-research-p2-database.sh` 结构校验 |
 | 最近的运行目录 | X6：`runs/career_X6_v1/`（日志 `runs/career_X6_v1.log`）；X2：`local-data/agentic-research/runs/career_X2_v2/`（重复 20 次；单次 `career_X2_v1/`）；X3：`runs/career_X3_v2/`（4 个种子；单种子 `career_X3_v1/`）；X1：`runs/career_X1_v1_*`；W6：`runs/career_W6_x1b_{before,after}_C_{1..4}`、噪声基线 `career_W6_noise_after_C`、归因 `career_W6_*_quality_diff.{md,json}` 与 `career_X1_mq80_quality_diff.*`；X5：`runs/career_X5_real_v1/`（模拟上游 `career_X5_stub_v1/`） |
 
@@ -30,9 +30,9 @@
 - W4（JUnit + 真实 PostgreSQL/pgvector）：越权矩阵 299 项全部符合（173 允许、126 拒绝，拒绝时业务服务未被调用）；私有库放最佳匹配时，其他用户 TopK=1 仍得到公开库的块（召回前过滤）。
 - W5（调研表 V1.2/V1.3 各 79 块；真实上游 SiliconFlow 单次运行，模拟上游复现同样的块数与命中）：原样重新入库、回退旧版上游调用 0；V1.2→V1.3 重嵌入 2/79 块，计费 token 45,722→1,368（2.99%）；块表与 pgvector 同事务先删后插已由集成测试证明。限制：表格按行累加分组，表中插一行会使该表后续块全部失效；ES/LightRAG/Milvus 的先删后插不在事务内。
 
-## 下一步（下个会话）
+## 收尾（2026-09-20）
 
-S6 三项产出已全部完成（2026-09-20）。剩下的收尾按 [career-s6-plan.md](career-s6-plan.md) §5：打标签 `career-done`、提交 `docs: close out the career sprint`，由用户决定何时做。`notes/` 下 12 个文件（11 篇复习笔记 + 面试问答）是否入库也由用户决定——仓库公开且简历挂着链接。（W6 的临时工作树 `../ragent-w6` 已于 2026-09-20 删除；需要重建“前”臂时用 `git worktree add` 检出 `career-v0-baseline`。）
+七项加固（W1—W7）与三份产出（README、11 篇复习笔记、82 题面试问答）全部完成并入库，标签 `career-done` 打在收尾提交上。本文件此后只在有新结论时更新，不再逐会话维护。复现旧版本：`git worktree add` 检出 `career-v0-baseline` 得到治理前的“前”臂（W6 用过的临时工作树 `../ragent-w6` 已删除）。下面两节是长期有效的部分——引用数字时照抄“结果摘要”的条件，“已知事实与遗留问题”里的每一条都还没解决。
 
 ## 已知事实与遗留问题
 

@@ -1,0 +1,142 @@
+{
+  "experiment": "X6 backlog drain capacity across instances (career sprint W7)",
+  "date": "2026-09-19",
+  "finished": "2026-09-20 00:53",
+  "upstream": "simulated upstream (scripts/stub-upstream.sh), fixed chat latency 700-900 ms; not a real provider, zero API cost",
+  "commit": "804ecbf",
+  "setup": {
+    "basis": "stub upstream, separate executor JVMs sharing one run database; all tasks created on instance a through ResearchRunService.create()",
+    "command": "bash scripts/career-x6.sh (X6_STAMP=career_X6_v1); eval/agentic-research/x6_capacity.py --tasks 300 --instances 1,2,3 --repeat 3 --poll 5 --control-poll 1 --control-repeat 1",
+    "perInstance": {
+      "slots": 2,
+      "maxConcurrentModelCalls": 2,
+      "leaseSeconds": 30,
+      "heartbeatSeconds": 10
+    },
+    "pollSeconds": {
+      "production": 5,
+      "control": 1
+    },
+    "idleSecondsBeforeSubmit": 30,
+    "tasksPerCell": 300,
+    "repetitions": {
+      "poll5": 3,
+      "poll1": 1
+    },
+    "runDir": "local-data/agentic-research/runs/career_X6_v1 (x6-report.md, x6-summary.json, per-cell instance logs and result.json)",
+    "note": "each cell gets a fresh isolated run database and a fresh stub upstream; a small fixed corpus is imported once before the matrix"
+  },
+  "definitions": {
+    "drain": "from the submission of the 300 tasks to the last terminal event, database clock",
+    "queueWait": "task creation to its first claim; percentiles are nearest-rank",
+    "serviceTime": "first RUN_STARTED to the terminal event",
+    "slotBoundPerMin": "instances x slots / mean service time, the ceiling if claiming were free and instantaneous",
+    "claimCalls": "application-side timing of the claim statement (pooled connection + transaction + statements); one call may claim several tasks, up to the free slots",
+    "invariants": "started exactly once by one executor, no takeover or release, exactly one terminal event, at most one ARTIFACT, contiguous event sequence, status COMPLETED"
+  },
+  "results": {
+    "poll5": {
+      "1": {
+        "repetitions": 3,
+        "throughputPerMin": {"mean": 12.16, "min": 12.13, "max": 12.17},
+        "speedupVs1": 1.0,
+        "slotBoundPerMin": 13.99,
+        "queueWaitP50s": 718.43,
+        "queueWaitP95s": 1399.34,
+        "rejectedAtSubmit": 0,
+        "runsInvariantFailed": "0 / 900",
+        "claimMeanMs": 5.02,
+        "claimMaxMs": 70.17,
+        "idleClaimsPerSecPerInstance": 0.2
+      },
+      "2": {
+        "repetitions": 3,
+        "throughputPerMin": {"mean": 24.04, "min": 23.92, "max": 24.1},
+        "speedupVs1": 1.98,
+        "slotBoundPerMin": 28.01,
+        "queueWaitP50s": 363.61,
+        "queueWaitP95s": 702.64,
+        "rejectedAtSubmit": 0,
+        "runsInvariantFailed": "0 / 900",
+        "claimMeanMs": 4.92,
+        "claimMaxMs": 85.14,
+        "idleClaimsPerSecPerInstance": 0.2
+      },
+      "3": {
+        "repetitions": 3,
+        "throughputPerMin": {"mean": 35.84, "min": 35.82, "max": 35.85},
+        "speedupVs1": 2.95,
+        "slotBoundPerMin": 41.84,
+        "queueWaitP50s": 242.22,
+        "queueWaitP95s": 469.59,
+        "rejectedAtSubmit": 0,
+        "runsInvariantFailed": "0 / 900",
+        "claimMeanMs": 5.61,
+        "claimMaxMs": 85.85,
+        "idleClaimsPerSecPerInstance": 0.2
+      }
+    },
+    "poll1": {
+      "1": {
+        "repetitions": 1,
+        "throughputPerMin": 13.32,
+        "speedupVs1": 1.0,
+        "slotBoundPerMin": 13.93,
+        "queueWaitP50s": 660.67,
+        "queueWaitP95s": 1274.11,
+        "rejectedAtSubmit": 0,
+        "runsInvariantFailed": "0 / 300",
+        "claimMeanMs": 4.79,
+        "claimMaxMs": 12.28,
+        "idleClaimsPerSecPerInstance": 1.0
+      },
+      "2": {
+        "repetitions": 1,
+        "throughputPerMin": 26.47,
+        "speedupVs1": 1.99,
+        "slotBoundPerMin": 27.88,
+        "queueWaitP50s": 331.31,
+        "queueWaitP95s": 634.34,
+        "rejectedAtSubmit": 0,
+        "runsInvariantFailed": "0 / 300",
+        "claimMeanMs": 4.12,
+        "claimMaxMs": 64.33,
+        "idleClaimsPerSecPerInstance": 1.0
+      },
+      "3": {
+        "repetitions": 1,
+        "throughputPerMin": 39.68,
+        "speedupVs1": 2.98,
+        "slotBoundPerMin": 41.96,
+        "queueWaitP50s": 216.35,
+        "queueWaitP95s": 422.21,
+        "rejectedAtSubmit": 0,
+        "runsInvariantFailed": "0 / 300",
+        "claimMeanMs": 4.07,
+        "claimMaxMs": 78.83,
+        "idleClaimsPerSecPerInstance": 1.0
+      }
+    }
+  },
+  "serviceTimeMeanS": "8.55-8.66 in every cell",
+  "loadBalance": {
+    "poll5_3": "a=102 b=100 c=98 of 300",
+    "poll1_3": "a=100 b=100 c=100 of 300",
+    "note": "on 3 instances 286-288 of 300 tasks were claimed by polling; the rest went straight into the submitting instance's free slots"
+  },
+  "conclusion": [
+    "Throughput scales linearly with instances: 12.2 / 24.0 / 35.8 tasks per minute at poll 5 s (speedup 1.00 / 1.98 / 2.95), 13.3 / 26.5 / 39.7 at poll 1 s (1.00 / 1.99 / 2.98). Repetitions agree within 0.2%.",
+    "The bottleneck is the slots, not the database. Every cell lands at 85-95% of the slot bound (instances x slots / service time); the remaining gap is the poll interval, which idles a freed slot for up to one interval. Dropping the poll from 5 s to 1 s recovers most of it: +9.5% / +10.1% / +10.7% throughput.",
+    "The claim statement is not a cost: 4.1-5.6 ms mean, 85 ms worst case, 52-231 calls per instance per 300-task drain (one call takes several tasks at once). Claim time is under 0.12% of the drain on any instance. Idle polling is exactly one claim query per interval per instance (0.2/s at poll 5 s, 1.0/s at poll 1 s).",
+    "A backlog never fails at the door: 0 of 3600 tasks rejected at submit; tasks that found no free slot waited in the database and were picked up by polling.",
+    "At least once did not become more than once under load: 0 invariant failures over 3600 runs (every run started exactly once, one terminal event, at most one artifact, contiguous event sequence, all COMPLETED).",
+    "Queue wait is what a backlog costs: with 300 tasks and 3 instances, P50 242 s and P95 470 s at poll 5 s. Wait scales down with instances (1x / 0.51x / 0.34x)."
+  ],
+  "limits": [
+    "Simulated upstream with a fixed 700-900 ms chat latency: this measures the queue and the executors, not a provider. Against a real provider the ceiling is the vendor's rate limit.",
+    "One host, one PostgreSQL: instances are separate JVMs on the same machine sharing one database, so this does not cover network latency, a connection-pool ceiling, or a loaded database.",
+    "Only up to 3 instances and 2 slots each; linearity beyond that is not measured. The database claim has headroom at 0.34 claim calls/s, but no saturation point was found.",
+    "pg_stat_statements is not enabled in the image, so claim cost is timed application-side and includes the pooled connection and transaction.",
+    "Single-agent mode, no fault injection: X6 measures clean drains. Failure behaviour is X2 and X3."
+  ]
+}

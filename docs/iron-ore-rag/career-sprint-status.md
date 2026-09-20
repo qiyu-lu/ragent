@@ -4,7 +4,7 @@
 
 | 项 | 值 |
 | --- | --- |
-| 更新时间 | 2026-09-20（S6 会话 A、B 完成：README 已重写；复习笔记 11 篇已写入 `docs/iron-ore-rag/notes/`，未提交） |
+| 更新时间 | 2026-09-20（S6 三个会话全部完成：README 已重写并提交；复习笔记 11 篇与面试问答 1 篇在 `docs/iron-ore-rag/notes/`，按计划留在工作区不提交） |
 | 当前工作项 | **S6**（简历条目、README、面试卡；结构见计划 §10） |
 | 分支 / 提交 | `feat/llm-backend-hardening`；标签 `career-w1`、`career-w3`、`career-w2`、`career-w4`、`career-w5`、`career-w6`、`career-w7` |
 | 回归通过数 | `bash scripts/validate-agentic-research-p7.sh`：W7 后 Python 53/53、Java 13 + 211（记录过的 260 早于删除测试的重构 `e2e7e5c`、`6120945` 等，未逐项核对），约 40 s；另有 `validate-agentic-research-p2-database.sh` 结构校验 |
@@ -19,7 +19,7 @@
 - [x] W5 内容寻址的 embedding 复用 + X5（[改动说明](changes/2026-09-18-content-addressed-embedding-reuse.md)）
 - [x] W6 W1 的质量护栏：归因、噪声基线、400 题扩样（X1b，[manifest](../../eval/agentic-research/manifests/career-w6-2026-09-19.json)；结论在 W1 改动说明“限制”一节）
 - [x] W7 容量基准：多实例排空积压（X6，[manifest](../../eval/agentic-research/manifests/career-x6-2026-09-19.json)；结论在 W2 改动说明“容量”一节）
-- [ ] S6（[计划](career-s6-plan.md)）：简历条目已定稿（§6）；**README 已完成**（会话 A）；**复习笔记已完成**（会话 B，11 篇在 `docs/iron-ore-rag/notes/`，约 1600 行，按计划留在工作区不提交）；面试问答（会话 C）待做
+- [x] S6（[计划](career-s6-plan.md)）：简历条目已定稿（§6）；**README 已完成**（会话 A，已提交）；**复习笔记已完成**（会话 B，11 篇约 1600 行）；**面试问答已完成**（会话 C，`notes/面试问答.md`，82 题约 1100 行，含 Top 15 清单、未实现之处与成熟做法的附录）。`notes/` 共 12 个文件，按计划留在工作区不提交、不加入 `.gitignore`，由用户决定
 
 ## 结果摘要（引用数字时连同条件一起说）
 
@@ -32,7 +32,7 @@
 
 ## 下一步（下个会话）
 
-S6：简历条目已定稿（2026-09-20）；README、复习笔记、面试问答按 [career-s6-plan.md](career-s6-plan.md) 分三个会话执行（A、B 可并行，C 等 B；A、B 已于 2026-09-20 完成）。原定结构——主讲 W2 持久化执行（含 W7 容量数字）、W1 提示缓存（含 W6 质量结论），副讲 W3 故障注入，W4、W5 各一句话；面试卡以方案取舍为主线，另加一张“这是 demo 吗”的应答卡。（W6 的临时工作树 `../ragent-w6` 已于 2026-09-20 删除；需要重建“前”臂时用 `git worktree add` 检出 `career-v0-baseline`。）
+S6 三项产出已全部完成（2026-09-20）。剩下的收尾按 [career-s6-plan.md](career-s6-plan.md) §5：打标签 `career-done`、提交 `docs: close out the career sprint`，由用户决定何时做。`notes/` 下 12 个文件（11 篇复习笔记 + 面试问答）是否入库也由用户决定——仓库公开且简历挂着链接。（W6 的临时工作树 `../ragent-w6` 已于 2026-09-20 删除；需要重建“前”臂时用 `git worktree add` 检出 `career-v0-baseline`。）
 
 ## 已知事实与遗留问题
 

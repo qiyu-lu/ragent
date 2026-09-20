@@ -4,7 +4,7 @@
 
 | 项 | 值 |
 | --- | --- |
-| 更新时间 | 2026-09-20（W7 已完成，标签 `career-w7`；X6 全量 3600 任务跑完） |
+| 更新时间 | 2026-09-20（S6 会话 A 完成：README 已按 `career-s6-plan.md` §2 重写） |
 | 当前工作项 | **S6**（简历条目、README、面试卡；结构见计划 §10） |
 | 分支 / 提交 | `feat/llm-backend-hardening`；标签 `career-w1`、`career-w3`、`career-w2`、`career-w4`、`career-w5`、`career-w6`、`career-w7` |
 | 回归通过数 | `bash scripts/validate-agentic-research-p7.sh`：W7 后 Python 53/53、Java 13 + 211（记录过的 260 早于删除测试的重构 `e2e7e5c`、`6120945` 等，未逐项核对），约 40 s；另有 `validate-agentic-research-p2-database.sh` 结构校验 |
@@ -20,6 +20,7 @@
 - [x] W6 W1 的质量护栏：归因、噪声基线、400 题扩样（X1b，[manifest](../../eval/agentic-research/manifests/career-w6-2026-09-19.json)；结论在 W1 改动说明“限制”一节）
 - [x] W7 容量基准：多实例排空积压（X6，[manifest](../../eval/agentic-research/manifests/career-x6-2026-09-19.json)；结论在 W2 改动说明“容量”一节）
 - [ ] S6 简历条目、README、面试卡（两主一副两句话的结构，见计划 §10）
+  - 简历条目已定稿（见 [career-s6-plan.md](career-s6-plan.md) §6）；**README 已完成**（会话 A，`README.md` 与 `changes/README.md`）；复习笔记（会话 B）、面试问答（会话 C）待做
 
 ## 结果摘要（引用数字时连同条件一起说）
 
@@ -32,7 +33,7 @@
 
 ## 下一步（下个会话）
 
-S6：按计划 §10 的结构写简历与面试卡——主讲 W2 持久化执行（含 W7 容量数字）、W1 提示缓存（含 W6 质量结论），副讲 W3 故障注入，W4、W5 各一句话；面试卡以方案取舍为主线，另加一张“这是 demo 吗”的应答卡。（W6 的临时工作树 `../ragent-w6` 已于 2026-09-20 删除；需要重建“前”臂时用 `git worktree add` 检出 `career-v0-baseline`。）
+S6：简历条目已定稿（2026-09-20）；README、复习笔记、面试问答按 [career-s6-plan.md](career-s6-plan.md) 分三个会话执行（A、B 可并行，C 等 B）。原定结构——主讲 W2 持久化执行（含 W7 容量数字）、W1 提示缓存（含 W6 质量结论），副讲 W3 故障注入，W4、W5 各一句话；面试卡以方案取舍为主线，另加一张“这是 demo 吗”的应答卡。（W6 的临时工作树 `../ragent-w6` 已于 2026-09-20 删除；需要重建“前”臂时用 `git worktree add` 检出 `career-v0-baseline`。）
 
 ## 已知事实与遗留问题
 

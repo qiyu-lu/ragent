@@ -14,11 +14,7 @@ temp
 .sts4-cache
 
 ### IntelliJ IDEA ###
-.idea
-!.idea/dictionaries/
-!.idea/inspectionProfiles/
-!.idea/scopes/
-!.idea/icon.png
+.idea/
 *.iws
 *.iml
 *.ipr
@@ -36,6 +32,9 @@ build/
 ### VS Code ###
 .vscode/
 scripts/logs/
+
+### Claude Code ###
+.claude/settings.local.json
 
 ### Frontend ###
 node_modules/

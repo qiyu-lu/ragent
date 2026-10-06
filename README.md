@@ -32,29 +32,9 @@ Java 后端 + AI · 基于 [Ragent 1.1.0](https://github.com/nageoffer/ragent) �
 
 ## 系统总览
 
-```mermaid
-%%{init: {"flowchart": {"nodeSpacing": 28, "rankSpacing": 40}}}%%
-flowchart TB
-    subgraph RS ["研究任务（分钟级）"]
-        R["研究目标"] --> T["任务表<br/>+ 事件日志"]
-        T --> N["多实例领取<br/>租约与接管"]
-        N --> S["Agent 检索<br/>阅读、委派"]
-        S --> G["报告 / 计划<br/>+ 引用校验"]
-    end
-    subgraph ING ["资料入库"]
-        A["XLSX / PDF"] --> B["结构感知<br/>解析与分块"]
-        B --> V["按内容哈希<br/>复用向量"]
-    end
-    subgraph QA ["普通问答（秒级）"]
-        Q["用户提问"] --> W["改写与拆分"]
-        W --> P["按权限裁剪<br/>检索范围"]
-        P --> K["向量召回<br/>+ Rerank"]
-        K --> E["带来源<br/>的回答"]
-    end
-    V --> DB[("PostgreSQL<br/>+ pgvector")]
-    K -.-> DB
-    S -.-> DB
-```
+<p align="center">
+  <img src="docs/iron-ore-rag/images/overview.png" width="620" alt="系统总览：普通问答、资料入库、研究任务三条链路共用 PostgreSQL + pgvector">
+</p>
 
 RAG 只提供证据和候选结果；任务状态、事件与产物由后端持久化，LLM 不直接执行外部控制。
 
@@ -82,23 +62,9 @@ RAG 只提供证据和候选结果；任务状态、事件与产物由后端持�
 4. 接管方从持久化的事件日志重建已完成的工具往返，从断点续跑。
 5. 计划停机时在步边界主动交还任务，不必等租约过期。
 
-```mermaid
-%%{init: {"sequence": {"actorMargin": 40, "width": 130, "mirrorActors": false}}}%%
-sequenceDiagram
-    participant A as 实例 A
-    participant DB as PostgreSQL
-    participant B as 实例 B
-    A->>DB: 领取，epoch=1
-    loop 周期心跳
-        A->>DB: 续租
-    end
-    Note over A: kill -9 / 暂停
-    Note over DB: 租约过期
-    B->>DB: 领取过期任务，epoch=2
-    DB-->>B: 已持久化的事件
-    Note over B: 重建上下文，断点续跑
-    A-xDB: 带 epoch=1 的写入被拒
-```
+<p align="center">
+  <img src="docs/iron-ore-rag/images/takeover.png" width="728" alt="跨实例接管：实例 A 失联后租约过期，实例 B 以 epoch=2 领取并从事件日志续跑，A 带 epoch=1 的迟到写入被拒">
+</p>
 
 **结果**（模拟上游；独立 JVM 共享运行库；租约 6 s / 轮询 1 s；每个场景重复 20 次）
 

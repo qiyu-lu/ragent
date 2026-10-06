@@ -1,0 +1,20 @@
+%%{init: {"theme": "base", "fontFamily": "Noto Sans CJK SC, PingFang SC, Microsoft YaHei, sans-serif", "themeVariables": {"fontSize": "15px", "actorBkg": "#eef2ff", "actorBorder": "#6366f1", "actorTextColor": "#1f2937", "actorLineColor": "#94a3b8", "signalColor": "#334155", "signalTextColor": "#1f2937", "noteBkgColor": "#fef9c3", "noteBorderColor": "#eab308", "noteTextColor": "#1f2937", "labelBoxBkgColor": "#f1f5f9", "labelBoxBorderColor": "#94a3b8", "labelTextColor": "#1f2937", "loopTextColor": "#334155"}, "sequence": {"actorMargin": 40, "width": 130, "mirrorActors": false}}}%%
+sequenceDiagram
+    %% 重新生成：npx -p @mermaid-js/mermaid-cli mmdc -i takeover.mmd -o takeover.png -s 3 -b white
+    participant A as 实例 A
+    participant DB as PostgreSQL
+    participant B as 实例 B
+    A->>DB: 领取，epoch=1
+    loop 周期心跳
+        A->>DB: 续租
+    end
+    Note over A: kill -9 / 暂停
+    Note over DB: 租约过期
+    rect rgb(239, 246, 255)
+        B->>DB: 领取过期任务，epoch=2
+        DB-->>B: 已持久化的事件
+        Note over B: 重建上下文，断点续跑
+    end
+    rect rgb(254, 242, 242)
+        A-xDB: 带 epoch=1 的写入被拒
+    end

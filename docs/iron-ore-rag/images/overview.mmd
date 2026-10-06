@@ -1,0 +1,27 @@
+%%{init: {"theme": "base", "fontFamily": "Noto Sans CJK SC, PingFang SC, Microsoft YaHei, sans-serif", "themeVariables": {"fontSize": "15px", "primaryColor": "#ffffff", "primaryBorderColor": "#94a3b8", "primaryTextColor": "#1f2937", "lineColor": "#64748b"}, "flowchart": {"nodeSpacing": 28, "rankSpacing": 40, "subGraphTitleMargin": {"top": 6, "bottom": 6}}}}%%
+flowchart TB
+    %% 重新生成：npx -p @mermaid-js/mermaid-cli mmdc -i overview.mmd -o overview.png -s 3 -b white
+    subgraph RS ["研究任务（分钟级）"]
+        R("研究目标") --> T("任务表<br/>+ 事件日志")
+        T --> N("多实例领取<br/>租约与接管")
+        N --> S("Agent 检索<br/>阅读、委派")
+        S --> G("报告 / 计划<br/>+ 引用校验")
+    end
+    subgraph ING ["资料入库"]
+        A("XLSX / PDF") --> B("结构感知<br/>解析与分块")
+        B --> V("按内容哈希<br/>复用向量")
+    end
+    subgraph QA ["普通问答（秒级）"]
+        Q("用户提问") --> W("改写与拆分")
+        W --> P("按权限裁剪<br/>检索范围")
+        P --> K("向量召回<br/>+ Rerank")
+        K --> E("带来源<br/>的回答")
+    end
+    V --> DB[("PostgreSQL<br/>+ pgvector")]
+    K -.-> DB
+    S -.-> DB
+    style QA fill:#eff6ff,stroke:#93c5fd
+    style ING fill:#f0fdf4,stroke:#86efac
+    style RS fill:#fff7ed,stroke:#fdba74
+    classDef db fill:#eef2ff,stroke:#6366f1,stroke-width:1.5px
+    class DB db

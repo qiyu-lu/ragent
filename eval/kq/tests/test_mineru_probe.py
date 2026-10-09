@@ -42,8 +42,6 @@ class PresignedPutTest(unittest.TestCase):
         self.assertEqual(headers.get("Content-Length"), "13")
 
     def test_param_key_and_body(self):
-        args = mineru_probe.parse_args.__wrapped__() if hasattr(mineru_probe.parse_args, "__wrapped__") else None
-        self.assertIsNone(args)  # parse_args reads sys.argv; param_key is covered through build_body below
         class A:  # minimal namespace
             file = Path("x.pdf"); is_ocr = "true"; enable_formula = "false"; enable_table = "true"; language = "ch"; model_version = "vlm"
         self.assertEqual(mineru_probe.param_key(A), "vlm_ocr-true_formula-false_table-true")
@@ -51,6 +49,16 @@ class PresignedPutTest(unittest.TestCase):
         self.assertEqual(body["model_version"], "vlm")
         self.assertFalse(body["enable_formula"])
         self.assertEqual(body["files"][0], {"name": "x.pdf", "is_ocr": True, "data_id": "kq-1"})
+
+    def test_resolve_doc_id_by_sha_then_name(self):
+        import json, tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            corpus = Path(tmp) / "corpus.json"
+            corpus.write_text(json.dumps({"documents": [{"id": "si", "doc_name": "a.pdf", "sha256": "ff"},
+                                                        {"id": "tfe", "doc_name": "b.pdf", "sha256": "ee"}]}), encoding="utf-8")
+            self.assertEqual(mineru_probe.resolve_doc_id("ee", "zzz.pdf", corpus), "tfe")
+            self.assertEqual(mineru_probe.resolve_doc_id("00", "a.pdf", corpus), "si")
+            self.assertIsNone(mineru_probe.resolve_doc_id("00", "none.pdf", corpus))
 
 
 if __name__ == "__main__":

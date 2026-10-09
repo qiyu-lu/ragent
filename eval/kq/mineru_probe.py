@@ -34,17 +34,25 @@ from evalkit import (  # noqa: E402
     count_empty_slots,
     count_noise_lines,
     count_non_space,
+    load_corpus,
+    load_jsonl,
+    read_json,
     sha256_file,
     sha256_text,
     slots_per_1000,
     utc_now_iso,
     write_json,
 )
+from parse_metrics import doc_metrics  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parents[1]
 DEFAULT_OUT = REPO_ROOT / "local-data/kq-eval/mineru-raw"
 DEFAULT_API = "https://mineru.net/api/v4"
+DEFAULT_CORPUS = REPO_ROOT / "local-data/kq-eval/corpus-kq-s1.json"
+DEFAULT_FACTS = REPO_ROOT / "local-data/kq-eval/questions/numeric-facts-v1.jsonl"
+DEFAULT_TEXTLAYER = REPO_ROOT / "local-data/kq-eval/textlayer/textlayer-summary.json"
+DEFAULT_CHUNKS_SUMMARY = REPO_ROOT / "local-data/kq-eval/runs/S1-chunks/chunks-summary.json"
 
 
 class ProbeError(RuntimeError):
@@ -53,7 +61,9 @@ class ProbeError(RuntimeError):
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--file", type=Path, required=True)
+    parser.add_argument("--file", type=Path, help="PDF to parse (required unless --metrics-only)")
+    parser.add_argument("--metrics-only", type=Path, metavar="PROBE_DIR",
+                        help="skip MinerU; (re)compute parse-metrics.json for an existing probe directory")
     parser.add_argument("--is-ocr", choices=["true", "false"], default="false")
     parser.add_argument("--enable-formula", choices=["true", "false"], default="true")
     parser.add_argument("--enable-table", choices=["true", "false"], default="true")
@@ -65,6 +75,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--poll-seconds", type=int, default=10)
     parser.add_argument("--timeout-seconds", type=int, default=1800)
     parser.add_argument("--note", default="", help="free text stored in probe.json, e.g. 'step a'")
+    parser.add_argument("--corpus", type=Path, default=DEFAULT_CORPUS, help="corpus manifest used to map the file to a doc id")
+    parser.add_argument("--facts", type=Path, default=DEFAULT_FACTS, help="numeric facts; metrics are skipped when missing")
+    parser.add_argument("--textlayer-summary", type=Path, default=DEFAULT_TEXTLAYER)
+    parser.add_argument("--chunks-summary", type=Path, default=DEFAULT_CHUNKS_SUMMARY,
+                        help="audit of the ingested chunks, for the H3 digit comparison")
     parser.add_argument("--dry-run", action="store_true", help="print the request body and exit")
     return parser.parse_args()
 
@@ -181,8 +196,89 @@ def markdown_metrics(markdown: str) -> dict:
     }
 
 
+def resolve_doc_id(file_sha256: str, file_name: str, corpus_path: Path) -> Optional[str]:
+    """Corpus doc id of the probed file: by SHA-256 first, by file name as a fallback."""
+
+    if not corpus_path.is_file():
+        return None
+    for doc in load_corpus(corpus_path).get("documents", []):
+        if doc.get("sha256") == file_sha256:
+            return doc["id"]
+    for doc in load_corpus(corpus_path).get("documents", []):
+        if doc.get("doc_name") == file_name:
+            return doc["id"]
+    return None
+
+
+def probe_metrics(out_dir: Path, args: argparse.Namespace, probe: Dict[str, Any], markdown: str) -> Optional[dict]:
+    """Parse-layer metrics of one full.md plus the H3 comparison against the ingested chunks."""
+
+    doc_id = resolve_doc_id(str(probe.get("file_sha256") or ""), Path(str(probe.get("file") or "")).name, args.corpus)
+    if doc_id is None or not args.facts.is_file():
+        return None
+    facts = [fact for fact in load_jsonl(args.facts) if fact.get("doc") == doc_id]
+    textlayer = None
+    if args.textlayer_summary.is_file():
+        for item in read_json(args.textlayer_summary).get("documents", []):
+            if item.get("id") == doc_id:
+                textlayer = item.get("digits_nd")
+    metrics = doc_metrics(doc_id, [markdown], facts, textlayer)
+    metrics["label"] = probe.get("note") or param_key(args)
+    metrics["params"] = probe.get("params")
+    if args.chunks_summary.is_file():
+        for item in read_json(args.chunks_summary).get("documents", []):
+            if item.get("corpus_doc_id") == doc_id:
+                metrics["ingested_chunks_digits_nd"] = item.get("digits_nd")
+                metrics["ingested_chunks_empty_slots"] = item.get("empty_slots")
+                metrics["ingested_chunks_facts_note"] = "H3: compare digits_nd here with the full.md digits of the same parameters"
+    write_json(out_dir / "parse-metrics.json", {
+        "schema_version": 1, "kind": "kq-parse-metrics", "created_at": utc_now_iso(),
+        "source": {"full_md": str(out_dir / "full.md"), "sha256": sha256_text(markdown)},
+        "facts_sha256": sha256_file(args.facts), "overall": None, "documents": [metrics],
+    })
+    return metrics
+
+
+def print_metrics(metrics: Optional[dict]) -> None:
+    if not metrics:
+        print("parse metrics skipped (file not in corpus manifest or facts file missing)")
+        return
+    retention = metrics.get("digit_retention")
+    print(f"facts {metrics['facts_found_raw']}/{metrics['facts_found_after_latex']}/{metrics['facts_total']} (raw/after-latex/total)  "
+          f"digits {metrics['digits_nd']} vs text layer {metrics['textlayer_digits_nd']} retention="
+          f"{'-' if retention is None else format(retention, '.2f')}  slots/1k={None if metrics['slots_per_1000'] is None else round(metrics['slots_per_1000'], 2)}  "
+          f"noise={metrics['noise_lines']}  ingested-chunks digits={metrics.get('ingested_chunks_digits_nd')} slots={metrics.get('ingested_chunks_empty_slots')}")
+    if metrics.get("facts_missing"):
+        print("  missing facts:", ", ".join(metrics["facts_missing"]))
+    if metrics.get("facts_deformed_latex"):
+        print("  found only after LaTeX unwrapping:", ", ".join(metrics["facts_deformed_latex"]))
+
+
+def metrics_only(args: argparse.Namespace) -> int:
+    out_dir = args.metrics_only
+    probe_path = out_dir / "probe.json"
+    if not probe_path.is_file() or not (out_dir / "full.md").is_file():
+        print(f"{out_dir}: needs probe.json and full.md")
+        return 1
+    probe = read_json(probe_path)
+    params = probe.get("params") or {}
+    args.model_version = None if str(params.get("model_version", "")).startswith("(") else params.get("model_version")
+    args.is_ocr = "true" if params.get("is_ocr") else "false"
+    args.enable_formula = "true" if params.get("enable_formula", True) else "false"
+    args.enable_table = "true" if params.get("enable_table", True) else "false"
+    metrics = probe_metrics(out_dir, args, probe, (out_dir / "full.md").read_text(encoding="utf-8"))
+    print(f"{out_dir}")
+    print_metrics(metrics)
+    return 0
+
+
 def main() -> int:
     args = parse_args()
+    if args.metrics_only:
+        return metrics_only(args)
+    if args.file is None:
+        print("--file is required (or use --metrics-only PROBE_DIR)")
+        return 1
     if not args.file.is_file():
         print(f"missing file: {args.file}")
         return 1
@@ -278,6 +374,8 @@ def main() -> int:
     print(f"done in {probe['elapsed_seconds']}s  digits={metrics.get('digits_nd')}  slots={metrics.get('empty_slots')} "
           f"(per1000={None if metrics.get('slots_per_1000') is None else round(metrics['slots_per_1000'], 2)})  "
           f"noise={metrics.get('noise_lines')}  $={metrics.get('dollar_signs')}  zip={probe['zip_sha256'][:12]}")
+    if markdown is not None:
+        print_metrics(probe_metrics(out_dir, args, probe, markdown))
     print(f"probe: {out_dir / 'probe.json'}")
     return 0
 

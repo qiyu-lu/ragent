@@ -43,7 +43,8 @@
 ## 阶段 1 运行顺序（用户在仓库根目录的终端跑）
 
 ```bash
-# 0. 每开一个新终端先定义这两个变量
+# 0. 一步一步跑，每步看完输出再下一步：失败的步骤不会阻止后面的命令，整块粘贴会把错误带到后面。
+#    每开一个新终端先定义这两个变量
 export B=http://127.0.0.1:9093/api/ragent
 export QD=local-data/kq-eval/questions
 
@@ -53,12 +54,17 @@ cp $QD/questions-draft.jsonl $QD/questions-v1.jsonl && cp $QD/numeric-facts-draf
 python3 eval/kq/verify_dataset.py --questions $QD/questions-v1.jsonl --facts $QD/numeric-facts-v1.jsonl --strict \
   --write-manifest eval/kq/manifests/kq-s1-dataset.json
 
-# 2. 评测实例：导出 BAILIAN_API_KEY SILICONFLOW_API_KEY MINERU_API_KEY，确认 docker ps 里 rocketmq-broker-1 与 nameserver-1 都在，然后
+# 2. 评测实例：另开一个终端（这条命令会一直占着终端）。三把 key 必须在启动应用的那个进程的环境里：
+#    终端启动就先 export 再 java -jar；IDEA 启动就写进运行配置的环境变量 / Password Safe。
+#    key 没带上时入库会在文档的 chunk-log 里报 "MinerU api-key 未配置"。确认 docker ps 里 rocketmq-broker-1 与 nameserver-1 都在。
+export BAILIAN_API_KEY=… SILICONFLOW_API_KEY=… MINERU_API_KEY=…
 java -jar bootstrap/target/bootstrap-0.0.1-SNAPSHOT.jar \
-  --spring.config.additional-location=file:$PWD/local-data/kq-eval/config/application-kq-s1.yaml   # 或 IDEA 同参数
+  --spring.config.additional-location=file:$PWD/local-data/kq-eval/config/application-kq-s1.yaml
 
-# 3. 入库 7 份并审计切片
-python3 eval/kq/prepare_kb.py --base $B --output local-data/kq-eval/runs/setup-s1.json
+# 3. 入库 7 份并审计切片。失败后修好原因再跑同一条命令加 --resume：成功的跳过、失败的重新分块、缺的补传
+python3 eval/kq/prepare_kb.py --base $B --output local-data/kq-eval/runs/setup-s1.json --continue-on-failure
+# （重跑：python3 eval/kq/prepare_kb.py --base $B --output local-data/kq-eval/runs/setup-s1-resume.json --resume --continue-on-failure）
+# 审计只在 7 份都 success 后做；之前跑过要先 rm -r local-data/kq-eval/runs/S1-chunks（脚本不覆盖旧文件）
 python3 eval/kq/audit_chunks.py --base $B --output local-data/kq-eval/runs/S1-chunks/chunks.jsonl
 python3 eval/kq/parse_metrics.py --facts $QD/numeric-facts-v1.jsonl --chunks local-data/kq-eval/runs/S1-chunks/chunks.jsonl \
   --label S1-base --output local-data/kq-eval/runs/S1-chunks/parse-metrics.json
@@ -66,7 +72,7 @@ python3 eval/kq/parse_metrics.py --facts $QD/numeric-facts-v1.jsonl --chunks loc
 # 4. 冒烟 1 题：候选里 rerankHead=true 的都应有 rerankScore，且不等于 channelScore
 python3 eval/kq/run_retrieval.py --base $B --label smoke --arm S1-base --split tune --repeat-index 0 \
   --server-commit $(git rev-parse HEAD) --questions $QD/questions-v1.jsonl \
-  --sub-questions $QD/sub-questions-smoke.jsonl --record-sub-questions --ids num-si-02
+  --sub-questions $QD/sub-questions-smoke.jsonl --record-sub-questions --ids num-si-01   # num-si-01 在 tune 集
 python3 -c "import json;d=json.load(open('local-data/kq-eval/runs/smoke/retrieval.json'))['details'][0]['raw_response'];print([(c['id'],c['channelScore'],c['rerankScore'],c['rerankHead'],c['finalSelected']) for c in d['results'][0]['candidates']])"
 
 # 5. 基线 S1-base：每集 3 次，r1 落盘子问题，r2/r3 回放同一批子问题

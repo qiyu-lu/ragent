@@ -14,11 +14,13 @@ Requires ``MINERU_API_KEY`` in the environment. Each call costs MinerU quota; ru
 from __future__ import annotations
 
 import argparse
+import http.client
 import io
 import json
 import os
 import sys
 import time
+import urllib.parse
 import urllib.request
 import zipfile
 from datetime import datetime
@@ -89,6 +91,33 @@ def _request(url: str, *, method: str = "GET", body: Optional[bytes] = None, hea
         raise ProbeError(f"{method} {url} -> HTTP {exc.code}: {detail}") from exc
     except Exception as exc:
         raise ProbeError(f"{method} {url} failed: {exc}") from exc
+
+
+def _put_presigned(url: str, body: bytes, timeout: int = 600) -> None:
+    """PUT the file to the pre-signed OSS URL with no Content-Type header.
+
+    The URL is signed for a request without Content-Type (MinerUClient.java sends none). ``urllib`` adds
+    ``application/x-www-form-urlencoded`` to any PUT with a body, which makes OSS answer 403
+    SignatureDoesNotMatch, so the request is written with ``http.client`` and explicit headers only.
+    """
+
+    parts = urllib.parse.urlsplit(url)
+    path = parts.path + ("?" + parts.query if parts.query else "")
+    connection_type = http.client.HTTPSConnection if parts.scheme == "https" else http.client.HTTPConnection
+    connection = connection_type(parts.hostname, parts.port, timeout=timeout)
+    try:
+        connection.putrequest("PUT", path)
+        connection.putheader("Content-Length", str(len(body)))
+        connection.endheaders()
+        connection.send(body)
+        response = connection.getresponse()
+        detail = response.read().decode("utf-8", errors="replace")[:500]
+        if response.status // 100 != 2:
+            raise ProbeError(f"PUT {parts.hostname}{parts.path} -> HTTP {response.status}: {detail}")
+    except (OSError, http.client.HTTPException) as exc:
+        raise ProbeError(f"PUT {parts.hostname}{parts.path} failed: {exc}") from exc
+    finally:
+        connection.close()
 
 
 def _json(url: str, api_key: str, *, method: str = "GET", body: Optional[dict] = None) -> dict:
@@ -195,7 +224,7 @@ def main() -> int:
         if not batch_id or not urls:
             raise ProbeError(f"requestUpload returned no batch_id/file_urls: {data}")
         probe["batch_id"] = batch_id
-        _request(urls[0], method="PUT", body=args.file.read_bytes(), timeout=600)
+        _put_presigned(urls[0], args.file.read_bytes())
         probe["uploaded_at"] = utc_now_iso()
 
         deadline = time.monotonic() + args.timeout_seconds

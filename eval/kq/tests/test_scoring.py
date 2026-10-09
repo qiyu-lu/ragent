@@ -87,6 +87,26 @@ class ScoringTest(unittest.TestCase):
         self.assertEqual(stats["mrr"]["range"], 0.0)
         self.assertNotIn("missing", stats)
 
+    def test_rerank_noop_detection(self):
+        live = response([{"subQuestion": "a", "rerankHeadSize": 2, "candidates": [
+            candidate("c1", "x", "硅含量", final_rank=0, rerank=0.91, channel=0.80),
+            candidate("c2", "y", "硅含量", final_rank=1, rerank=0.40, channel=0.79)]}], ["c1", "c2"])
+        noop = response([{"subQuestion": "a", "rerankHeadSize": 2, "candidates": [
+            candidate("c1", "x", "硅含量", final_rank=0, rerank=0.80, channel=0.80),
+            candidate("c2", "y", "硅含量", final_rank=1, rerank=0.79, channel=0.79)]}], ["c1", "c2"])
+        single = response([{"subQuestion": "a", "rerankHeadSize": 1, "candidates": [
+            candidate("c1", "x", "硅含量", final_rank=0, rerank=0.80, channel=0.80)]}], ["c1"])
+        self.assertFalse(evalkit.rerank_looks_noop(live))
+        self.assertTrue(evalkit.rerank_looks_noop(noop))
+        self.assertIsNone(evalkit.rerank_looks_noop(single))
+
+    def test_rewrite_fallback_detection(self):
+        q = "碱熔那一步，坩埚先在炉口放多久、进炉后又要放多久？"
+        self.assertTrue(evalkit.looks_like_rewrite_fallback(q, [q]))
+        self.assertTrue(evalkit.looks_like_rewrite_fallback(q, ["碱熔那一步，坩埚先在炉口放多久", "进炉后又要放多久？"]))
+        self.assertFalse(evalkit.looks_like_rewrite_fallback(q, ["铁矿石硅含量测定碱融法坩埚在马弗炉入口放置时间", "碱融法入炉后放置时间"]))
+        self.assertFalse(evalkit.looks_like_rewrite_fallback(q, []))
+
     def test_replay_posts_sub_questions_only_when_given(self):
         client = evalkit.ApiClient("http://127.0.0.1:9093/api/ragent")
         with patch.object(client, "request_json", return_value={"subQuestions": ["一"]}) as request:

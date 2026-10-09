@@ -69,7 +69,11 @@ python3 eval/kq/audit_chunks.py --base $B --output local-data/kq-eval/runs/S1-ch
 python3 eval/kq/parse_metrics.py --facts $QD/numeric-facts-v1.jsonl --chunks local-data/kq-eval/runs/S1-chunks/chunks.jsonl \
   --label S1-base --output local-data/kq-eval/runs/S1-chunks/parse-metrics.json
 
-# 4. 冒烟 1 题：候选里 rerankHead=true 的都应有 rerankScore，且不等于 channelScore
+# 4. 先在工作终端验 key（200 = key 可用；401 = key 无效或过期；若这里 200 而应用里 401，说明应用进程没拿到 key）
+curl -s -o /dev/null -w '%{http_code}\n' https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank \
+  -H "Authorization: Bearer $BAILIAN_API_KEY" -H 'Content-Type: application/json' \
+  -d '{"model":"qwen3-rerank","input":{"query":"q","documents":["a","b"]},"parameters":{"top_n":1}}'
+#    冒烟 1 题：run_retrieval.py 会在重排回退到 noop（头部 rerankScore 全等于 channelScore）或改写回退（子问题原样返回）时自动退出 2
 python3 eval/kq/run_retrieval.py --base $B --label smoke --arm S1-base --split tune --repeat-index 0 \
   --server-commit $(git rev-parse HEAD) --questions $QD/questions-v1.jsonl \
   --sub-questions $QD/sub-questions-smoke.jsonl --record-sub-questions --ids num-si-01   # num-si-01 在 tune 集

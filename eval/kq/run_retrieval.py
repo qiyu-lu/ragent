@@ -5,6 +5,11 @@ First run of a question set: ``--record-sub-questions`` lets the server rewrite 
 stores the resulting sub-questions in a JSONL file. Every later run (repeats, other arms) replays those
 sub-questions so the online rewrite model is out of the comparison. Runs are sequential (concurrency 1)
 so the three repeats of an arm are comparable.
+
+Two guards abort the run (exit 2) so a broken model key cannot produce a "baseline": the rerank must be
+live (head candidates carry a model score different from the channel score) and the recorded rewrites
+must not all be verbatim pieces of the original question. ``--allow-noop-rerank`` /
+``--allow-rewrite-fallback`` override them for arms that intentionally run that way.
 """
 
 from __future__ import annotations
@@ -24,6 +29,8 @@ from evalkit import (  # noqa: E402
     aggregate,
     load_corpus,
     load_jsonl,
+    looks_like_rewrite_fallback,
+    rerank_looks_noop,
     score_question,
     sha256_file,
     stem_to_doc_id,
@@ -62,6 +69,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ids", nargs="*")
     parser.add_argument("--types", nargs="*")
     parser.add_argument("--note", default="")
+    parser.add_argument("--allow-noop-rerank", action="store_true", help="do not abort when the rerank looks like the noop fallback")
+    parser.add_argument("--allow-rewrite-fallback", action="store_true",
+                        help="do not abort when the recorded or stored rewrites look like the server's no-LLM fallback")
     return parser.parse_args()
 
 
@@ -72,6 +82,18 @@ def load_sub_questions(path: Path) -> Dict[str, dict]:
     for row in load_jsonl(path):
         stored[str(row["id"])] = row
     return stored
+
+
+REWRITE_FALLBACK_MIN = 5
+
+
+def fallback_share(entries: Dict[str, dict]) -> float:
+    """Share of stored sub-question sets that are verbatim pieces of their question."""
+
+    if not entries:
+        return 0.0
+    hits = sum(1 for entry in entries.values() if looks_like_rewrite_fallback(str(entry.get("question") or ""), entry.get("subQuestions") or []))
+    return hits / len(entries)
 
 
 def select_rows(rows: List[dict], args: argparse.Namespace) -> List[dict]:
@@ -118,6 +140,11 @@ def main() -> int:
         print("no matching questions")
         return 1
     stored = load_sub_questions(args.sub_questions)
+    if stored and not args.allow_rewrite_fallback and len(stored) >= REWRITE_FALLBACK_MIN and fallback_share(stored) > 0.5:
+        print(f"stored sub-questions in {args.sub_questions} look like the rewrite fallback "
+              f"({fallback_share(stored):.0%} are verbatim pieces of the question): the rewrite model was not live when "
+              f"they were recorded. Delete the file and record again, or pass --allow-rewrite-fallback")
+        return 2
     missing = [row["id"] for row in rows if row["id"] not in stored]
     if missing and not args.record_sub_questions:
         print(f"{len(missing)} questions have no stored sub-questions (e.g. {missing[:3]}); "
@@ -141,6 +168,7 @@ def main() -> int:
     details: List[dict] = []
     failures: List[dict] = []
     recorded = 0
+    recorded_fallback = 0
     started_at = utc_now_iso()
     started = time.monotonic()
     for index, row in enumerate(rows, 1):
@@ -158,7 +186,23 @@ def main() -> int:
                                      "rewrittenQuestion": response.get("rewrittenQuestion"),
                                      "recordedAt": utc_now_iso(), "serverCommit": args.server_commit}
                 recorded += 1
+                if looks_like_rewrite_fallback(row["question"], actual):
+                    recorded_fallback += 1
+                if (not args.allow_rewrite_fallback and recorded >= REWRITE_FALLBACK_MIN
+                        and recorded_fallback == recorded):
+                    print(f"aborting: the first {recorded} rewrites all returned the question itself; the rewrite LLM is not "
+                          f"live (server log: '查询改写 LLM 调用失败'). Fix the chat model key, delete {args.sub_questions} "
+                          f"if it was written, and run again (or pass --allow-rewrite-fallback)")
+                    return 2
+            noop = rerank_looks_noop(response)
+            if noop and not args.allow_noop_rerank:
+                head = [(c["id"], c["channelScore"], c["rerankScore"]) for c in response["results"][0]["candidates"] if c.get("rerankHead")][:3]
+                print(f"aborting at {row['id']}: every rerank-head candidate carries its channel score, e.g. {head}; the rerank "
+                      f"fell back to rerank-noop (server log: 'bailian rerank 请求失败'). Fix BAILIAN_API_KEY in the app "
+                      f"process, restart it and run again (or pass --allow-noop-rerank)")
+                return 2
             score = score_question(row, response, stems)
+            score["rerank_noop_suspected"] = noop
             details.append({
                 "id": row["id"], "type": row.get("type"), "split": row.get("split"),
                 "answerable": row.get("answerable"), "reference_docs": row.get("reference_docs") or [],
@@ -173,8 +217,13 @@ def main() -> int:
             failures.append({"id": row["id"], "error": str(exc)})
             print(f"[{index}/{len(rows)}] failed {row['id']}: {exc}")
     if recorded:
+        if not args.allow_rewrite_fallback and recorded >= REWRITE_FALLBACK_MIN and recorded_fallback / recorded > 0.5:
+            print(f"aborting: {recorded_fallback}/{recorded} recorded rewrites are verbatim pieces of the question; the rewrite "
+                  f"LLM was not live for most of the run. Nothing was written to {args.sub_questions}; fix the chat model key "
+                  f"and run again (or pass --allow-rewrite-fallback)")
+            return 2
         write_jsonl(args.sub_questions, [stored[key] for key in sorted(stored)])
-        print(f"recorded {recorded} sub-question sets -> {args.sub_questions}")
+        print(f"recorded {recorded} sub-question sets -> {args.sub_questions} ({recorded_fallback} identical to the question)")
 
     summary = aggregate(details)
     report = {

@@ -483,6 +483,38 @@ def all_candidates(response: Mapping[str, Any]) -> List[dict]:
     return rows
 
 
+def rerank_looks_noop(response: Mapping[str, Any]) -> Optional[bool]:
+    """True when every rerank-head candidate carries exactly its channel score.
+
+    The BaiLian client writes the model's relevance_score back to the head objects; after a fallback to
+    ``rerank-noop`` the head keeps the vector cosine, so the two columns coincide for the whole head.
+    Returns None when no sub-question has a head of at least two candidates (nothing to judge).
+    """
+
+    verdicts: List[bool] = []
+    for result in response.get("results") or []:
+        head = [c for c in result.get("candidates") or [] if c.get("rerankHead")]
+        if len(head) < 2:
+            continue
+        verdicts.append(all(c.get("rerankScore") is not None and c.get("rerankScore") == c.get("channelScore") for c in head))
+    if not verdicts:
+        return None
+    return all(verdicts)
+
+
+def looks_like_rewrite_fallback(question: str, sub_questions: Sequence[str]) -> bool:
+    """True when every sub-question is a verbatim piece of the original question.
+
+    The server's rewrite fallback (LLM unavailable) returns the normalized question split by rule, so
+    nothing is rephrased; a real LLM rewrite almost always changes the wording. One identity rewrite
+    can be legitimate, so callers judge the share over many questions, not a single one.
+    """
+
+    original = normalize(question)
+    subs = [normalize(sub) for sub in sub_questions if normalize(sub)]
+    return bool(subs) and all(sub in original for sub in subs)
+
+
 def max_rerank_score(response: Mapping[str, Any]) -> Optional[float]:
     scores = [c.get("rerankScore") for c in all_candidates(response) if c.get("rerankScore") is not None]
     return max(scores) if scores else None

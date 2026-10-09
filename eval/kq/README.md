@@ -40,9 +40,13 @@
   空槽按每千非空白字符计，噪声行按出版社水印与页眉页脚模式计。
 - 门槛：调参集上基线三次重复的极差；提升小于极差记“未证实”。
 
-## 阶段 1 运行顺序（用户在终端跑；`B=http://127.0.0.1:9093/api/ragent`，`QD=local-data/kq-eval/questions`）
+## 阶段 1 运行顺序（用户在仓库根目录的终端跑）
 
 ```bash
+# 0. 每开一个新终端先定义这两个变量
+export B=http://127.0.0.1:9093/api/ragent
+export QD=local-data/kq-eval/questions
+
 # 1. 核对后冻结（改 jsonl 本身，review-draft.md 只是视图）
 python3 eval/kq/verify_dataset.py --strict
 cp $QD/questions-draft.jsonl $QD/questions-v1.jsonl && cp $QD/numeric-facts-draft.jsonl $QD/numeric-facts-v1.jsonl

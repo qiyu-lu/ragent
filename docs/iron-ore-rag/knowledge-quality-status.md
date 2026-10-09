@@ -17,7 +17,7 @@
 - [ ] 阶段 3 中文全文通道与融合：阶段 2 改动说明；通道、jieba + 术语表、tsvector 迁移、BM25；rrf / thr 两臂（blend 可选）；评测
 - [ ] 收尾：阶段 3 改动说明；简历映射；ff 合并
 
-## 用户要跑的命令（每个会话结束时写，跑完清空；`B=http://127.0.0.1:9093/api/ragent`，`QD=local-data/kq-eval/questions`，全文与循环写法见 eval/kq/README.md）
+## 用户要跑的命令（每个会话结束时写，跑完清空。先在终端执行 `export B=http://127.0.0.1:9093/api/ragent QD=local-data/kq-eval/questions`，全文与循环写法见 eval/kq/README.md）
 1. 核对 `$QD/review-draft.md`，改 `questions-draft.jsonl` / `numeric-facts-draft.jsonl` 本身；`python3 eval/kq/verify_dataset.py --strict` 通过后复制为 `questions-v1.jsonl` / `numeric-facts-v1.jsonl`，再 `python3 eval/kq/verify_dataset.py --questions $QD/questions-v1.jsonl --facts $QD/numeric-facts-v1.jsonl --strict --write-manifest eval/kq/manifests/kq-s1-dataset.json`（冻结，哈希进仓库）
 2. 导出 `BAILIAN_API_KEY`、`SILICONFLOW_API_KEY`、`MINERU_API_KEY`；`docker ps` 确认 `rocketmq-broker-1` 与 `nameserver-1` 都在；启动评测实例：`--spring.config.additional-location=file:/home/sd101t/IdeaProjects/ragent-iron-ore-rag/local-data/kq-eval/config/application-kq-s1.yaml`（9093 / `ragent_eval_kq_s1` / Redis DB 13 / MQ 主题后缀 `_kq_s1`）
 3. 入库并审计：`python3 eval/kq/prepare_kb.py --base $B --output local-data/kq-eval/runs/setup-s1.json`；`python3 eval/kq/audit_chunks.py --base $B --output local-data/kq-eval/runs/S1-chunks/chunks.jsonl`；`python3 eval/kq/parse_metrics.py --facts $QD/numeric-facts-v1.jsonl --chunks local-data/kq-eval/runs/S1-chunks/chunks.jsonl --label S1-base --output local-data/kq-eval/runs/S1-chunks/parse-metrics.json`

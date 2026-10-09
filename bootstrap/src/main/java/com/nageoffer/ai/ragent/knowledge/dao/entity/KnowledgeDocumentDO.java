@@ -140,6 +140,13 @@ public class KnowledgeDocumentDO {
     private String ingestionSpec;
 
     /**
+     * 文档元数据（JSON）：标准号、发布年、代替的旧标准、检测对象、组分、方法（入库抽取，人工确认后 source=confirmed），
+     * 以及解析质量审计 parseAudit 与归一化摘要 normalization
+     */
+    @TableField(typeHandler = JsonbTypeHandler.class)
+    private String docMetadata;
+
+    /**
      * 数据通道（Pipeline）ID
      * 仅在 processMode=pipeline 时有效
      */

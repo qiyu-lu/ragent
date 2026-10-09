@@ -61,6 +61,7 @@ public class DefaultIngestionKernel implements IngestionKernel {
     private final ChunkingService chunkingService;
     private final ChunkEmbeddingService chunkEmbeddingService;
     private final ChunkIndexWriter chunkIndexWriter;
+    private final ParseQualityStage parseQualityStage;
 
     @Override
     public IngestionOutcome run(DocumentRef doc,
@@ -78,10 +79,11 @@ public class DefaultIngestionKernel implements IngestionKernel {
             throw new ClientException("无法识别文件类型：docId=" + doc.docId() + ", filename=" + doc.filename());
         }
 
-        // ② parse：(MIME × 档位) → 解析器
+        // ② parse：(MIME × 档位) → 解析器，随后过解析质量闸门、归一化与清洗，并抽文档元数据
         long parseStart = System.currentTimeMillis();
         DocumentParser parser = parserRegistry.require(mimeType, effectiveSpec.parseProfile());
-        ParsedDocument parsed = parser.parseStructured(bytes, mimeType, parserOptions(doc));
+        ParseQualityStage.Output parseOutput = parseQualityStage.run(parser, bytes, mimeType, parserOptions(doc), doc.filename());
+        ParsedDocument parsed = parseOutput.document();
         List<Block> blocks = parsed.blocks() == null ? List.of() : parsed.blocks();
         long parseMillis = System.currentTimeMillis() - parseStart;
         log.info("摄取-解析完成 docId={} mime={} 档位={} 解析器={} blocks={}",
@@ -108,7 +110,7 @@ public class DefaultIngestionKernel implements IngestionKernel {
 
         return new IngestionOutcome(mimeType, parser.getParserType(), blocks.size(), chunks,
                 new IngestionOutcome.IngestionTimings(parseMillis, chunkMillis, embedMillis, indexMillis),
-                embedded.stats());
+                embedded.stats(), parseOutput.documentMetadata());
     }
 
     /**

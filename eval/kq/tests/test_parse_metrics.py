@@ -40,6 +40,19 @@ class ParseMetricsTest(unittest.TestCase):
         self.assertEqual(total["coverage_raw"], 0.5)
         self.assertIsNotNone(total["digit_retention"])
 
+    def test_image_references_do_not_count_as_digits(self):
+        hashed = "![](images/7bbefdb15db7a398b850af5819e9032c17ab2850429d95bb3bfa4129852b6424.jpg)"
+        plain = parse_metrics.doc_metrics("d", ["称取 0.5 g"], [], 10)
+        with_image = parse_metrics.doc_metrics("d", ["称取 0.5 g\n" + hashed], [], 10)
+        self.assertEqual(plain["digits_nd"], 2)
+        self.assertEqual(with_image["digits_nd"], 2)
+        self.assertEqual(with_image["non_space_chars"], plain["non_space_chars"])
+
+    def test_strict_slots_skip_the_verb_pattern(self):
+        item = parse_metrics.doc_metrics("d", ["继续加热，直至冒烟。温度控制在 ,放置 。"], [], None)
+        self.assertEqual(item["empty_slots"], 3)          # 加热， / 在 , / 放置 。
+        self.assertEqual(item["empty_slots_strict"], 1)   # only 在 ,
+
     def test_no_facts_gives_none_coverage(self):
         item = parse_metrics.doc_metrics("empty", ["x"], [], None)
         self.assertIsNone(item["coverage_raw"])

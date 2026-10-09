@@ -31,6 +31,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -81,6 +82,18 @@ public class MinerUDocumentParser implements DocumentParser {
      * options 字段：文档 ID，用于资产 key 命名，不传时自动生成 UUID
      */
     public static final String OPT_DOCUMENT_ID = "documentId";
+
+    /**
+     * options 字段：本次调用的解析参数，覆盖 {@link MinerUProperties} 的同名配置，供解析质量闸门按文档选组合
+     */
+    public static final String OPT_IS_OCR = "minerU.isOcr";
+    public static final String OPT_ENABLE_FORMULA = "minerU.enableFormula";
+    public static final String OPT_MODEL_VERSION = "minerU.modelVersion";
+
+    /**
+     * ParsedDocument.metadata 字段：本次实际发给 MinerU 的解析参数
+     */
+    public static final String META_PARAMS = "minerU.params";
 
     /**
      * ParsedDocument.metadata 字段：MinerU 分配的 batchId，排障时凭它去 MinerU 侧查任务
@@ -156,7 +169,7 @@ public class MinerUDocumentParser implements DocumentParser {
         String uploadName = resolveUploadName(sourceFile, mimeType, documentId);
 
         // 1. 申请上传链接，只提交元信息、不带 url
-        BatchSubmitRequest request = buildSubmitRequest(uploadName, documentId);
+        BatchSubmitRequest request = buildSubmitRequest(uploadName, documentId, options);
         BatchUploadTicket ticket = minerUClient.requestUpload(request);
 
         // 2. 把源文件字节直接 PUT 上传到 MinerU OSS
@@ -194,6 +207,7 @@ public class MinerUDocumentParser implements DocumentParser {
         mergedMeta.put(META_ZIP_URL, status.zipUrl());
         mergedMeta.put("parser", getParserType());
         mergedMeta.put("mimeType", mimeType == null ? "" : mimeType);
+        mergedMeta.put(META_PARAMS, describeParams(request));
 
         return ParsedDocument.of(parsed.blocks(), mergedMeta);
     }
@@ -208,15 +222,34 @@ public class MinerUDocumentParser implements DocumentParser {
         return "doc-" + documentId + extFromMime(mimeType);
     }
 
-    private BatchSubmitRequest buildSubmitRequest(String fileName, String documentId) {
+    private BatchSubmitRequest buildSubmitRequest(String fileName, String documentId, Map<String, Object> options) {
         return new BatchSubmitRequest(
                 fileName,
                 documentId,
-                properties.isOcr(),
+                extractBoolean(options, OPT_IS_OCR, properties.isOcr()),
                 properties.isEnableTable(),
-                properties.isEnableFormula(),
-                properties.getLanguage()
+                extractBoolean(options, OPT_ENABLE_FORMULA, properties.isEnableFormula()),
+                properties.getLanguage(),
+                extractString(options, OPT_MODEL_VERSION, properties.getModelVersion())
         );
+    }
+
+    private static Map<String, Object> describeParams(BatchSubmitRequest request) {
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("isOcr", request.isOcr());
+        params.put("enableFormula", request.enableFormula());
+        params.put("enableTable", request.enableTable());
+        params.put("modelVersion", request.modelVersion() == null || request.modelVersion().isBlank()
+                ? "default" : request.modelVersion());
+        return params;
+    }
+
+    private static boolean extractBoolean(Map<String, Object> options, String key, boolean defaultValue) {
+        Object value = options == null ? null : options.get(key);
+        if (value instanceof Boolean b) {
+            return b;
+        }
+        return value == null ? defaultValue : Boolean.parseBoolean(value.toString());
     }
 
     private static String extFromMime(String mimeType) {

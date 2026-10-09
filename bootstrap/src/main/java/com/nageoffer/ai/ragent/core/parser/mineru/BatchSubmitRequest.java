@@ -27,6 +27,7 @@ package com.nageoffer.ai.ragent.core.parser.mineru;
  *   "enable_formula": true,
  *   "enable_table":   true,
  *   "language":       "ch",
+ *   "model_version":  "pipeline",   // 可选，留空不发
  *   "files": [
  *     {
  *       "name":     "xxx.pdf",
@@ -43,6 +44,7 @@ package com.nageoffer.ai.ragent.core.parser.mineru;
  * @param enableTable   是否提取表格
  * @param enableFormula 是否提取公式
  * @param language      语言代码,遵循 MinerU(PaddleOCR)规范,如 ch / en / chinese_cht
+ * @param modelVersion  解析模型 pipeline / vlm / MinerU-HTML,为空时不发
  */
 public record BatchSubmitRequest(
         String fileName,
@@ -50,6 +52,7 @@ public record BatchSubmitRequest(
         boolean isOcr,
         boolean enableTable,
         boolean enableFormula,
-        String language
+        String language,
+        String modelVersion
 ) {
 }

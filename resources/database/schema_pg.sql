@@ -226,7 +226,8 @@ CREATE TABLE t_knowledge_document (
     updated_by       VARCHAR(20),
     create_time      TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
     update_time      TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted          SMALLINT      NOT NULL DEFAULT 0
+    deleted          SMALLINT      NOT NULL DEFAULT 0,
+    doc_metadata     JSONB
 );
 CREATE INDEX idx_kb_id ON t_knowledge_document (kb_id);
 COMMENT ON TABLE t_knowledge_document IS '知识库文档表';
@@ -714,6 +715,7 @@ COMMENT ON COLUMN t_knowledge_document.source_location IS '来源地址';
 COMMENT ON COLUMN t_knowledge_document.schedule_enabled IS '是否启用定时刷新';
 COMMENT ON COLUMN t_knowledge_document.schedule_cron IS '定时表达式';
 COMMENT ON COLUMN t_knowledge_document.ingestion_spec IS '文档级摄取配置：解析档位 + 分块预算';
+COMMENT ON COLUMN t_knowledge_document.doc_metadata IS '文档元数据：标准号、发布年、代替、检测对象、组分、方法，及解析审计与归一化摘要';
 COMMENT ON COLUMN t_knowledge_document.pipeline_id IS 'Pipeline ID';
 COMMENT ON COLUMN t_knowledge_document.created_by IS '创建人';
 COMMENT ON COLUMN t_knowledge_document.updated_by IS '修改人';

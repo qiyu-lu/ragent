@@ -38,6 +38,12 @@ export interface SourceRef {
   documentVersion?: string;
   sheetName?: string;
   cellRange?: string;
+  /** 标准号（文档元数据） */
+  standardNo?: string;
+  /** 代替本文档的新版本标准号；有值即"已被代替" */
+  supersededBy?: string;
+  /** 解析质量审计：RECOVERED（OCR 重解析后合格）/ NEEDS_REVIEW（需人工复核） */
+  parseVerdict?: "RECOVERED" | "NEEDS_REVIEW";
 }
 
 export interface Message {

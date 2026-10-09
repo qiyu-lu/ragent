@@ -30,6 +30,7 @@ from evalkit import (  # noqa: E402
     percentile,
     sha256_file,
     stem_to_doc_id,
+    strip_image_refs,
     utc_now_iso,
     write_json,
     write_jsonl,
@@ -91,7 +92,7 @@ def summarize_document(doc: dict, chunks: List[dict], corpus_id: Optional[str], 
     lengths = [len(text) for text in texts]
     counts = Counter(normalized)
     duplicates = sum(count - 1 for text, count in counts.items() if text and count > 1)
-    joined = "\n".join(texts)
+    joined = strip_image_refs("\n".join(texts))  # image file names are hashes, not content
     return {
         "corpus_doc_id": corpus_id,
         "server_doc_id": str(doc.get("id")),

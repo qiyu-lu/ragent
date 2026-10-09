@@ -52,6 +52,7 @@ import com.nageoffer.ai.ragent.ingestion.domain.pipeline.PipelineDefinition;
 import com.nageoffer.ai.ragent.ingestion.engine.IngestionEngine;
 import com.nageoffer.ai.ragent.ingestion.service.IngestionPipelineService;
 import com.nageoffer.ai.ragent.knowledge.config.KnowledgeScheduleProperties;
+import com.nageoffer.ai.ragent.knowledge.controller.request.DocumentMetadataConfirmRequest;
 import com.nageoffer.ai.ragent.knowledge.controller.request.KnowledgeDocumentPageRequest;
 import com.nageoffer.ai.ragent.knowledge.controller.request.KnowledgeDocumentUpdateRequest;
 import com.nageoffer.ai.ragent.knowledge.controller.request.KnowledgeDocumentUploadRequest;
@@ -75,6 +76,7 @@ import com.nageoffer.ai.ragent.knowledge.schedule.CronScheduleHelper;
 import com.nageoffer.ai.ragent.knowledge.service.KnowledgeChunkService;
 import com.nageoffer.ai.ragent.knowledge.service.KnowledgeDocumentScheduleService;
 import com.nageoffer.ai.ragent.knowledge.service.KnowledgeDocumentService;
+import com.nageoffer.ai.ragent.knowledge.support.DocumentMetadataCodec;
 import com.nageoffer.ai.ragent.knowledge.support.IngestionSpecCodec;
 import com.nageoffer.ai.ragent.knowledge.support.DocumentIdentityResolver;
 import com.nageoffer.ai.ragent.knowledge.support.VectorTargetResolver;
@@ -130,6 +132,7 @@ public class KnowledgeDocumentServiceImpl implements KnowledgeDocumentService {
     private final RemoteFileFetcher remoteFileFetcher;
     private final VectorTargetResolver vectorTargetResolver;
     private final BizChangeLogContext bizChangeLogContext;
+    private final DocumentMetadataCodec documentMetadataCodec;
 
     @Value("knowledge-document-chunk_topic${unique-name:}")
     private String chunkTopic;
@@ -301,6 +304,7 @@ public class KnowledgeDocumentServiceImpl implements KnowledgeDocumentService {
             int savedCount = outcome.chunkCount();
             // 回填字节探测出的真实 MIME；展示用的 file_type 仍由扩展名决定，两者互不导出
             refreshMimeType(docId, outcome.mimeType());
+            refreshDocMetadata(docId, outcome.documentMetadata());
 
             markChunkSucceeded(docId, savedCount);
             long totalDuration = System.currentTimeMillis() - totalStartTime;
@@ -333,6 +337,43 @@ public class KnowledgeDocumentServiceImpl implements KnowledgeDocumentService {
             return;
         }
         documentMapper.updateById(KnowledgeDocumentDO.builder().id(docId).mimeType(mimeType).build());
+    }
+
+    /**
+     * 写入元数据草稿与入库诊断；人工确认过的治理字段保留，见 {@link DocumentMetadataCodec#mergeOnIngest}
+     */
+    private void refreshDocMetadata(String docId, Map<String, Object> ingested) {
+        if (ingested == null || ingested.isEmpty()) {
+            return;
+        }
+        KnowledgeDocumentDO current = documentMapper.selectById(docId);
+        String merged = documentMetadataCodec.write(
+                documentMetadataCodec.mergeOnIngest(current == null ? null : current.getDocMetadata(), ingested));
+        documentMapper.update(Wrappers.lambdaUpdate(KnowledgeDocumentDO.class)
+                .eq(KnowledgeDocumentDO::getId, docId)
+                .setSql("doc_metadata = CAST({0} AS jsonb)", merged));
+    }
+
+    @Override
+    public Map<String, Object> getMetadata(String docId) {
+        KnowledgeDocumentDO documentDO = documentMapper.selectById(docId);
+        Assert.notNull(documentDO, () -> new ClientException("文档不存在"));
+        return documentMetadataCodec.read(documentDO.getDocMetadata());
+    }
+
+    @Override
+    public Map<String, Object> confirmMetadata(String docId, DocumentMetadataConfirmRequest request) {
+        KnowledgeDocumentDO documentDO = documentMapper.selectById(docId);
+        Assert.notNull(documentDO, () -> new ClientException("文档不存在"));
+        if (request == null) {
+            throw new ClientException("确认的元数据不能为空");
+        }
+        Map<String, Object> merged = documentMetadataCodec.confirm(documentDO.getDocMetadata(),
+                request.toMetadata(), UserContext.getUsername());
+        documentMapper.update(Wrappers.lambdaUpdate(KnowledgeDocumentDO.class)
+                .eq(KnowledgeDocumentDO::getId, docId)
+                .setSql("doc_metadata = CAST({0} AS jsonb)", documentMetadataCodec.write(merged)));
+        return merged;
     }
 
     private byte[] readFileBytes(KnowledgeDocumentDO documentDO) {

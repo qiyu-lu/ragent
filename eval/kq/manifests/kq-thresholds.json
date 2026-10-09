@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "kind": "kq-thresholds",
+  "written": "2026-10-09",
+  "tag": "kq-s1",
+  "status_file": "docs/iron-ore-rag/knowledge-quality-status.md",
+  "note": "Fixed before any stage-2 code change; never edited afterwards. Values come from the S1-base tune summary (3 replays at 59b858c). A gain counts as improved when it reaches the threshold; a loss counts as regressed when it exceeds it. For Hit@5 and MRR the threshold is max(range, 1/n): one question going from a miss to rank 1. Context precision has no per-question unit, so its threshold is the range alone.",
+  "sources": {
+    "S1-base-tune-summary": {
+      "path": "local-data/kq-eval/runs/S1-base-tune-summary.json",
+      "sha256": "d1c55aace92f2511bf743b44369bcb5d3d20b873fdcbc4649b9b8e2828e8dced"
+    },
+    "S1-base-test-summary": {
+      "path": "local-data/kq-eval/runs/S1-base-test-summary.json",
+      "sha256": "81dab9f70c2d135aa02ce24b7da74526221b2df94dff12ae83390c0b9e1af4a1"
+    },
+    "S1-base-parse-metrics": {
+      "path": "local-data/kq-eval/runs/S1-chunks/parse-metrics.json",
+      "facts_found_raw": 98,
+      "facts_total": 141
+    }
+  },
+  "retrieval": {
+    "overall_answerable": {"n": 53, "hit@5": 0.018868, "mrr": 0.022013, "context_precision": 0.004043},
+    "numeric": {"n": 22, "hit@5": 0.045455, "mrr": 0.045455}
+  },
+  "test_reproduction": {
+    "overall_answerable": {"hit@5": 0.058, "mrr": 0.048}
+  },
+  "parse": {
+    "coverage_raw_min_facts": 113,
+    "per_document_max_fact_loss": 1
+  },
+  "validity": {
+    "max_empty_channel_sub_questions": 8
+  }
+}

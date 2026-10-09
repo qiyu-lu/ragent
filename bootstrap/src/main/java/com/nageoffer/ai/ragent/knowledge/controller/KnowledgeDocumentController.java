@@ -19,6 +19,7 @@ package com.nageoffer.ai.ragent.knowledge.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.nageoffer.ai.ragent.knowledge.controller.request.DocumentMetadataConfirmRequest;
 import com.nageoffer.ai.ragent.knowledge.controller.request.KnowledgeDocumentPageRequest;
 import com.nageoffer.ai.ragent.knowledge.controller.request.KnowledgeDocumentUploadRequest;
 import com.nageoffer.ai.ragent.knowledge.controller.request.KnowledgeDocumentUpdateRequest;
@@ -142,6 +143,25 @@ public class KnowledgeDocumentController {
         accessService.requireDocument(docId, KbPermission.MANAGE);
         documentService.update(docId, requestParam);
         return Results.success();
+    }
+
+    /**
+     * 文档元数据：治理字段（标准号、检测对象、组分……）与解析审计
+     */
+    @GetMapping("/knowledge-base/docs/{docId}/metadata")
+    public Result<Map<String, Object>> getMetadata(@PathVariable String docId) {
+        accessService.requireDocument(docId, KbPermission.READ);
+        return Results.success(documentService.getMetadata(docId));
+    }
+
+    /**
+     * 人工确认文档元数据
+     */
+    @PutMapping("/knowledge-base/docs/{docId}/metadata")
+    public Result<Map<String, Object>> confirmMetadata(@PathVariable String docId,
+                                                       @RequestBody DocumentMetadataConfirmRequest requestParam) {
+        accessService.requireDocument(docId, KbPermission.MANAGE);
+        return Results.success(documentService.confirmMetadata(docId, requestParam));
     }
 
     /**

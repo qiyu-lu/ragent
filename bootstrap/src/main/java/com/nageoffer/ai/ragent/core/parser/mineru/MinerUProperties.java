@@ -77,6 +77,13 @@ public class MinerUProperties {
     private String language = "ch";
 
     /**
+     * 解析模型：pipeline / vlm / MinerU-HTML，留空不发、由服务端取默认（pipeline）
+     * <p>
+     * 显式写上才能让解析结果不随服务端默认值变化而漂移；2026-10-09 实验里 vlm 对丢数字没有改善
+     */
+    private String modelVersion;
+
+    /**
      * 全局 outstanding 任务上限，防止打爆 SaaS，默认 16
      */
     private int concurrencyLimit = 16;

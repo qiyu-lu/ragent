@@ -20,7 +20,10 @@ package com.nageoffer.ai.ragent.core.ingest;
 import com.nageoffer.ai.ragent.core.chunk.model.Chunk;
 import com.nageoffer.ai.ragent.core.ingest.embed.ChunkEmbeddings.EmbeddingStats;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 摄取结果：块数、耗时、命中的解析器，够外层写摄取日志与更新统计
@@ -33,6 +36,7 @@ import java.util.List;
  * @param chunks     最终落库的块
  * @param timings    各阶段耗时
  * @param embedding  向量化的缓存命中与上游计数
+ * @param documentMetadata 写进 {@code doc_metadata} 的元数据草稿、解析审计与归一化摘要，可为空
  */
 public record IngestionOutcome(
         String mimeType,
@@ -40,13 +44,17 @@ public record IngestionOutcome(
         int blockCount,
         List<Chunk> chunks,
         IngestionTimings timings,
-        EmbeddingStats embedding
+        EmbeddingStats embedding,
+        Map<String, Object> documentMetadata
 ) {
 
     public IngestionOutcome {
         chunks = chunks == null ? List.of() : List.copyOf(chunks);
         timings = timings == null ? IngestionTimings.zero() : timings;
         embedding = embedding == null ? EmbeddingStats.ZERO : embedding;
+        // 元数据里允许空值（如没有标准号），不能用 Map.copyOf
+        documentMetadata = documentMetadata == null ? Map.of()
+                : Collections.unmodifiableMap(new LinkedHashMap<>(documentMetadata));
     }
 
     public int chunkCount() {

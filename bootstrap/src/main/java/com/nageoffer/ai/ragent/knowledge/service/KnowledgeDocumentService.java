@@ -19,6 +19,7 @@ package com.nageoffer.ai.ragent.knowledge.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.nageoffer.ai.ragent.knowledge.controller.request.DocumentMetadataConfirmRequest;
 import com.nageoffer.ai.ragent.knowledge.controller.request.KnowledgeDocumentPageRequest;
 import com.nageoffer.ai.ragent.knowledge.controller.request.KnowledgeDocumentUploadRequest;
 import com.nageoffer.ai.ragent.knowledge.controller.request.KnowledgeDocumentUpdateRequest;
@@ -29,6 +30,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 知识库文档服务接口
@@ -126,4 +128,14 @@ public interface KnowledgeDocumentService {
      * @return markdown 原始文本内容
      */
     String preview(String docId);
+
+    /**
+     * 文档元数据：标准号、检测对象等治理字段，以及解析审计与归一化摘要
+     */
+    Map<String, Object> getMetadata(String docId);
+
+    /**
+     * 人工确认治理字段，来源改为 confirmed；之后重新分块不再覆盖这些字段
+     */
+    Map<String, Object> confirmMetadata(String docId, DocumentMetadataConfirmRequest request);
 }

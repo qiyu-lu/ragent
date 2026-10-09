@@ -81,4 +81,19 @@ public class SourceRef {
     private String sheetName;
 
     private String cellRange;
+
+    /**
+     * 标准号（文档元数据），非标准文档为 null
+     */
+    private String standardNo;
+
+    /**
+     * 代替本文档的新版本标准号：同一知识库里有新版本时才有值，面板据此标"已被代替"
+     */
+    private String supersededBy;
+
+    /**
+     * 解析质量审计结论：RECOVERED（OCR 重解析后合格）或 NEEDS_REVIEW（需人工复核）；首次合格或未审计为 null
+     */
+    private String parseVerdict;
 }

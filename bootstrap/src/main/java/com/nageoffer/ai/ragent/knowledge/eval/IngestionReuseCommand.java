@@ -35,6 +35,7 @@ import com.nageoffer.ai.ragent.core.chunk.blockaware.ListChunker;
 import com.nageoffer.ai.ragent.core.chunk.blockaware.ParagraphChunker;
 import com.nageoffer.ai.ragent.core.chunk.blockaware.TableChunker;
 import com.nageoffer.ai.ragent.core.ingest.DefaultIngestionKernel;
+import com.nageoffer.ai.ragent.core.ingest.ParseQualityStage;
 import com.nageoffer.ai.ragent.core.ingest.DocumentRef;
 import com.nageoffer.ai.ragent.core.ingest.IngestionOutcome;
 import com.nageoffer.ai.ragent.core.ingest.IngestionSpec;
@@ -146,7 +147,8 @@ public class IngestionReuseCommand {
 
             List<Map<String, Object>> results = new ArrayList<>();
             for (Step step : job.steps()) {
-                var kernel = new DefaultIngestionKernel(parsers(), chunking(), step.cache() ? cached : uncached, writer);
+                var kernel = new DefaultIngestionKernel(parsers(), chunking(), step.cache() ? cached : uncached, writer,
+                        ParseQualityStage.passThrough());
                 Map<String, Object> result = runStep(kernel, step, target, jdbc);
                 results.add(result);
                 Files.writeString(run.resolve("x5-steps.jsonl"), JSON.writeValueAsString(result) + "\n",

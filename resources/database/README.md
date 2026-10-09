@@ -39,3 +39,7 @@ P1 已移除送检、任务模拟与 ROS1 代码，P5 已用研究 artifact 替�
 可运行 `bash scripts/validate-agentic-research-p2-database.sh`，在开发 PostgreSQL 容器中随机创建隔离库，验证新建 schema 与两次增量执行的列、默认值、约束及索引一致、历史草稿保留和存储约束。`P2_POSTGRES_CONTAINER` 可覆盖容器名；脚本只删除本次成功创建的测试库，不能视为已有业务环境已升级。
 
 使用 `P2_RUN_JAVA_TESTS=true bash scripts/validate-agentic-research-p2-database.sh` 可追加运行 `ResearchEvidencePostgresIT`，验证实际 Java 存储、PGVector 文档过滤、MyBatis 来源读取和 Spring 只读 REPEATABLE READ 邻接事务。需本机 JDK 17、可离线解析的 Maven 依赖及容器映射的 PostgreSQL 端口。连接凭证由脚本临时读取为子进程环境变量，不打印到日志；测试只接受本机随机 `research_p2_` 数据库，结束后由同一脚本清理。合成向量及正文夹具不代表公开语料导入或模型效果验证。
+
+## 2026-10-09：文档元数据列（knowledge-quality 阶段 2）
+
+`t_knowledge_document` 新增 JSONB 列 `doc_metadata`：标准号、发布年、代替的旧标准、检测对象、组分、方法（入库抽取，人工确认后 `source=confirmed`），以及解析质量审计 `parseAudit` 与归一化摘要 `normalization`。新环境的 `schema_pg.sql` 已包含（列在表尾，与升级后的列序一致）；已有环境执行 `upgrades/v1.1.0/261009_knowledge_document_metadata.sql`，只加列、可重复执行、不回填，重新分块时由入库流程写入。**应用代码读取文档时会选这一列，未升级的库查文档会报错**，部署新代码前先执行。`bash scripts/validate-agentic-research-p2-database.sh` 已把 `t_knowledge_document` 纳入新建与升级的列一致性比对。

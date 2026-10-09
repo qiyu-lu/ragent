@@ -35,7 +35,7 @@ psql_p2 < resources/database/init_data_pg.sql
 
 p2_catalog_sql="SELECT table_name, column_name, udt_name, is_nullable, column_default
   FROM information_schema.columns
-  WHERE table_schema = 'public' AND table_name IN ('t_research_run', 't_research_evidence', 't_research_event', 't_research_corpus_document', 't_knowledge_base', 't_knowledge_base_grant', 't_embedding_cache', 't_knowledge_document_chunk_log')
+  WHERE table_schema = 'public' AND table_name IN ('t_research_run', 't_research_evidence', 't_research_event', 't_research_corpus_document', 't_knowledge_base', 't_knowledge_base_grant', 't_embedding_cache', 't_knowledge_document_chunk_log', 't_knowledge_document')
   ORDER BY table_name, ordinal_position;
   SELECT conrelid::regclass, conname, pg_get_constraintdef(oid)
   FROM pg_constraint
@@ -77,6 +77,9 @@ DROP TABLE t_embedding_cache;
 ALTER TABLE t_knowledge_document_chunk_log DROP COLUMN embed_cache_hits;
 ALTER TABLE t_knowledge_document_chunk_log DROP COLUMN embed_cache_misses;
 
+-- knowledge-quality stage 2: rewind the document metadata column.
+ALTER TABLE t_knowledge_document DROP COLUMN doc_metadata;
+
 -- Intent tree: existing deployments still carry the node table.
 CREATE TABLE t_intent_node (id VARCHAR(20) NOT NULL PRIMARY KEY, intent_code VARCHAR(64) NOT NULL);
 INSERT INTO t_intent_node (id, intent_code) VALUES ('p2-intent', 'legacy');
@@ -95,6 +98,8 @@ psql_p2 < resources/database/upgrades/v1.1.0/260918_03_embedding_cache.sql
 psql_p2 < resources/database/upgrades/v1.1.0/260918_03_embedding_cache.sql
 psql_p2 < resources/database/upgrades/v1.1.0/260919_01_drop_intent_node.sql
 psql_p2 < resources/database/upgrades/v1.1.0/260919_01_drop_intent_node.sql
+psql_p2 < resources/database/upgrades/v1.1.0/261009_knowledge_document_metadata.sql
+psql_p2 < resources/database/upgrades/v1.1.0/261009_knowledge_document_metadata.sql
 psql_p2 -Atc "$p2_catalog_sql" > "$p2_scratch/upgraded-catalog.txt"
 diff -u "$p2_scratch/fresh-catalog.txt" "$p2_scratch/upgraded-catalog.txt"
 

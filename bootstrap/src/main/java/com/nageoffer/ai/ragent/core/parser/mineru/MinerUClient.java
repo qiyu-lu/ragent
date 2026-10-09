@@ -83,6 +83,9 @@ public class MinerUClient {
         body.put("enable_formula", request.enableFormula());
         body.put("enable_table", request.enableTable());
         body.put("language", request.language() == null ? "ch" : request.language());
+        if (request.modelVersion() != null && !request.modelVersion().isBlank()) {
+            body.put("model_version", request.modelVersion().trim());
+        }
 
         ArrayNode files = body.putArray("files");
         ObjectNode file = files.addObject();

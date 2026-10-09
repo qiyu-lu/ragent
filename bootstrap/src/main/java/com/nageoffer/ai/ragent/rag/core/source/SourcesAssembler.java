@@ -23,6 +23,7 @@ import com.nageoffer.ai.ragent.framework.convention.RetrievedChunk;
 import com.nageoffer.ai.ragent.framework.convention.SourceRef;
 import com.nageoffer.ai.ragent.knowledge.dao.entity.KnowledgeDocumentDO;
 import com.nageoffer.ai.ragent.knowledge.dao.mapper.KnowledgeDocumentMapper;
+import com.nageoffer.ai.ragent.knowledge.service.impl.DocumentGovernanceResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -52,6 +53,7 @@ public class SourcesAssembler {
     private static final String SOURCE_TYPE_FEISHU = "feishu";
 
     private final KnowledgeDocumentMapper documentMapper;
+    private final DocumentGovernanceResolver governanceResolver;
 
     /**
      * 由请求级最终分片列表装配来源。
@@ -80,11 +82,13 @@ public class SourcesAssembler {
         // 批量补齐来源类型与外部链接
         List<String> docIds = ordered.stream().map(RetrievedChunk::getDocId).toList();
         Map<String, KnowledgeDocumentDO> docs = loadDocs(docIds);
+        Map<String, DocumentGovernanceResolver.DocumentGovernance> governance = governanceResolver.resolve(docIds);
 
         List<SourceRef> sources = new ArrayList<>(ordered.size());
         int index = 1;
         for (RetrievedChunk chunk : ordered) {
             KnowledgeDocumentDO doc = docs.get(chunk.getDocId());
+            DocumentGovernanceResolver.DocumentGovernance docGovernance = governance.get(chunk.getDocId());
             String sourceType = doc != null ? doc.getSourceType() : null;
             sources.add(SourceRef.builder()
                     .index(index++)
@@ -98,6 +102,10 @@ public class SourcesAssembler {
                     .documentVersion(doc != null ? doc.getDocumentVersion() : chunk.getDocumentVersion())
                     .sheetName(chunk.getSheetName())
                     .cellRange(chunk.getCellRange())
+                    .standardNo(docGovernance != null && docGovernance.metadata() != null
+                            ? docGovernance.metadata().standardNo() : null)
+                    .supersededBy(docGovernance != null ? docGovernance.supersededBy() : null)
+                    .parseVerdict(docGovernance != null ? reportedVerdict(docGovernance.parseVerdict()) : null)
                     .build());
         }
         return sources;
@@ -130,6 +138,13 @@ public class SourcesAssembler {
             return chunk.getDocName();
         }
         return doc != null ? doc.getDocName() : null;
+    }
+
+    /**
+     * 只把需要提醒读者的审计结论带到面板：首次合格不提示
+     */
+    private static String reportedVerdict(String verdict) {
+        return "RECOVERED".equals(verdict) || "NEEDS_REVIEW".equals(verdict) ? verdict : null;
     }
 
     private static double score(RetrievedChunk chunk) {

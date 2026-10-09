@@ -106,6 +106,17 @@ def count_digits(text: Optional[str]) -> int:
     return sum(1 for ch in text or "" if unicodedata.category(ch) == "Nd")
 
 
+# Markdown image references. MinerU names images by a 64-hex SHA-256 and ingestion rewrites them to
+# asset URLs with a UUID, so each reference carries 25-45 digits that are not document content.
+IMAGE_REF_RE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
+
+
+def strip_image_refs(text: Optional[str]) -> str:
+    """Drop ``![alt](url)`` before character statistics; anchor matching keeps the text as stored."""
+
+    return IMAGE_REF_RE.sub("", text or "")
+
+
 def count_ascii_digits(text: Optional[str]) -> int:
     return sum(1 for ch in text or "" if "0" <= ch <= "9")
 
@@ -138,6 +149,10 @@ SLOT_PATTERNS = [
         r"约\s*[,，。.]",
     )
 ]
+# The verb pattern above also fires on intact prose ("继续加热，""干燥，灰化"): on the 2026-10-09 probes every
+# match it made in a good parse was such a false positive. The strict set leaves it out; the stage-2 parse
+# quality gate audits with the same six patterns (ParseTextMetrics.STRICT_SLOT_PATTERNS).
+STRICT_SLOT_PATTERNS = [pattern for pattern in SLOT_PATTERNS if not pattern.pattern.startswith("(?:放置")]
 NOISE_PATTERNS = [
     re.compile(pattern) for pattern in (
         r"中国标准出版社授权北京万方数据",
@@ -150,6 +165,11 @@ NOISE_PATTERNS = [
 def count_empty_slots(text: Optional[str]) -> int:
     value = text or ""
     return sum(len(pattern.findall(value)) for pattern in SLOT_PATTERNS)
+
+
+def count_empty_slots_strict(text: Optional[str]) -> int:
+    value = text or ""
+    return sum(len(pattern.findall(value)) for pattern in STRICT_SLOT_PATTERNS)
 
 
 def slots_per_1000(text: Optional[str]) -> Optional[float]:

@@ -1,0 +1,65 @@
+# 阶段 2 评测实例的附加配置（knowledge-quality 计划 §5.4）：库 ragent_eval_kq_s2，闸门 + 归一化 + 清洗打开，boost 关。
+# 用法：复制到 local-data/kq-eval/config/application-kq-s2.yaml（Git 忽略），启动参数加
+#   --spring.config.additional-location=file:<绝对路径>/local-data/kq-eval/config/application-kq-s2.yaml
+# boost 臂不改这个文件，在启动命令后追加 --rag.search.metadata-boost.enabled=true --rag.search.metadata-boost.beta=0.2
+# 模型 API Key 仍只从环境变量注入：BAILIAN_API_KEY、SILICONFLOW_API_KEY、MINERU_API_KEY。
+# 检索预算、通道超时与阶段 1 完全相同（S1-base 的条件），只改入库侧。
+server:
+  port: 9094
+
+# 隔离 RocketMQ 主题 / 消费组与应用名，避免与阶段 1 实例互相消费入库消息
+unique-name: _kq_s2
+
+spring:
+  datasource:
+    url: jdbc:postgresql://127.0.0.1:5432/ragent_eval_kq_s2?client_encoding=UTF8
+  data:
+    redis:
+      database: 14
+
+ragent:
+  eval:
+    enabled: true
+    rewrite-log: local-data/kq-eval/rewrites/rewrites-s2.jsonl
+    max-sub-questions: 10
+
+rag:
+  storage:
+    kb-bucket: ragent-sources-kq-s2   # 应用启动时自动建桶（StorageInitializer）
+    asset-bucket: ragent-assets-kq-s2
+  image-parse:
+    embedded-describe-enabled: false  # 与阶段 1 相同：图片解析关闭
+  ingestion:
+    parse-quality:
+      enabled: true      # §5.1 闸门；阈值用 application.yaml 里标定的默认值
+    normalize:
+      enabled: true      # §5.2 归一化与去页面家具
+  query-rewrite:
+    enabled: true
+  rerank:
+    enabled: true
+  search:
+    default-top-k: 10
+    recall-budget: 20
+    request-level-refill-enabled: false
+    channels:
+      timeout-ms: 15000
+      vector:
+        enabled: true
+      web-search:
+        enabled: false
+    fusion:
+      strategy: rrf
+      rrf-k: 20
+      rerank-candidate-limit: 40
+    metadata-boost:
+      enabled: false     # S2-gate 臂关；boost 臂用启动参数打开
+  knowledge:
+    # 从仓库里的文件读术语表（在仓库根目录启动），核对后改了同义写法重启即生效，不必重新打包
+    terms-location: file:bootstrap/src/main/resources/kq/terms.csv
+
+mineru:
+  ocr: false             # 闸门按文档决定 OCR，这里是首次解析的默认
+  enable-formula: true
+  enable-table: true
+  model-version: pipeline  # 显式固定，免得服务端默认值变化让解析结果漂移

@@ -94,8 +94,43 @@ export function SourcesPanel() {
                         </span>
                         <span className="truncate">{sourceSite(source)}</span>
                       </div>
-                      {source.documentVersion || source.sheetName || source.cellRange ? (
+                      {source.documentVersion ||
+                      source.sheetName ||
+                      source.cellRange ||
+                      source.standardNo ||
+                      source.supersededBy ||
+                      source.parseVerdict ? (
                         <div className="mt-1.5 flex flex-wrap gap-1 text-[11px] text-[#526176]">
+                          {source.standardNo ? (
+                            <span className="rounded bg-[#EEF2FF] px-1.5 py-0.5">
+                              {source.standardNo}
+                            </span>
+                          ) : null}
+                          {source.supersededBy ? (
+                            <span
+                              className="rounded bg-[#FEF3C7] px-1.5 py-0.5 text-[#92400E]"
+                              title={`已被 ${source.supersededBy} 代替`}
+                            >
+                              已被代替
+                            </span>
+                          ) : null}
+                          {source.parseVerdict ? (
+                            <span
+                              className={cn(
+                                "rounded px-1.5 py-0.5",
+                                source.parseVerdict === "NEEDS_REVIEW"
+                                  ? "bg-[#FEF3C7] text-[#92400E]"
+                                  : "bg-[#F1F5F9]"
+                              )}
+                              title={
+                                source.parseVerdict === "NEEDS_REVIEW"
+                                  ? "解析质量审计未通过，数值请对照原文"
+                                  : "首次解析丢数字，已用 OCR 重新解析"
+                              }
+                            >
+                              {source.parseVerdict === "NEEDS_REVIEW" ? "解析需复核" : "OCR 重解析"}
+                            </span>
+                          ) : null}
                           {source.documentVersion ? (
                             <span className="rounded bg-[#EEF2FF] px-1.5 py-0.5">
                               {source.documentVersion}

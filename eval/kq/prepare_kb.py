@@ -37,6 +37,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--password", default="admin")
     parser.add_argument("--token")
     parser.add_argument("--visibility", default="PUBLIC", choices=["PUBLIC", "PRIVATE", "RESTRICTED"])
+    parser.add_argument("--kb-name", help="override the corpus KB name (stage 2 ingests the same corpus as kq-s2)")
+    parser.add_argument("--collection-name", help="override the corpus collection name")
     parser.add_argument("--poll-seconds", type=int, default=10)
     parser.add_argument("--ingest-timeout", type=int, default=1800, help="per document")
     parser.add_argument("--only", nargs="*", help="corpus doc ids to ingest (default all)")
@@ -141,8 +143,13 @@ def main() -> int:
             print(f"sha256 mismatch: {path}")
             return 1
     spec = manifest["ingestion_spec"]
+    kb_spec = dict(manifest["knowledge_base"])
+    if args.kb_name:
+        kb_spec["name"] = args.kb_name
+    if args.collection_name:
+        kb_spec["collection_name"] = args.collection_name
     if args.dry_run:
-        print(json.dumps({"knowledge_base": manifest["knowledge_base"], "ingestion_spec": spec,
+        print(json.dumps({"knowledge_base": kb_spec, "ingestion_spec": spec,
                           "documents": [doc["doc_name"] for doc in documents]}, ensure_ascii=False, indent=2))
         return 0
 
@@ -153,7 +160,7 @@ def main() -> int:
     try:
         if not client.token:
             client.login(args.username, args.password)
-        kb = create_or_reuse_kb(client, manifest["knowledge_base"], args.visibility, args.resume)
+        kb = create_or_reuse_kb(client, kb_spec, args.visibility, args.resume)
         print(f"kb {kb['name']} id={kb['id']} ({'reused' if kb['reused'] else 'created'})")
         existing = existing_documents(client, kb["id"]) if kb["reused"] else {}
         for doc, action, current in plan_actions(documents, existing):

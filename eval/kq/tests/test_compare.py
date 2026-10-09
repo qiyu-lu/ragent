@@ -35,6 +35,33 @@ class CompareTest(unittest.TestCase):
         self.assertEqual(cmp.verdict("n_chunks", 2.0, 0.5), "regressed")
         self.assertEqual(cmp.verdict("hit@5", 0.01, 0.04), "unproven")
 
+    def test_fixed_thresholds_replace_the_range_and_one_question_counts(self):
+        base = [report("b1", "S1-base", 1, 34 / 53, 0.60), report("b2", "S1-base", 2, 34 / 53, 0.60),
+                report("b3", "S1-base", 3, 34 / 53, 0.60)]
+        cand = [report("c1", "S2", 1, 35 / 53, 0.61), report("c2", "S2", 2, 35 / 53, 0.61),
+                report("c3", "S2", 3, 35 / 53, 0.61)]
+        fixed = {"overall_answerable": {"hit@5": 1 / 53, "mrr": 0.022}}
+        comparison = cmp.compare_arms(cmp.summarize_arm(base), cmp.summarize_arm(cand), fixed)
+        self.assertEqual(comparison["overall_answerable"]["hit@5"]["verdict"], "improved")
+        self.assertEqual(comparison["overall_answerable"]["hit@5"]["threshold_source"], "fixed")
+        self.assertEqual(comparison["overall_answerable"]["mrr"]["verdict"], "unproven")
+        self.assertEqual(comparison["by_type"]["numeric"]["hit@5"]["threshold_source"], "baseline_range")
+
+    def test_zero_range_never_turns_no_change_into_improved(self):
+        self.assertEqual(cmp.verdict("hit@5", 0.0, 0.0), "unproven")
+
+    def test_validity_counts_empty_channel_sub_questions(self):
+        bad = report("r1", "S2", 1, 0.8, 0.5)
+        bad["details"] = [{"raw_response": {"stages": [{"stage": "channel-VectorSearch", "chunkCount": 0},
+                                                       {"stage": "post-Rerank", "chunkCount": 0}]}}] * 9
+        good = report("r2", "S2", 2, 0.8, 0.5)
+        good["details"] = [{"raw_response": {"stages": [{"stage": "channel-VectorSearch", "chunkCount": 20}]}}]
+        self.assertEqual(cmp.empty_channel_sub_questions(bad), 9)
+        problems = cmp.check_validity({"S2": [bad, good]}, 8)
+        self.assertEqual(len(problems), 1)
+        self.assertIn("r1", problems[0])
+        self.assertEqual(cmp.check_validity({"S2": [bad]}, None), [])
+
     def test_compatibility_checks(self):
         arms = {"a": [report("a1", "a", 1, 0.8, 0.5), report("a2", "a", 1, 0.8, 0.5)],
                 "b": [report("b1", "b", 1, 0.8, 0.5, split="test")]}

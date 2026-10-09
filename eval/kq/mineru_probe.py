@@ -30,8 +30,10 @@ from typing import Any, Dict, List, Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from evalkit import (  # noqa: E402
+    IMAGE_REF_RE,
     count_digits,
     count_empty_slots,
+    count_empty_slots_strict,
     count_noise_lines,
     count_non_space,
     load_corpus,
@@ -40,6 +42,7 @@ from evalkit import (  # noqa: E402
     sha256_file,
     sha256_text,
     slots_per_1000,
+    strip_image_refs,
     utc_now_iso,
     write_json,
 )
@@ -182,17 +185,21 @@ def markdown_from_zip(zip_bytes: bytes) -> tuple:
 
 
 def markdown_metrics(markdown: str) -> dict:
+    """Character statistics on the markdown without image references (their hash file names are not content)."""
+
     lines = markdown.splitlines()
+    text = strip_image_refs(markdown)
     return {
         "chars": len(markdown),
-        "non_space_chars": count_non_space(markdown),
-        "digits_nd": count_digits(markdown),
-        "empty_slots": count_empty_slots(markdown),
-        "slots_per_1000": slots_per_1000(markdown),
-        "noise_lines": count_noise_lines(markdown),
+        "non_space_chars": count_non_space(text),
+        "digits_nd": count_digits(text),
+        "empty_slots": count_empty_slots(text),
+        "empty_slots_strict": count_empty_slots_strict(text),
+        "slots_per_1000": slots_per_1000(text),
+        "noise_lines": count_noise_lines(text),
         "dollar_signs": markdown.count("$"),
         "lines_with_math": sum(1 for line in lines if "$" in line),
-        "image_refs": markdown.count("]("),
+        "image_refs": len(IMAGE_REF_RE.findall(markdown)),
     }
 
 

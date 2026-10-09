@@ -109,7 +109,23 @@ rag:
     embedding-cache:
       enabled: true
       max-entries: 100000  # 按 last_used 淘汰；1536 维一条约 6 KB
+    # 解析质量闸门（knowledge-quality 计划 §5.1）：MinerU 解析的 PDF 对 PDFBox 文字层审计严格空槽与数字保留率，
+    # 不合格就把 OCR 开关取反重解析一次、保留得分高的。阈值在 2026-10-09 的解析实验上标定；过了阶段 2 门槛再默认开启
+    parse-quality:
+      enabled: false
+      scanned-max-median-chars-per-page: 50
+      garbled-min-ratio: 0.1
+      repeated-line-min-page-share: 0.5
+      max-strict-slots-per1000: 0.3
+      min-digit-retention: 0.85
+      fallback-enabled: true
+    # 入库归一化（NFKC、单位、空白、数值型行内公式去壳）与去页面家具（§5.2），默认关闭
+    normalize:
+      enabled: false
+      drop-repeated-lines: true
+      repeated-line-min-occurrences: 3
   knowledge:
+    terms-location: classpath:kq/terms.csv  # 领域术语表：元数据抽取、查询侧加权、阶段 3 分词词典共用
     schedule:
       scan-delay-ms: 10000
       lock-seconds: 900
@@ -137,6 +153,10 @@ rag:
       channel-weights:
         vector: 1.0
         web-search: 0.5
+    # 查询侧文档元数据加权（§5.3）：查询提到的检测对象 / 组分与文档元数据对上时，重排头部 最终分 = 重排分 + β × 匹配度
+    metadata-boost:
+      enabled: false
+      beta: 0.2
 
   trace:
     enabled: true
@@ -308,6 +328,7 @@ mineru:
   enable-formula: true
   ocr: false
   language: ch
+  model-version:  # 留空不发，服务端默认 pipeline；可选 pipeline / vlm / MinerU-HTML
   concurrency-limit: 5
   semaphore-name: rag:mineru:parse
   max-wait-seconds: 30
@@ -321,3 +342,9 @@ sa-token:
   token-style: simple-uuid
   is-log: false
   is-print: false
+
+logging:
+  level:
+    # 解析质量闸门用 PDFBox 抽文字层，标准 PDF 的内嵌字体会触发成片的字体回退告警，与抽取结果无关
+    org.apache.pdfbox: error
+    org.apache.fontbox: error

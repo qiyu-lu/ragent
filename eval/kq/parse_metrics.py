@@ -4,8 +4,12 @@
 * numeric-fact coverage: share of facts whose anchor is found in the document's text, reported twice —
   against the raw text (missing = "丢失") and after LaTeX unwrapping (missing only there = "变形");
 * digit retention: Unicode digits in the parsed text / digits in the ``pdftotext -layout`` text layer;
-* empty slots per 1000 non-space characters;
+* empty slots per 1000 non-space characters, all seven patterns and the strict six the stage-2 gate uses;
 * noise lines (publisher watermark, header/footer).
+
+Character statistics (digits, non-space characters, slots) are taken after removing Markdown image
+references (``metric_version`` 2): an image reference carries a SHA-256 or UUID file name, so version 1
+counted 25-45 hash digits per image as document digits. Fact matching still runs on the text as stored.
 
 Input is either the chunk export of ``audit_chunks.py`` (``--chunks``) or one MinerU ``full.md``
 (``--full-md`` with ``--doc``).
@@ -25,14 +29,18 @@ from evalkit import (  # noqa: E402
     contains_anchor,
     count_digits,
     count_empty_slots,
+    count_empty_slots_strict,
     count_noise_lines,
     count_non_space,
     load_jsonl,
     read_json,
     sha256_file,
+    strip_image_refs,
     utc_now_iso,
     write_json,
 )
+
+METRIC_VERSION = 2
 
 HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parents[1]
@@ -79,10 +87,11 @@ def doc_metrics(doc_id: str, texts: Sequence[str], facts: Sequence[Mapping], tex
             found_latex_only.append(str(fact.get("id")))
         else:
             missing.append(str(fact.get("id")))
-    joined = "\n".join(texts)
+    joined = strip_image_refs("\n".join(texts))
     digits = count_digits(joined)
     non_space = count_non_space(joined)
     slots = count_empty_slots(joined)
+    slots_strict = count_empty_slots_strict(joined)
     total = len(facts)
     return {
         "doc": doc_id,
@@ -100,6 +109,8 @@ def doc_metrics(doc_id: str, texts: Sequence[str], facts: Sequence[Mapping], tex
         "non_space_chars": non_space,
         "empty_slots": slots,
         "slots_per_1000": (slots * 1000.0 / non_space) if non_space else None,
+        "empty_slots_strict": slots_strict,
+        "slots_strict_per_1000": (slots_strict * 1000.0 / non_space) if non_space else None,
         "noise_lines": count_noise_lines(joined),
     }
 
@@ -112,6 +123,7 @@ def overall(per_doc: Sequence[Mapping]) -> dict:
     textlayer = sum(item["textlayer_digits_nd"] or 0 for item in per_doc if item.get("textlayer_digits_nd"))
     non_space = sum(item["non_space_chars"] for item in per_doc)
     slots = sum(item["empty_slots"] for item in per_doc)
+    slots_strict = sum(item.get("empty_slots_strict") or 0 for item in per_doc)
     return {
         "documents": len(per_doc),
         "facts_total": total,
@@ -119,6 +131,7 @@ def overall(per_doc: Sequence[Mapping]) -> dict:
         "coverage_after_latex": latex / total if total else None,
         "digit_retention": digits / textlayer if textlayer else None,
         "slots_per_1000": slots * 1000.0 / non_space if non_space else None,
+        "slots_strict_per_1000": slots_strict * 1000.0 / non_space if non_space else None,
         "noise_lines": sum(item["noise_lines"] for item in per_doc),
     }
 
@@ -161,11 +174,13 @@ def main() -> int:
         print(f"{doc_id[:28]:30s} facts={item['facts_found_raw']}/{item['facts_found_after_latex']}/{item['facts_total']} "
               f"(raw/latex/total) digits={item['digits_nd']}/{item['textlayer_digits_nd']} "
               f"retention={'-' if retention is None else format(retention, '.2f')} "
-              f"slots/1k={'-' if item['slots_per_1000'] is None else format(item['slots_per_1000'], '.2f')} noise={item['noise_lines']}")
+              f"slots/1k={'-' if item['slots_per_1000'] is None else format(item['slots_per_1000'], '.2f')} "
+              f"strict={item['empty_slots_strict']} noise={item['noise_lines']}")
     summary = overall(per_doc)
     write_json(args.output, {
         "schema_version": 1,
         "kind": "kq-parse-metrics",
+        "metric_version": METRIC_VERSION,
         "label": args.label,
         "created_at": utc_now_iso(),
         "source": source,
@@ -175,7 +190,8 @@ def main() -> int:
         "documents": per_doc,
     })
     print(f"overall: coverage raw={summary['coverage_raw']} after-latex={summary['coverage_after_latex']} "
-          f"digit_retention={summary['digit_retention']} slots/1k={summary['slots_per_1000']}")
+          f"digit_retention={summary['digit_retention']} slots/1k={summary['slots_per_1000']} "
+          f"strict/1k={summary['slots_strict_per_1000']} noise={summary['noise_lines']}")
     print(f"report: {args.output}")
     return 0
 

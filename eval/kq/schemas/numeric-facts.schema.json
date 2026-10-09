@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "kq numeric fact",
+  "type": "object",
+  "required": ["id", "doc", "clause", "anchor", "kind"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^f-[a-z0-9-]+$"},
+    "doc": {"type": "string", "description": "corpus doc id"},
+    "page": {"type": ["integer", "null"], "description": "PDF page index (1-based); null for XLSX"},
+    "clause": {"type": "string", "description": "clause number, table, or sheet!cell"},
+    "anchor": {"type": "string", "minLength": 1, "description": "the value as written in the source"},
+    "alt_anchors": {"type": "array", "items": {"type": "string"}, "description": "accepted variants of the same value in parsed text"},
+    "kind": {"enum": ["temperature", "time", "concentration", "mass", "volume", "particle_size", "limit", "precision", "count", "ratio", "other"]},
+    "description": {"type": "string"},
+    "source": {"enum": ["text", "manual"], "description": "text: locatable in the text layer; manual: read from page images (scanned PDF)"}
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "description": "Shared normalization contract. eval/kq/evalkit.normalize must map every case input to expected; the stage-2 Java ingestion normalizer reads the same cases. latex_cases go through strip_latex before normalize.",
+  "cases": [
+    {"name": "fullwidth digits, percent and tilde", "input": "１．００％～４０．００％", "expected": "1.00%~40.00%"},
+    {"name": "layout spaces and markdown emphasis", "input": "**1050 ℃ ± 20 ℃**", "expected": "1050°C±20°C"},
+    {"name": "degree sign variants", "input": "400℃±20 °C / 400 ºC / 105˚C", "expected": "400°C±20°C/400°C/105°C"},
+    {"name": "dash and micro variants", "input": "100 μm–160 µm — 1−2 ‐ 3", "expected": "100μm-160μm-1-2-3"},
+    {"name": "ideographic space, zero width and fullwidth letter", "input": "称取　0.100​ｇ试样", "expected": "称取0.100g试样"},
+    {"name": "fullwidth standard number and parentheses", "input": "ＹＳ／Ｔ ３６０．２—２０１１（１＋１）", "expected": "YS/T360.2-2011(1+1)"},
+    {"name": "fullwidth percent", "input": "质量分数１％", "expected": "质量分数1%"},
+    {"name": "tilde kept as range", "input": "放置 1min~2min", "expected": "放置1min~2min"},
+    {"name": "pdftotext split digits", "input": "1.\n00~10.\n00", "expected": "1.00~10.00"},
+    {"name": "chinese punctuation fullwidth forms", "input": "盐酸（１＋９）；硫酸：１＋１，混匀。", "expected": "盐酸(1+9);硫酸:1+1,混匀。"}
+  ],
+  "latex_cases": [
+    {"name": "temperature and time in math", "input": "温度控制在 $400 \\pm 20 ^ { \\circ } \\mathrm { C }$ ，放置 $1 \\sim 2 \\mathrm { ~ m i n }$", "expected": "温度控制在400±20°C,放置1~2min"},
+    {"name": "density", "input": "盐酸 $\\rho = 1.19 \\mathrm { g } / \\mathrm { m L }$", "expected": "盐酸ρ=1.19g/mL"},
+    {"name": "percent", "input": "硅含量高于 $10 \\%$ (质量分数)", "expected": "硅含量高于10%(质量分数)"},
+    {"name": "mathrm with tilde space", "input": "$1050 \\mathrm { ~ ^ { \\circ } C } \\pm 20 \\mathrm { ~ ^ { \\circ } C }$", "expected": "1050°C±20°C"},
+    {"name": "text outside math untouched", "input": "称取 0.200 g 试样，精确至 0.000 1 g。", "expected": "称取0.200g试样,精确至0.0001g。"}
+  ]
+}

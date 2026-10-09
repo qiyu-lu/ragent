@@ -1,0 +1,2 @@
+{"id": "f-example-01", "doc": "example-doc", "page": 5, "clause": "7.4.1.1", "anchor": "温度控制在 400 ℃±20 ℃", "alt_anchors": ["温度控制在400±20℃"], "kind": "temperature", "description": "示例：原文写法与 MinerU 常见变形各记一条", "source": "text"}
+{"id": "f-example-02", "doc": "example-scan-doc", "page": 6, "clause": "6.7", "anchor": "950~1000℃灼烧30min", "kind": "temperature", "description": "示例：扫描件由人工读图核对", "source": "manual"}

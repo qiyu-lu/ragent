@@ -1,0 +1,53 @@
+# 阶段 1 评测实例的附加配置（knowledge-quality 计划 §4.1）。
+# 用法：复制到 local-data/kq-eval/config/application-kq-s1.yaml（Git 忽略），启动参数加
+#   --spring.config.additional-location=file:<绝对路径>/local-data/kq-eval/config/application-kq-s1.yaml
+# 模型 API Key 仍只从环境变量 / IDE Password Safe 注入：BAILIAN_API_KEY、SILICONFLOW_API_KEY、MINERU_API_KEY。
+# 注意：Spring 的 YAML 列表按下标合并，这里不覆盖 ai.*.candidates；模型回退是否发生要看评测接口返回的 rerankScore。
+server:
+  port: 9093
+
+# 隔离 RocketMQ 主题 / 消费组与应用名，避免与同机的普通实例互相消费入库消息
+unique-name: _kq_s1
+
+spring:
+  datasource:
+    url: jdbc:postgresql://127.0.0.1:5432/ragent_eval_kq_s1?client_encoding=UTF8
+  data:
+    redis:
+      database: 13
+
+ragent:
+  eval:
+    enabled: true
+    rewrite-log: local-data/kq-eval/rewrites/rewrites.jsonl
+    max-sub-questions: 10
+
+rag:
+  storage:
+    kb-bucket: ragent-sources-kq-s1   # 应用启动时自动建桶（StorageInitializer）
+    asset-bucket: ragent-assets-kq-s1
+  image-parse:
+    embedded-describe-enabled: false  # §4.1：图片解析关闭
+  query-rewrite:
+    enabled: true
+  rerank:
+    enabled: true
+  search:
+    default-top-k: 10
+    recall-budget: 20
+    request-level-refill-enabled: false
+    channels:
+      timeout-ms: 15000
+      vector:
+        enabled: true
+      web-search:
+        enabled: false
+    fusion:
+      strategy: rrf
+      rrf-k: 20
+      rerank-candidate-limit: 40
+
+mineru:
+  ocr: false
+  enable-formula: true   # S1-base 保持当前解析配置；解析实验走 eval/kq/mineru_probe.py，不改这里
+  enable-table: true

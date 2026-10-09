@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "kq evaluation question",
+  "type": "object",
+  "required": ["id", "type", "split", "question", "answerable", "reference_docs", "anchors", "paraphrased"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+    "type": {"enum": ["numeric", "procedure", "survey", "confusion", "unanswerable"]},
+    "split": {"enum": ["tune", "test"]},
+    "question": {"type": "string", "minLength": 1},
+    "answerable": {"type": "boolean"},
+    "reference_docs": {"type": "array", "items": {"type": "string"}, "uniqueItems": true, "description": "corpus doc ids; empty for unanswerable"},
+    "confuser_docs": {"type": "array", "items": {"type": "string"}, "uniqueItems": true, "description": "near-domain documents the question is designed to be confused with"},
+    "anchors": {"type": "array", "items": {"type": "string", "minLength": 1}, "maxItems": 3, "description": "1..3 phrases taken from the source text; empty for unanswerable"},
+    "source": {"type": "string", "description": "clause or sheet!cell the anchors come from"},
+    "paraphrased": {"type": "boolean", "description": "colloquial or reworded relative to the source"},
+    "notes": {"type": "string"}
+  },
+  "additionalProperties": false
+}

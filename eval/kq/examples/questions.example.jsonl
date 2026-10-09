@@ -1,0 +1,3 @@
+{"id": "num-example-01", "type": "numeric", "split": "tune", "question": "示例：某操作的温度要控制在多少？（不含真实题目）", "answerable": true, "reference_docs": ["example-doc"], "anchors": ["示例锚点 400 ℃±20 ℃"], "source": "7.4.1.1", "paraphrased": true}
+{"id": "con-example-01", "type": "confusion", "split": "test", "question": "示例：对象 A（不是对象 B）的称样量是多少？", "answerable": true, "reference_docs": ["example-doc"], "confuser_docs": ["example-doc-b"], "anchors": ["示例锚点 0.200 g"], "source": "5.1", "paraphrased": true}
+{"id": "una-example-01", "type": "unanswerable", "split": "tune", "question": "示例：资料中没有的测定项目怎么做？", "answerable": false, "reference_docs": [], "anchors": [], "source": "", "paraphrased": false, "notes": "语料不含该方法"}

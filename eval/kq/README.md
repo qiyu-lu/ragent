@@ -24,6 +24,8 @@
 | `verify_boost_beta.py` | 阶段 2：从重排头部的排序反推每次运行实际用的 boost β，核对与臂名一致，并检查空通道上限 |
 | `run_stage2_remaining.py` | 阶段 2：无人值守跑完剩下的运行（自己启停实例、按臂设 β、检查并重跑作废的、对比、按规则选 β、跑测试集），`--plan` 只看计划 |
 | `run_stage3.py` | 阶段 3：无人值守跑完全部运行（构建、快照与升级 `ragent_eval_kq_s1`、按臂启停实例、回填全文索引、检查并重跑作废的、按状态文件的规则选臂、跑测试集），`--plan` 只看计划 |
+| `run_gate_fix_check.py` | 2026-10-10 审查修正后的复核：构建、建 `ragent_eval_kq_s2b`、重新入库 7 份、核对闸门判定与入库正文、解析层指标、调参集回放 3 次并对比（测试集不跑），`--plan` 只看计划 |
+| `stage3_sensitivity.py` | 阶段 3 的提升按四种口径重算（报告值 / 命中限定参考文档 / 只用向量通道正常的运行 / 两者都用），并列出全文通道真正补上的题 |
 | `config/application-kq-s1.example.yaml` | 评测实例的附加配置样例（端口 9093、库 `ragent_eval_kq_s1`、Redis DB 13、独立桶与 MQ 主题）；闸门与归一化显式关闭，保留 S1-base 条件（2026-10-10 起两者默认开启） |
 | `config/application-kq-s2.example.yaml` | 阶段 2 实例（端口 9094、库 `ragent_eval_kq_s2`、Redis DB 14）：闸门与归一化打开，boost 关，检索配置与阶段 1 相同 |
 | `manifests/kq-thresholds.json` | 阶段 2、3 的门槛与运行有效性规则（2026-10-09 写定，`kq-s1`），对比脚本读它 |
@@ -317,3 +319,26 @@ docker exec -i ragent-iron-ore-dev-postgres-1 sh -c 'exec pg_restore -U "$POSTGR
   < local-data/kq-eval/snapshots/ragent_eval_kq_s1-pre-s3-*.dump
 ```
 
+
+## 审查修正复核（2026-10-10 晚，用户在仓库根目录的终端跑）
+
+收尾后的审查修正了闸门与归一化的实现（重解析失败不再拒收、图片只在选中的那次上传、审计误报、入库正文保留中文标点与上下标，见闸门改动说明的"审查后的修正"）。入库正文变了，需要重新入库确认阶段 2 的结论还在。
+
+在**有三把 key 的终端**里（这次要入库，`MINERU_API_KEY` 也要在），确认 9095 上没有实例，执行：
+
+```bash
+python3 eval/kq/run_gate_fix_check.py
+```
+
+不用改任何参数，约 30 分钟。先看计划与预检：`python3 eval/kq/run_gate_fix_check.py --plan`。脚本按顺序：
+
+1. 离线构建 jar；代码目录有未提交的改动就拒绝开跑。
+2. 建库 `ragent_eval_kq_s2b`（`schema_pg.sql` + `init_data_pg.sql`；已有就复用），由 S2 配置样例生成 `local-data/kq-eval/config/application-kq-s2b.yaml`：端口 9095、Redis DB 15、独立的桶与 RocketMQ 名字，闸门与归一化打开，boost、全文、阈值、融合都关。
+3. 启动实例，经正常 API 入库 7 份（`runs/setup-s2b.json`；中断后续跑写 `setup-s2b-resume-*.json`），导出切片并算解析层四指标（`runs/S2b-chunks/`，与 S1、S2 同为 metric v2）。
+4. 核对：每份文档的闸门判定与 `ragent_eval_kq_s2` 相同；所有文档的 `normalization.version` 为 2；调研表的中文标点与上标仍在；解析层主门槛（≥ 113/141，任一文档不比 S1 少 2 条及以上）。
+5. 调参集回放 3 次（`runs/S2b-gate-tune-r{1,2,3}`），向量通道空结果 > 8 的自动挪开重跑；与 `S1-base` 按写定门槛对比（`runs/S2b-gate-vs-S1-base-tune.json`），与 `S2-gate` 只报告（`runs/S2b-gate-vs-S2-gate-tune.json`）。
+6. 停掉实例，写汇总 `runs/gate-fix-check-summary-*.json`。
+
+测试集不跑：它已经为这一项用过一次，修正也没有改阈值。中途断了，重新执行同一条命令会接着跑。跑完由下一个会话读汇总，回填闸门改动说明与计划 §10。
+
+阶段 3 的敏感性分析不需要服务，直接读已有运行：`python3 eval/kq/stage3_sensitivity.py`（加 `--output <路径>` 另存 JSON）。

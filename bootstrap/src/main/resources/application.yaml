@@ -110,17 +110,19 @@ rag:
       enabled: true
       max-entries: 100000  # 按 last_used 淘汰；1536 维一条约 6 KB
     # 解析质量闸门（knowledge-quality 计划 §5.1）：MinerU 解析的 PDF 对 PDFBox 文字层审计严格空槽与数字保留率，
-    # 不合格就把 OCR 开关取反重解析一次、保留得分高的。阈值在 2026-10-09 的解析实验上标定；
-    # 2026-10-10 过了阶段 2 门槛且测试集复现，默认开启（changes/2026-10-10-parse-quality-gate.md）
+    # 不合格就把 OCR 开关取反重解析一次、保留得分高的；重解析本身失败时保留首次结果、标人工复核。
+    # 阈值在 2026-10-09 的解析实验上标定；2026-10-10 过了阶段 2 门槛且测试集复现，默认开启（changes/2026-10-10-parse-quality-gate.md）
     parse-quality:
       enabled: true
       scanned-max-median-chars-per-page: 50
       garbled-min-ratio: 0.1
       repeated-line-min-page-share: 0.5
       max-strict-slots-per1000: 0.3
+      min-strict-slots: 3        # 空槽至少这么多处才看密度，短标准里一处误报不判不合格
       min-digit-retention: 0.85
       fallback-enabled: true
-    # 入库归一化（NFKC、单位、空白、数值型行内公式去壳）与去页面家具（§5.2），与闸门同一臂评测，一起默认开启
+    # 入库归一化（全角数字字母与单位字符转写、空白、MinerU 结果的数值型行内公式去壳；中文标点与上下标不动）
+    # 与去页面家具（§5.2），与闸门同一臂评测，一起默认开启
     normalize:
       enabled: true
       drop-repeated-lines: true

@@ -72,14 +72,14 @@ class ParsedDocumentNormalizerTest {
         blocks.add(new ListBlock(P, false, List.of("东北大学", "盐酸")));
 
         ParsedDocumentNormalizer.Result result = new ParsedDocumentNormalizer(enabled())
-                .normalize(ParsedDocument.of(blocks, Map.of("parser", "MinerU")), layerWithFurniture());
+                .normalize(ParsedDocument.of(blocks, Map.of("parser", "MinerU")), layerWithFurniture(), true);
 
         List<String> texts = result.document().blocks().stream().map(ParsedDocumentNormalizerTest::text).toList();
-        assertEquals(List.of("中华人民共和国国家标准", "GB/T 6730.10-2014", "前言正文。",
-                "GB/T 6730.10-2014 规定了重量法。", "盐酸"), texts);
+        assertEquals(List.of("中华人民共和国国家标准", "GB/T 6730.10—2014", "前言正文。",
+                "GB/T 6730.10—2014 规定了重量法。", "盐酸"), texts, "入库正文保留标准号里的破折号");
         assertEquals(6, result.removedLines(), "水印 3 次（含 OCR 变体与残片）+ 东北大学 3 次");
         assertEquals("MinerU", result.document().metadata().get("parser"));
-        assertEquals(Map.of("applied", true, "repeatedLinesRemoved", 6), result.toMap());
+        assertEquals(Map.of("applied", true, "version", 2, "repeatedLinesRemoved", 6), result.toMap());
     }
 
     @Test
@@ -87,8 +87,8 @@ class ParsedDocumentNormalizerTest {
         List<Block> blocks = List.of(new ParagraphBlock(P, "GB/T 6730.10—2014"), new ParagraphBlock(P, "1 范围"),
                 new ParagraphBlock(P, "GB/T 6730.10—2014"), new ParagraphBlock(P, "正文\nGB/T 6730.10-2014"));
         ParsedDocumentNormalizer.Result result = new ParsedDocumentNormalizer(enabled())
-                .normalize(ParsedDocument.of(blocks), layerWithFurniture());
-        assertEquals(List.of("GB/T 6730.10-2014", "1 范围", "正文"),
+                .normalize(ParsedDocument.of(blocks), layerWithFurniture(), true);
+        assertEquals(List.of("GB/T 6730.10—2014", "1 范围", "正文"),
                 result.document().blocks().stream().map(ParsedDocumentNormalizerTest::text).toList());
         assertEquals(2, result.removedLines());
     }
@@ -98,7 +98,7 @@ class ParsedDocumentNormalizerTest {
         List<Block> blocks = List.of(new ParagraphBlock(P, WATERMARK), new ParagraphBlock(P, "正文"),
                 new ParagraphBlock(P, WATERMARK));
         ParsedDocumentNormalizer.Result result = new ParsedDocumentNormalizer(enabled())
-                .normalize(ParsedDocument.of(blocks), layerWithFurniture());
+                .normalize(ParsedDocument.of(blocks), layerWithFurniture(), true);
         assertEquals(3, result.document().blocks().size());
         assertEquals(0, result.removedLines());
     }
@@ -113,21 +113,35 @@ class ParsedDocumentNormalizerTest {
                 code,
                 new ImageBlock(P, asset, "图１", "图１"));
         ParsedDocument normalized = new ParsedDocumentNormalizer(enabled())
-                .normalize(ParsedDocument.of(blocks), null).document();
+                .normalize(ParsedDocument.of(blocks), null, true).document();
 
-        assertEquals("温度 400±20°C,质量分数1%", text(normalized.blocks().get(0)));
+        assertEquals("温度 400±20°C，质量分数1%", text(normalized.blocks().get(0)));
         assertEquals(List.of("灼烧", "1050 °C"), ((TableBlock) normalized.blocks().get(1)).rows().get(0));
         assertSame(code, normalized.blocks().get(2));
         ImageBlock image = (ImageBlock) normalized.blocks().get(3);
         assertSame(asset, image.asset());
         assertEquals("图1", image.caption());
+
+        ParsedDocument notMinerU = new ParsedDocumentNormalizer(enabled())
+                .normalize(ParsedDocument.of(blocks), null, false).document();
+        assertEquals("温度 $400 \\pm 20 ^ { \\circ } \\mathrm { C }$，质量分数1%", text(notMinerU.blocks().get(0)),
+                "不是 MinerU 的 markdown 时 $ 是字面字符，不去壳");
+    }
+
+    @Test
+    void spreadsheetCellsKeepChinesePunctuationAndSuperscripts() {
+        String cell = "铁矿石中以二价铁（Fe²+）形态存在的铁元素含量，占干矿总重量的百分比；核心功能：① 取样";
+        List<Block> blocks = List.of(new TableBlock(P, List.of("指标", "说明"), List.of(List.of("亚铁品位", cell))));
+        ParsedDocument normalized = new ParsedDocumentNormalizer(enabled())
+                .normalize(ParsedDocument.of(blocks), null, false).document();
+        assertEquals(List.of("亚铁品位", cell), ((TableBlock) normalized.blocks().get(0)).rows().get(0));
     }
 
     @Test
     void disabledNormalizerReturnsTheSameDocument() {
         ParsedDocument document = ParsedDocument.of(List.of(new ParagraphBlock(P, "１００ ℃")));
         ParsedDocumentNormalizer.Result result = new ParsedDocumentNormalizer(new TextNormalizeProperties())
-                .normalize(document, layerWithFurniture());
+                .normalize(document, layerWithFurniture(), true);
         assertSame(document, result.document());
         assertFalse(result.applied());
     }

@@ -86,4 +86,43 @@ class IngestionTextNormalizerTest {
         assertEquals("称取 0.200 g 试样", IngestionTextNormalizer.normalize("称取 0.200 g 试样"));
         assertEquals("", IngestionTextNormalizer.normalize(null));
     }
+
+    @Test
+    void literalDollarSignsAreNotTreatedAsMath() {
+        String price = "62%品位到岸价 $105/吨，较上月 $98/吨上涨。";
+        assertEquals(price, IngestionTextNormalizer.normalizeForStorage(price, true));
+        assertEquals("62%品位到岸价 $105/吨,较上月 $98/吨上涨。", IngestionTextNormalizer.normalize(price));
+        String lines = "运费：$12\n备注：港口费另计 $3";
+        assertEquals(lines, IngestionTextNormalizer.normalizeForStorage(lines, true), "两个 $ 跨行时不配对，换行不能被吞");
+        String html = "<td>$5</td><td colspan=\"2\">$7</td>";
+        assertEquals(html, IngestionTextNormalizer.normalizeForStorage(html, true));
+        String english = "from $5 and $7 per tonne";
+        assertEquals(english, IngestionTextNormalizer.normalizeForStorage(english, true));
+        String mixed = "成本 $5，公式 $x^{2}$";
+        assertEquals(mixed, IngestionTextNormalizer.normalizeForStorage(mixed, true));
+        assertNull(IngestionTextNormalizer.plainMath("x".repeat(121)));
+    }
+
+    @Test
+    void storageFormKeepsMeaningAndOnlyFoldsCompatibilityCharacters() {
+        String text = "（1）试剂：盐酸（ρ １．１９ ｇ／ｍＬ）；见表２！二价铁（Fe²⁺），10⁻³ mol/L，面积 10 m²，①称样";
+        assertEquals("（1）试剂：盐酸（ρ 1.19 g/mL）；见表2！二价铁（Fe²⁺），10⁻³ mol/L，面积 10 m²，①称样",
+                IngestionTextNormalizer.normalizeForStorage(text, false));
+        // 表意空格、小数分组、℃、㎎ 与微符号 µ（U+00B5）展开；～ 和展开后会拍平上标的 ㎡ 不动
+        assertEquals("称取 0.5000 g，精确至 0.0001 g，灼烧至 1050 °C～1100 °C，3 ㎡ 与 5 mg、μm",
+                IngestionTextNormalizer.normalizeForStorage(
+                        "称取　0.5000 g，精确至 0.000 1 g，灼烧至 1050 ℃～1100 ℃，3 ㎡ 与 5 ㎎、µm", false));
+        // 标准号里的"—"保留，减号 U+2212 统一成 "-"；康熙部首"⼀⼆"（U+2F00、U+2F06）展开成常用汉字
+        assertEquals("GB/T 6730.10—2014 代替 GB/T 6730.10—1986，1-2，一二",
+                IngestionTextNormalizer.normalizeForStorage("GB/T 6730.10—2014 代替 GB/T 6730.10—1986，1−2，⼀⼆", false));
+        assertEquals("", IngestionTextNormalizer.normalizeForStorage(null, true));
+    }
+
+    @Test
+    void storageFormUnwrapsMathOnlyWhenAsked() {
+        String math = "温度控制在 $400 \\pm 20 ^ { \\circ } \\mathrm { C }$ ，放置 $1 \\sim 2 \\mathrm { ~ m i n }$";
+        assertEquals("温度控制在 400±20°C ，放置 1~2min", IngestionTextNormalizer.normalizeForStorage(math, true));
+        assertEquals("温度控制在 $400 \\pm 20 ^ { \\circ } \\mathrm { C }$ ，放置 $1 \\sim 2 \\mathrm { ~ m i n }$",
+                IngestionTextNormalizer.normalizeForStorage(math, false));
+    }
 }

@@ -150,8 +150,9 @@ SLOT_PATTERNS = [
     )
 ]
 # The verb pattern above also fires on intact prose ("继续加热，""干燥，灰化"): on the 2026-10-09 probes every
-# match it made in a good parse was such a false positive. The strict set leaves it out; the stage-2 parse
-# quality gate audits with the same six patterns (ParseTextMetrics.STRICT_SLOT_PATTERNS).
+# match it made in a good parse was such a false positive. The strict set leaves it out. This is metric v2 and
+# stays as it is so the published numbers reproduce; since 2026-10-10 the stage-2 parse quality gate
+# (ParseTextMetrics.STRICT_SLOT_PATTERNS) additionally skips compound words such as "修约。" and "存在，".
 STRICT_SLOT_PATTERNS = [pattern for pattern in SLOT_PATTERNS if not pattern.pattern.startswith("(?:放置")]
 NOISE_PATTERNS = [
     re.compile(pattern) for pattern in (

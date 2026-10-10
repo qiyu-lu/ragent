@@ -22,7 +22,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * 入库文本归一化与清洗配置（knowledge-quality 计划 §5.2），默认关闭，过了阶段 2 门槛再开
+ * 入库文本归一化与清洗配置（knowledge-quality 计划 §5.2）。Java 字段默认关闭，{@code application.yaml}
+ * 自 2026-10-10 起打开（与闸门同一臂过了阶段 2 门槛）
  */
 @Data
 @Configuration
@@ -30,7 +31,8 @@ import org.springframework.context.annotation.Configuration;
 public class TextNormalizeProperties {
 
     /**
-     * 总开关：NFKC、单位、空白、数值型行内公式去壳
+     * 总开关：入库形态的归一化（全角数字字母转半角、单位字符、空白，MinerU 结果的数值型行内公式去壳），
+     * 见 {@link IngestionTextNormalizer#normalizeForStorage}
      */
     private boolean enabled = false;
 

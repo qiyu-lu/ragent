@@ -17,8 +17,8 @@
 
 package com.nageoffer.ai.ragent.core.parser.mineru;
 
-import com.nageoffer.ai.ragent.core.parser.DocumentParser;
 import com.nageoffer.ai.ragent.core.parser.ParserType;
+import com.nageoffer.ai.ragent.core.parser.StagedDocumentParser;
 import com.nageoffer.ai.ragent.core.parser.model.ParsedDocument;
 import com.nageoffer.ai.ragent.core.parser.registry.ParseProfile;
 import com.nageoffer.ai.ragent.framework.exception.ServiceException;
@@ -45,11 +45,14 @@ import java.util.concurrent.TimeoutException;
  * <p>
  * 本地上传链路不依赖任何公网可达的源文件 URL，适配内网部署；解析许可由 {@link RPermitExpirableSemaphore}
  * 跨实例发放，压住 MinerU 侧同时在跑的任务数，配置项见 {@link MinerUProperties}
+ * <p>
+ * 解析分两步（{@link StagedDocumentParser}）：{@link #fetch} 持有许可、取回结果 zip，{@link #complete} 解包、
+ * 上传图片并图生文。许可只覆盖 MinerU 侧的工作；解析质量闸门用 {@link #preview} 只展开正文比较候选结果
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class MinerUDocumentParser implements DocumentParser {
+public class MinerUDocumentParser implements StagedDocumentParser {
 
     /**
      * 版面解析类：PDF / Word / PPT 只有 MinerU 一条路，两个档位都由它承担
@@ -134,6 +137,11 @@ public class MinerUDocumentParser implements DocumentParser {
 
     @Override
     public ParsedDocument parseStructured(byte[] content, String mimeType, Map<String, Object> options) {
+        return complete(fetch(content, mimeType, options));
+    }
+
+    @Override
+    public Fetched fetch(byte[] content, String mimeType, Map<String, Object> options) {
         if (content == null || content.length == 0) {
             throw new ServiceException("MinerU 解析输入字节为空");
         }
@@ -149,7 +157,7 @@ public class MinerUDocumentParser implements DocumentParser {
             if (permitId == null) {
                 throw new ServiceException("MinerU 解析任务过多，请稍后重试");
             }
-            return doParseStructured(content, mimeType, options);
+            return doFetch(content, mimeType, options);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new ServiceException("MinerU 获取解析许可被中断");
@@ -163,7 +171,27 @@ public class MinerUDocumentParser implements DocumentParser {
         }
     }
 
-    private ParsedDocument doParseStructured(byte[] content, String mimeType, Map<String, Object> options) {
+    @Override
+    public ParsedDocument preview(Fetched fetched) {
+        return unpack(fetched, false);
+    }
+
+    @Override
+    public ParsedDocument complete(Fetched fetched) {
+        return unpack(fetched, true);
+    }
+
+    /**
+     * 解包为 ParsedDocument，并注入 batchId、zipUrl 与实际参数，供下游节点持久化后排障
+     */
+    private ParsedDocument unpack(Fetched fetched, boolean withImages) {
+        ParsedDocument parsed = resultUnpacker.unpack(fetched.payload(), fetched.sourceFile(), fetched.documentId(), withImages);
+        Map<String, Object> mergedMeta = new HashMap<>(parsed.metadata() == null ? Map.of() : parsed.metadata());
+        mergedMeta.putAll(fetched.metadata());
+        return ParsedDocument.of(parsed.blocks(), mergedMeta);
+    }
+
+    private Fetched doFetch(byte[] content, String mimeType, Map<String, Object> options) {
         String sourceFile = extractString(options, OPT_SOURCE_FILE, "");
         String documentId = extractString(options, OPT_DOCUMENT_ID, UUID.randomUUID().toString());
         String uploadName = resolveUploadName(sourceFile, mimeType, documentId);
@@ -195,21 +223,16 @@ public class MinerUDocumentParser implements DocumentParser {
             throw new ServiceException("MinerU 等待异常 batchId=" + ticket.batchId() + ": " + cause.getMessage());
         }
 
-        // 4. 下载 zip
+        // 4. 下载 zip，解包在 preview / complete 里做
         byte[] zipBytes = minerUClient.downloadZip(status.zipUrl());
 
-        // 5. 解包为 ParsedDocument
-        ParsedDocument parsed = resultUnpacker.unpack(zipBytes, sourceFile, documentId);
-
-        // 6. batchId + zipUrl 注入 metadata，供下游节点持久化后排障
-        Map<String, Object> mergedMeta = new HashMap<>(parsed.metadata() == null ? Map.of() : parsed.metadata());
-        mergedMeta.put(META_BATCH_ID, ticket.batchId());
-        mergedMeta.put(META_ZIP_URL, status.zipUrl());
-        mergedMeta.put("parser", getParserType());
-        mergedMeta.put("mimeType", mimeType == null ? "" : mimeType);
-        mergedMeta.put(META_PARAMS, describeParams(request));
-
-        return ParsedDocument.of(parsed.blocks(), mergedMeta);
+        Map<String, Object> meta = new LinkedHashMap<>();
+        meta.put(META_BATCH_ID, ticket.batchId());
+        meta.put(META_ZIP_URL, status.zipUrl());
+        meta.put("parser", getParserType());
+        meta.put("mimeType", mimeType == null ? "" : mimeType);
+        meta.put(META_PARAMS, describeParams(request));
+        return new Fetched(zipBytes, sourceFile, documentId, meta);
     }
 
     /**

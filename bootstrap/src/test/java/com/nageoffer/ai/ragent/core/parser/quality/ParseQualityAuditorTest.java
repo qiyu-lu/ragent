@@ -19,11 +19,15 @@ package com.nageoffer.ai.ragent.core.parser.quality;
 
 import com.nageoffer.ai.ragent.core.parser.DocumentParser;
 import com.nageoffer.ai.ragent.core.parser.ParserType;
+import com.nageoffer.ai.ragent.core.parser.StagedDocumentParser;
 import com.nageoffer.ai.ragent.core.parser.mineru.MinerUDocumentParser;
+import com.nageoffer.ai.ragent.core.parser.model.AssetRef;
+import com.nageoffer.ai.ragent.core.parser.model.ImageBlock;
 import com.nageoffer.ai.ragent.core.parser.model.ParagraphBlock;
 import com.nageoffer.ai.ragent.core.parser.model.ParsedDocument;
 import com.nageoffer.ai.ragent.core.parser.model.Provenance;
 import com.nageoffer.ai.ragent.core.parser.registry.ParseProfile;
+import com.nageoffer.ai.ragent.framework.exception.ServiceException;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
@@ -33,6 +37,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +47,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ParseQualityAuditorTest {
@@ -60,12 +66,14 @@ class ParseQualityAuditorTest {
     }
 
     /**
-     * 按 OCR 开关返回不同正文的假 MinerU 解析器，并记下每次调用的开关
+     * 按 OCR 开关返回不同正文的假 MinerU 解析器：记下每次取结果用的开关，以及哪几次被展开成完整结果（上传图片、图生文）
      */
-    private static final class FakeMinerU implements DocumentParser {
+    private static final class FakeMinerU implements StagedDocumentParser {
         final List<Boolean> calls = new ArrayList<>();
+        final List<Boolean> completed = new ArrayList<>();
         final String withoutOcr;
         final String withOcr;
+        RuntimeException failOnSecondFetch;
 
         FakeMinerU(String withoutOcr, String withOcr) {
             this.withoutOcr = withoutOcr;
@@ -79,10 +87,36 @@ class ParseQualityAuditorTest {
 
         @Override
         public ParsedDocument parseStructured(byte[] content, String mimeType, Map<String, Object> options) {
+            return complete(fetch(content, mimeType, options));
+        }
+
+        @Override
+        public Fetched fetch(byte[] content, String mimeType, Map<String, Object> options) {
             boolean ocr = Boolean.TRUE.equals(options.get(MinerUDocumentParser.OPT_IS_OCR));
             calls.add(ocr);
-            return ParsedDocument.of(List.of(new ParagraphBlock(Provenance.ofFile("x.pdf"), ocr ? withOcr : withoutOcr)),
+            if (calls.size() == 2 && failOnSecondFetch != null) {
+                throw failOnSecondFetch;
+            }
+            return new Fetched((ocr ? withOcr : withoutOcr).getBytes(StandardCharsets.UTF_8), "x.pdf", "doc-1",
                     Map.of(MinerUDocumentParser.META_PARAMS, Map.of("isOcr", ocr)));
+        }
+
+        @Override
+        public ParsedDocument preview(Fetched fetched) {
+            return document(fetched, null);
+        }
+
+        @Override
+        public ParsedDocument complete(Fetched fetched) {
+            completed.add(Boolean.TRUE.equals(((Map<?, ?>) fetched.metadata().get(MinerUDocumentParser.META_PARAMS)).get("isOcr")));
+            return document(fetched, "图生文转写：温度 1000 ℃，时间 30 min，质量 0.5000 g");
+        }
+
+        private static ParsedDocument document(Fetched fetched, String imageDescription) {
+            Provenance provenance = Provenance.ofFile(fetched.sourceFile());
+            return ParsedDocument.of(List.of(new ParagraphBlock(provenance, new String(fetched.payload(), StandardCharsets.UTF_8)),
+                            new ImageBlock(provenance, new AssetRef("images/a.jpg", "image/jpeg"), "图1", "图1", imageDescription)),
+                    fetched.metadata());
         }
 
         @Override
@@ -104,7 +138,9 @@ class ParseQualityAuditorTest {
         assertEquals(GOOD, ((ParagraphBlock) result.document().blocks().get(0)).text());
         assertFalse(result.audit().attempts().get(0).passed());
         assertTrue(result.audit().attempts().get(0).failures().get(0).startsWith("strictSlotsPer1000"));
-        assertEquals(1.0, result.audit().chosen().digitRetention(), 1e-9);
+        assertEquals(1.0, result.audit().chosen().digitRetention(), 1e-9, "审计用的是不带图生文描述的正文");
+        assertEquals(List.of(true), parser.completed, "只有选中的那次上传图片、做图生文");
+        assertTrue(((ImageBlock) result.document().blocks().get(1)).description().startsWith("图生文"));
     }
 
     @Test
@@ -115,7 +151,78 @@ class ParseQualityAuditorTest {
                         layer(TextLayerClass.TEXT, ParseTextMetrics.measure(GOOD).digits()));
 
         assertEquals(List.of(false), parser.calls);
+        assertEquals(List.of(false), parser.completed);
         assertEquals(ParseAudit.Verdict.PASSED, result.audit().verdict());
+    }
+
+    @Test
+    void failedReparseKeepsTheFirstResultForReview() {
+        FakeMinerU parser = new FakeMinerU(BAD, GOOD);
+        parser.failOnSecondFetch = new ServiceException("MinerU 等待超时(包含调度缓冲)batchId=b-2");
+        ParseQualityAuditor.AuditedParse result = new ParseQualityAuditor(enabled())
+                .parse(parser, new byte[]{1}, "application/pdf", Map.of(),
+                        layer(TextLayerClass.TEXT, ParseTextMetrics.measure(GOOD).digits()));
+
+        assertEquals(List.of(false, true), parser.calls);
+        assertEquals(ParseAudit.Verdict.NEEDS_REVIEW, result.audit().verdict());
+        assertEquals(0, result.audit().chosenAttempt());
+        assertEquals(BAD, ((ParagraphBlock) result.document().blocks().get(0)).text());
+        assertEquals(List.of(false), parser.completed);
+        ParseAudit.Attempt failed = result.audit().attempts().get(1);
+        assertTrue(failed.failedToParse());
+        assertEquals(Map.of("isOcr", true), failed.params());
+        assertTrue(failed.parseError().contains("等待超时"));
+        assertEquals(failed.parseError(), failed.toMap().get("parseError"));
+        assertFalse(result.audit().attempts().get(0).toMap().containsKey("parseError"));
+    }
+
+    @Test
+    void interruptedReparseIsNotSwallowed() {
+        FakeMinerU parser = new FakeMinerU(BAD, GOOD);
+        parser.failOnSecondFetch = new ServiceException("MinerU 获取解析许可被中断");
+        Thread.currentThread().interrupt();
+        try {
+            assertThrows(ServiceException.class, () -> new ParseQualityAuditor(enabled())
+                    .parse(parser, new byte[]{1}, "application/pdf", Map.of(), layer(TextLayerClass.TEXT, 10)));
+        } finally {
+            Thread.interrupted();
+        }
+        assertTrue(parser.completed.isEmpty());
+    }
+
+    @Test
+    void aSingleSlotDoesNotFailAShortDocument() {
+        String oneSlot = "称取 0.5000 g 试样，加热 30 min，温度控制在 ,冷却后称量。";
+        assertEquals(1, ParseTextMetrics.measure(oneSlot).strictSlots());
+        FakeMinerU parser = new FakeMinerU(oneSlot, BAD);
+        ParseQualityAuditor.AuditedParse result = new ParseQualityAuditor(enabled())
+                .parse(parser, new byte[]{1}, "application/pdf", Map.of(), layer(TextLayerClass.SCANNED, 5));
+        assertEquals(ParseAudit.Verdict.PASSED, result.audit().verdict());
+        assertTrue(result.audit().chosen().strictSlotsPer1000() > 0.3, "密度超了，但只有 1 处");
+        assertEquals(List.of(false), parser.calls);
+    }
+
+    @Test
+    void plainParsersAreNotGated() {
+        DocumentParser plain = new DocumentParser() {
+            @Override
+            public String getParserType() {
+                return ParserType.MINERU.getType();
+            }
+
+            @Override
+            public ParsedDocument parseStructured(byte[] content, String mimeType, Map<String, Object> options) {
+                return ParsedDocument.of(List.of(new ParagraphBlock(Provenance.ofFile("x.pdf"), BAD)));
+            }
+
+            @Override
+            public Map<ParseProfile, Set<String>> supportedMimeTypes() {
+                return Map.of(ParseProfile.FAST, Set.of("application/pdf"));
+            }
+        };
+        ParseQualityAuditor auditor = new ParseQualityAuditor(enabled());
+        assertFalse(auditor.applies(plain, "application/pdf"));
+        assertNull(auditor.parse(plain, new byte[]{1}, "application/pdf", Map.of(), layer(TextLayerClass.TEXT, 10)).audit());
     }
 
     @Test
@@ -156,6 +263,7 @@ class ParseQualityAuditorTest {
         ParseQualityAuditor.AuditedParse word = new ParseQualityAuditor(enabled())
                 .parse(parser, new byte[]{1}, "application/msword", Map.of(), layer(TextLayerClass.TEXT, 10));
         assertNull(word.audit());
+        assertEquals(List.of(false, false), parser.completed, "闸门不作用时照常一次解析、上传图片");
     }
 
     @Test
@@ -167,14 +275,57 @@ class ParseQualityAuditorTest {
     }
 
     @Test
-    void betterPrefersPassingThenFewerSlotsThenHigherRetention() {
+    void lessThanSignsInTheTextAreNotTags() {
+        ParseTextMetrics.Measurement measurement = ParseTextMetrics.measure(
+                "<table><tr><td>< 15000</td><td><0.1 %</td><td rowspan=\"3\">>5 mm</td></tr></table><br/>");
+        assertEquals(5 + 2 + 1, measurement.digits(), "小于号后面的数字不能被当成标签吞掉，rowspan 的 3 不算");
+    }
+
+    @Test
+    void compoundWordsAreNotEmptySlots() {
+        assertEquals(0, ParseTextMetrics.measure("结果按 GB/T 8170 修约。不存在，所在。现在，节约。").strictSlots());
+        assertEquals(2, ParseTextMetrics.measure("称取约 ,温度控制在 。").strictSlots());
+    }
+
+    @Test
+    void imageDescriptionsAreNotAuditText() {
+        Provenance provenance = Provenance.ofFile("x.pdf");
+        ParsedDocument document = ParsedDocument.of(List.of(new ParagraphBlock(provenance, "称取 0.5 g"),
+                new ImageBlock(provenance, new AssetRef("images/a.jpg", "image/jpeg"), "图1", "图1", "流程图：在 ,加热 100 ℃")));
+        ParseTextMetrics.Measurement measurement = ParseTextMetrics.measure(document);
+        assertEquals(2, measurement.digits(), "描述里的数字不算");
+        assertEquals(0, measurement.strictSlots(), "描述里的空槽也不算");
+    }
+
+    @Test
+    void betterNeverPicksAFailedParseThenPrefersPassingThenFewerFailures() {
+        ParseQualityAuditor auditor = new ParseQualityAuditor(enabled());
         ParseAudit.Attempt passing = new ParseAudit.Attempt(Map.of(), 10, 1000, 5, 5.0, 0.5, true, List.of());
         ParseAudit.Attempt failingClean = new ParseAudit.Attempt(Map.of(), 10, 1000, 0, 0.0, 1.0, false, List.of("x"));
-        assertTrue(ParseQualityAuditor.better(passing, failingClean));
-        ParseAudit.Attempt fewerSlots = new ParseAudit.Attempt(Map.of(), 10, 1000, 1, 1.0, 0.4, false, List.of("x"));
-        ParseAudit.Attempt moreSlots = new ParseAudit.Attempt(Map.of(), 10, 1000, 9, 9.0, 0.9, false, List.of("x"));
-        assertTrue(ParseQualityAuditor.better(fewerSlots, moreSlots));
-        assertFalse(ParseQualityAuditor.better(moreSlots, fewerSlots));
+        ParseAudit.Attempt failedParse = ParseAudit.Attempt.parseFailed(Map.of("isOcr", true), "timeout");
+        assertTrue(auditor.better(passing, failingClean));
+        assertFalse(auditor.better(failedParse, failingClean));
+        assertTrue(auditor.better(failingClean, failedParse));
+
+        ParseAudit.Attempt oneFailure = new ParseAudit.Attempt(Map.of(), 99, 1000, 4, 0.32, 0.99, false, List.of("slots"));
+        ParseAudit.Attempt twoFailures = new ParseAudit.Attempt(Map.of(), 60, 1000, 3, 0.31, 0.60, false, List.of("slots", "retention"));
+        assertTrue(auditor.better(oneFailure, twoFailures), "空槽密度只差 0.01，不能压过保留率 0.99 对 0.60");
+        assertFalse(auditor.better(twoFailures, oneFailure));
+    }
+
+    @Test
+    void betterComparesRetentionWhenOneSideIsShortOfIt() {
+        ParseQualityAuditor auditor = new ParseQualityAuditor(enabled());
+        ParseAudit.Attempt lowRetention = new ParseAudit.Attempt(Map.of(), 80, 1000, 0, 0.0, 0.80, false, List.of("retention"));
+        ParseAudit.Attempt slotsOnly = new ParseAudit.Attempt(Map.of(), 99, 1000, 5, 5.0, 0.99, false, List.of("slots"));
+        assertTrue(auditor.better(slotsOnly, lowRetention));
+        assertFalse(auditor.better(lowRetention, slotsOnly));
+
+        ParseAudit.Attempt fewerSlots = new ParseAudit.Attempt(Map.of(), 99, 1000, 5, 0.5, 0.99, false, List.of("slots"));
+        ParseAudit.Attempt moreSlots = new ParseAudit.Attempt(Map.of(), 102, 1000, 20, 2.0, 1.02, false, List.of("slots"));
+        assertTrue(auditor.better(fewerSlots, moreSlots), "保留率都达标时比空槽");
+        assertFalse(auditor.better(moreSlots, fewerSlots));
+        assertFalse(auditor.better(fewerSlots, fewerSlots), "打平留首次");
     }
 
     @Test

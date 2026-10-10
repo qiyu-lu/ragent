@@ -52,7 +52,7 @@ public record ParseAudit(Verdict verdict,
          */
         RECOVERED,
         /**
-         * 所有尝试都不合格，保留得分高的那次，需要人工复核
+         * 所有尝试都不合格（或重解析本身失败），保留得分高的那次，需要人工复核
          */
         NEEDS_REVIEW
     }
@@ -66,6 +66,7 @@ public record ParseAudit(Verdict verdict,
      * @param digitRetention     数字保留率；扫描件与坏字体为 null
      * @param passed             是否合格
      * @param failures           不合格的原因
+     * @param parseError         解析本身失败（超时、服务报错）时的原因；这样的尝试没有结果，不会被选中
      */
     public record Attempt(Map<String, Object> params,
                           int digits,
@@ -74,11 +75,34 @@ public record ParseAudit(Verdict verdict,
                           double strictSlotsPer1000,
                           Double digitRetention,
                           boolean passed,
-                          List<String> failures) {
+                          List<String> failures,
+                          String parseError) {
+
+        private static final int MAX_ERROR_LENGTH = 300;
 
         public Attempt {
             params = params == null ? Map.of() : Map.copyOf(params);
             failures = failures == null ? List.of() : List.copyOf(failures);
+        }
+
+        public Attempt(Map<String, Object> params, int digits, int nonSpaceChars, int strictSlots,
+                       double strictSlotsPer1000, Double digitRetention, boolean passed, List<String> failures) {
+            this(params, digits, nonSpaceChars, strictSlots, strictSlotsPer1000, digitRetention, passed, failures, null);
+        }
+
+        /**
+         * 解析调用本身失败的一次尝试
+         */
+        static Attempt parseFailed(Map<String, Object> params, String error) {
+            String message = error == null || error.isBlank() ? "unknown" : error.strip();
+            if (message.length() > MAX_ERROR_LENGTH) {
+                message = message.substring(0, MAX_ERROR_LENGTH);
+            }
+            return new Attempt(params, 0, 0, 0, 0D, null, false, List.of("parseError"), message);
+        }
+
+        public boolean failedToParse() {
+            return parseError != null;
         }
 
         Map<String, Object> toMap() {
@@ -91,6 +115,9 @@ public record ParseAudit(Verdict verdict,
             map.put("digitRetention", digitRetention == null ? null : round(digitRetention));
             map.put("passed", passed);
             map.put("failures", failures);
+            if (parseError != null) {
+                map.put("parseError", parseError);
+            }
             return map;
         }
     }

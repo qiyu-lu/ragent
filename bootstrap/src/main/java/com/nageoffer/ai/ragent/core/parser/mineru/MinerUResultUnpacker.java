@@ -109,6 +109,13 @@ public class MinerUResultUnpacker {
      * @param documentId 资产 key 命名用，落成 {@code assets/{documentId}/{uuid}.{ext}}
      */
     public ParsedDocument unpack(byte[] zipBytes, String sourceFile, String documentId) {
+        return unpack(zipBytes, sourceFile, documentId, true);
+    }
+
+    /**
+     * @param withImages false 时只展开正文：图片不上传、不生成描述，图片地址保留 zip 内路径（解析质量闸门比较候选结果用）
+     */
+    public ParsedDocument unpack(byte[] zipBytes, String sourceFile, String documentId, boolean withImages) {
         if (zipBytes == null || zipBytes.length == 0) {
             throw new ServiceException("MinerU zip 字节为空");
         }
@@ -119,8 +126,8 @@ public class MinerUResultUnpacker {
         }
 
         // 上传所有图片，得 {zip 内路径 → 公开 URL} 映射
-        Map<String, String> imageUrlMap = uploadImages(contents.images, documentId);
-        Map<String, String> imageDescriptionMap = describeImages(contents.images);
+        Map<String, String> imageUrlMap = withImages ? uploadImages(contents.images, documentId) : Map.of();
+        Map<String, String> imageDescriptionMap = withImages ? describeImages(contents.images) : Map.of();
 
         // 解析 markdown 输出 Block 列表
         Provenance prov = Provenance.ofFile(sourceFile);

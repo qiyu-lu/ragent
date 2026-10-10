@@ -34,13 +34,20 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 解析之后、分块之前的文本归一化与清洗：先按频次规则去页面家具，再逐 Block 归一化文本
+ * 解析之后、分块之前的文本归一化与清洗：先按频次规则去页面家具，再逐 Block 做入库形态的归一化
+ * （{@link IngestionTextNormalizer#normalizeForStorage}）
  * <p>
  * 代码块原样保留；图片只动说明文字，不碰资产地址
  */
 @Component
 @RequiredArgsConstructor
 public class ParsedDocumentNormalizer {
+
+    /**
+     * 入库形态的版本，写进 {@code doc_metadata.normalization.version}：1 是 2026-10-09～10 评测用的整体 NFKC，
+     * 2 是审查后改成的不改意思的换写
+     */
+    static final int STORAGE_FORM_VERSION = 2;
 
     private final TextNormalizeProperties properties;
 
@@ -57,12 +64,18 @@ public class ParsedDocumentNormalizer {
         public Map<String, Object> toMap() {
             Map<String, Object> map = new LinkedHashMap<>();
             map.put("applied", applied);
+            if (applied) {
+                map.put("version", STORAGE_FORM_VERSION);
+            }
             map.put("repeatedLinesRemoved", removedLines);
             return map;
         }
     }
 
-    public Result normalize(ParsedDocument document, PdfTextLayer textLayer) {
+    /**
+     * @param unwrapMath 是否给数值型行内公式去壳：只有 MinerU 的 markdown 里 {@code $} 才是公式定界符
+     */
+    public Result normalize(ParsedDocument document, PdfTextLayer textLayer, boolean unwrapMath) {
         if (!properties.isEnabled() || document == null) {
             return new Result(document, 0, false);
         }
@@ -74,41 +87,45 @@ public class ParsedDocumentNormalizer {
             blocks = filtered.blocks();
             removed = filtered.removedLines();
         }
-        List<Block> normalized = blocks.stream().map(ParsedDocumentNormalizer::normalizeBlock).toList();
+        List<Block> normalized = blocks.stream().map(block -> normalizeBlock(block, unwrapMath)).toList();
         return new Result(ParsedDocument.of(normalized, document.metadata()), removed, true);
     }
 
-    static Block normalizeBlock(Block block) {
+    static Block normalizeBlock(Block block, boolean unwrapMath) {
         if (block instanceof HeadingBlock heading) {
-            return new HeadingBlock(heading.provenance(), heading.level(), IngestionTextNormalizer.normalize(heading.text()));
+            return new HeadingBlock(heading.provenance(), heading.level(), normalize(heading.text(), unwrapMath));
         }
         if (block instanceof ParagraphBlock paragraph) {
-            return new ParagraphBlock(paragraph.provenance(), IngestionTextNormalizer.normalize(paragraph.text()));
+            return new ParagraphBlock(paragraph.provenance(), normalize(paragraph.text(), unwrapMath));
         }
         if (block instanceof ListBlock list) {
-            return new ListBlock(list.provenance(), list.ordered(), normalizeAll(list.items()));
+            return new ListBlock(list.provenance(), list.ordered(), normalizeAll(list.items(), unwrapMath));
         }
         if (block instanceof TableBlock table) {
-            return new TableBlock(table.provenance(), normalizeAll(table.headers()),
-                    table.rows() == null ? null : table.rows().stream().map(ParsedDocumentNormalizer::normalizeAll).toList(),
+            return new TableBlock(table.provenance(), normalizeAll(table.headers(), unwrapMath),
+                    table.rows() == null ? null : table.rows().stream().map(row -> normalizeAll(row, unwrapMath)).toList(),
                     table.rowCellRanges());
         }
         if (block instanceof HtmlTableBlock html) {
-            return new HtmlTableBlock(html.provenance(), IngestionTextNormalizer.normalize(html.html()));
+            return new HtmlTableBlock(html.provenance(), normalize(html.html(), unwrapMath));
         }
         if (block instanceof ImageBlock image) {
-            return new ImageBlock(image.provenance(), image.asset(), normalizeNullable(image.caption()),
-                    normalizeNullable(image.altText()), normalizeNullable(image.description()));
+            return new ImageBlock(image.provenance(), image.asset(), normalizeNullable(image.caption(), unwrapMath),
+                    normalizeNullable(image.altText(), unwrapMath), normalizeNullable(image.description(), unwrapMath));
         }
         // CodeBlock 原样保留
         return block;
     }
 
-    private static List<String> normalizeAll(List<String> values) {
-        return values == null ? null : values.stream().map(IngestionTextNormalizer::normalize).toList();
+    private static String normalize(String value, boolean unwrapMath) {
+        return IngestionTextNormalizer.normalizeForStorage(value, unwrapMath);
     }
 
-    private static String normalizeNullable(String value) {
-        return value == null ? null : IngestionTextNormalizer.normalize(value);
+    private static List<String> normalizeAll(List<String> values, boolean unwrapMath) {
+        return values == null ? null : values.stream().map(value -> normalize(value, unwrapMath)).toList();
+    }
+
+    private static String normalizeNullable(String value, boolean unwrapMath) {
+        return value == null ? null : normalize(value, unwrapMath);
     }
 }

@@ -19,6 +19,7 @@ package com.nageoffer.ai.ragent.core.ingest;
 
 import com.nageoffer.ai.ragent.core.ingest.metadata.DocumentMetadataExtractor;
 import com.nageoffer.ai.ragent.core.parser.DocumentParser;
+import com.nageoffer.ai.ragent.core.parser.ParserType;
 import com.nageoffer.ai.ragent.core.parser.model.ParsedDocument;
 import com.nageoffer.ai.ragent.core.parser.normalize.ParsedDocumentNormalizer;
 import com.nageoffer.ai.ragent.core.parser.quality.ParseQualityAuditor;
@@ -34,8 +35,8 @@ import java.util.Map;
 /**
  * 摄取第 ② 步的质量环节：PDF 文字层 → 解析质量闸门 → 归一化与去页面家具 → 文档元数据
  * <p>
- * 文字层只对 PDF 抽一次，闸门、清洗和元数据抽取共用；闸门与归一化各有开关，默认关闭时解析结果与原先一致，
- * 只多出写进 {@code doc_metadata} 的元数据草稿
+ * 文字层只对 PDF 抽一次，闸门、清洗和元数据抽取共用；闸门与归一化各有开关（Java 默认关闭，{@code application.yaml}
+ * 自 2026-10-10 起打开），关闭时解析结果与原先一致，只多出写进 {@code doc_metadata} 的元数据草稿
  */
 @Component
 public class ParseQualityStage {
@@ -76,7 +77,8 @@ public class ParseQualityStage {
         }
         PdfTextLayer textLayer = ParseQualityAuditor.isPdf(mimeType) ? textLayerAnalyzer.analyze(bytes).orElse(null) : null;
         ParseQualityAuditor.AuditedParse audited = parseQualityAuditor.parse(parser, bytes, mimeType, options, textLayer);
-        ParsedDocumentNormalizer.Result normalized = documentNormalizer.normalize(audited.document(), textLayer);
+        boolean minerUMarkdown = ParserType.MINERU.getType().equals(parser.getParserType());
+        ParsedDocumentNormalizer.Result normalized = documentNormalizer.normalize(audited.document(), textLayer, minerUMarkdown);
 
         Map<String, Object> metadata = new LinkedHashMap<>(
                 metadataExtractor.extract(filename, textLayer, audited.document()).toMap());

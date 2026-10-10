@@ -29,6 +29,11 @@ HIGHER_IS_BETTER = {"hit@5", "hit@5_all", "anchor_recall", "mrr", "context_preci
 LOWER_IS_BETTER = {"n_chunks", "retrieved_doc_count", "max_rerank_score", "top_final_rerank"}
 # A gain of exactly one question (1/n) must reach a threshold of 1/n despite float rounding of the means.
 EPSILON = 1e-9
+# The thresholds file stores its values with 6 decimals, so 1/22 is written 0.045455 (4.5e-7 above 1/22).
+# A fixed threshold is honoured to that stored precision: half of the last decimal. Added 2026-10-10 after
+# the stage-3 runs, when a numeric MRR gain of exactly 1/22 came out "unproven" against 0.045455; the rule
+# written at kq-s1 is max(range, 1/n) with "gain >= threshold", and the comment above states the intent.
+FIXED_PRECISION = 5e-7
 
 
 def parse_args() -> argparse.Namespace:
@@ -102,13 +107,13 @@ def summarize_arm(reports: Sequence[Mapping[str, Any]]) -> dict:
     }
 
 
-def verdict(metric: str, delta: float, threshold: float) -> str:
+def verdict(metric: str, delta: float, threshold: float, tolerance: float = EPSILON) -> str:
     """Improved when the gain reaches the threshold, regressed when the loss exceeds it."""
 
     better = delta if metric in HIGHER_IS_BETTER else -delta
-    if better >= threshold - EPSILON and better > 0:
+    if better >= threshold - tolerance and better > 0:
         return "improved"
-    if better < -threshold - EPSILON:
+    if better < -threshold - tolerance:
         return "regressed"
     return "unproven"
 
@@ -134,7 +139,8 @@ def compare_arms(baseline: Mapping[str, Any], candidate: Mapping[str, Any],
             out[key] = {"baseline_mean": base_block[key]["mean"], "candidate_mean": cand_block[key]["mean"],
                         "delta": delta, "threshold": threshold,
                         "threshold_source": "fixed" if fixed_value is not None else "baseline_range",
-                        "verdict": verdict(key, delta, threshold)}
+                        "verdict": verdict(key, delta, threshold,
+                                           FIXED_PRECISION if fixed_value is not None else EPSILON)}
         return out
 
     comparison: Dict[str, Any] = {

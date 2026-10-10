@@ -47,6 +47,14 @@ class CompareTest(unittest.TestCase):
         self.assertEqual(comparison["overall_answerable"]["mrr"]["verdict"], "unproven")
         self.assertEqual(comparison["by_type"]["numeric"]["hit@5"]["threshold_source"], "baseline_range")
 
+    def test_fixed_threshold_is_honoured_to_its_stored_precision(self):
+        # 门槛文件把 1/22 存成 0.045455：恰好一道题的提升（1/22）按写定规则 max(极差, 1/n) 算过
+        self.assertEqual(cmp.verdict("mrr", 1 / 22, 0.045455, cmp.FIXED_PRECISION), "improved")
+        self.assertEqual(cmp.verdict("mrr", 1 / 22, 0.045455), "unproven", "the old exact comparison")
+        self.assertEqual(cmp.verdict("hit@5", -1 / 53, 0.018868, cmp.FIXED_PRECISION), "unproven",
+                         "a loss of exactly the threshold does not exceed it")
+        self.assertEqual(cmp.verdict("mrr", 0.0450, 0.045455, cmp.FIXED_PRECISION), "unproven")
+
     def test_zero_range_never_turns_no_change_into_improved(self):
         self.assertEqual(cmp.verdict("hit@5", 0.0, 0.0), "unproven")
 

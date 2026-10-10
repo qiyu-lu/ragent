@@ -109,7 +109,7 @@ python3 eval/kq/parse_metrics.py --facts $QD/numeric-facts-v1.jsonl --full-md <p
 
 ## 阶段 2 运行顺序（用户在仓库根目录的终端跑）
 
-**进度：第 0～7 步已于 2026-10-10 跑完**（入库 `runs/setup-s2.json`、解析层 `runs/S2-chunks/parse-metrics.json`、元数据确认 `metadata/doc-metadata-s2-confirmed.json`、S2-gate 调参集对比 `runs/S2-gate-vs-S1-base-tune.json`，S2-gate 过了门槛）。
+**进度：阶段 2 已于 2026-10-10 全部跑完**（入库 `runs/setup-s2.json`、解析层 `runs/S2-chunks/parse-metrics.json`、元数据确认 `metadata/doc-metadata-s2-confirmed.json`、对比 `runs/S2-gate-vs-S1-base-{tune,test}.json` 与 `runs/S2-boost-vs-S2-gate-tune.json`、汇总 `runs/stage2-remaining-summary-1010112845.json`）。S2-gate 过了门槛，boost 三个 β 都没过、没跑测试集；结论见 `docs/iron-ore-rag/changes/2026-10-10-*.md`。下面的命令留作复现。
 
 ### 剩下的全部：一条命令（推荐，2026-10-10 11:15 更新）
 

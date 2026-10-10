@@ -22,6 +22,7 @@
 | `compare_retrieval_repeats.py` | 每臂多次重复的均值与极差；`--thresholds manifests/kq-thresholds.json` 用阶段 2 开工时写定的门槛与运行有效性规则判 improved / unproven / regressed，否则以基线极差为门槛 |
 | `doc_metadata.py` | 阶段 2：导出入库抽取的文档元数据与解析审计供核对（`export`），把核对后的值写回为 confirmed（`confirm`） |
 | `verify_boost_beta.py` | 阶段 2：从重排头部的排序反推每次运行实际用的 boost β，核对与臂名一致，并检查空通道上限 |
+| `run_stage2_remaining.py` | 阶段 2：无人值守跑完剩下的运行（自己启停实例、按臂设 β、检查并重跑作废的、对比、按规则选 β、跑测试集），`--plan` 只看计划 |
 | `config/application-kq-s1.example.yaml` | 评测实例的附加配置样例（端口 9093、库 `ragent_eval_kq_s1`、Redis DB 13、独立桶与 MQ 主题） |
 | `config/application-kq-s2.example.yaml` | 阶段 2 实例（端口 9094、库 `ragent_eval_kq_s2`、Redis DB 14）：闸门与归一化打开，boost 关，检索配置与阶段 1 相同 |
 | `manifests/kq-thresholds.json` | 阶段 2、3 的门槛与运行有效性规则（2026-10-09 写定，`kq-s1`），对比脚本读它 |
@@ -110,17 +111,27 @@ python3 eval/kq/parse_metrics.py --facts $QD/numeric-facts-v1.jsonl --full-md <p
 
 **进度：第 0～7 步已于 2026-10-10 跑完**（入库 `runs/setup-s2.json`、解析层 `runs/S2-chunks/parse-metrics.json`、元数据确认 `metadata/doc-metadata-s2-confirmed.json`、S2-gate 调参集对比 `runs/S2-gate-vs-S1-base-tune.json`，S2-gate 过了门槛）。
 
-**接下来按这个顺序做（2026-10-10 03:00 更新）。** 已挪开作废的：`S2-boost-0.2` 三次（实例当时没开 boost）、`S2-boost-0.1-tune-r1`（24 个空通道）、`S2-gate-test-r2`（18 个空通道）。保留有效的：S2-gate 调参集 3 次、S2-gate 测试集 r1 与 r3、`S2-boost-0.1` 的 r2 与 r3。
+### 剩下的全部：一条命令（推荐，2026-10-10 11:15 更新）
 
-1. 第 9 步 β = 0.1：只补 r1（把循环写成 `for r in 1`）。终端 A 还是 β = 0.1 的实例就不用重启，不确定就按第 9 步用 `BETA=0.1` 重启。
-2. 第 10 步 β = 0.2：r1～r3 全跑。
-3. 第 11 步 β = 0.3：r1～r3 全跑。
-4. 第 12 步：boost 对比，按写好的规则选 β。
-5. 第 8 步：只补 r2（`for r in 2`）。终端 A 先换回第 3 步那条不带 boost 参数的启动命令；跑完再执行第 8 步的对比命令。
-6. 第 13 步：第 12 步选出了 β 才跑，否则跳过。
-7. 第 14 步：停实例。
+在**有三把 key 的终端**里（就是之前启动实例的那个），先按 Ctrl-C 停掉 9094 上的实例，然后执行：
 
-每一轮跑完都先执行该步里的 `verify_boost_beta.py`，全部打印 `OK` 才进下一步。它会从排序结果反推这几次实际用的 β，实例没开 boost、开错了 β、空通道超过 8 个都会打印 `INVALID`。
+```bash
+python3 eval/kq/run_stage2_remaining.py
+```
+
+不用改任何参数，大约 40 分钟。脚本按下面的顺序自动完成，每一步之间不用人工操作：
+
+1. β = 0.2、0.3 各启动一次实例，各在调参集跑 3 次（β = 0.1 的 3 次已经有效，跳过）。
+2. 和 S2-gate 对比，按状态文件写好的规则选 β。
+3. 不带 boost 启动实例，补跑 S2-gate 测试集的 r2，再和 S1-base 对比。
+4. 第 2 步选出了 β 的话，再用它跑测试集 3 次并对比。
+5. 停掉实例，写出汇总 `runs/stage2-remaining-summary-*.json`。
+
+每次运行都自动检查 boost 设置、实际 β、空通道是否 ≤ 8：超时作废的自动挪开重跑；嵌入通道整体没响应或 key 没带上，就直接报原因并停下。中途断了，重新执行同一条命令会接着跑，已有效的运行不会重跑。想先看它要跑什么：`python3 eval/kq/run_stage2_remaining.py --plan`。
+
+已挪开作废的：`S2-boost-0.2` 三次（实例当时没开 boost）、`S2-gate-test-r2`（18 个空通道），以及 β = 0.1 第一次的 r1（24 个空通道，已补跑有效）。
+
+下面是脚本内部做的各步，留作说明；只有脚本出问题时才需要手动照做。
 
 通用约定（每一步都适用）：
 

@@ -8,7 +8,8 @@ flowchart TB
         S --> G("报告 / 计划<br/>+ 引用校验")
     end
     subgraph ING ["资料入库"]
-        A("XLSX / PDF") --> B("结构感知<br/>解析与分块")
+        A("XLSX / PDF") --> QG("解析质量闸门<br/>不合格换 OCR")
+        QG --> B("结构感知分块<br/>+ 文档元数据")
         B --> V("按内容哈希<br/>复用向量")
     end
     subgraph QA ["普通问答（秒级）"]

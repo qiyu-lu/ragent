@@ -53,11 +53,17 @@ public final class BlockTextRenderer {
         StringBuilder sb = new StringBuilder();
         for (Block b : blocks) {
             if (b instanceof HeadingBlock h) {
-                sb.append("#".repeat(Math.max(1, h.level())))
-                        .append(' ').append(h.text() == null ? "" : h.text()).append("\n\n");
+                if (h.text() == null || h.text().isBlank()) {
+                    // 空标题只是分节标记（Excel 版面分析的区域边界），没有可渲染的文字
+                    continue;
+                }
+                sb.append("#".repeat(Math.max(1, h.level()))).append(' ').append(h.text()).append("\n\n");
             } else if (b instanceof ParagraphBlock p) {
                 sb.append(p.text() == null ? "" : p.text()).append("\n\n");
             } else if (b instanceof TableBlock t) {
+                if (t.caption() != null && !t.caption().isBlank()) {
+                    sb.append(t.caption()).append("\n\n");
+                }
                 if (t.headers() != null) {
                     sb.append(String.join(" | ", t.headers())).append('\n');
                 }

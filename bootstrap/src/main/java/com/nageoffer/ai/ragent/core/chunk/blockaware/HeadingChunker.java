@@ -43,8 +43,17 @@ public class HeadingChunker implements BlockChunker<HeadingBlock> {
 
     @Override
     public List<ChunkDraft> chunk(HeadingBlock block, ChunkContext ctx) {
-        if (block == null || !StringUtils.hasText(block.text())) {
+        if (block == null) {
             return List.of();
+        }
+        if (!StringUtils.hasText(block.text())) {
+            // 空标题是分节标记（Excel 版面分析的区域边界）：不带文字，只让打包器在这里分节，
+            // 否则一个 sheet 的各个区域同属一节，整节不超容忍上限就会被装成一个大块
+            ChunkMetadata metadata = ChunkMetadata.builder()
+                    .outlinePath(ctx.outlinePath())
+                    .provenance(block.provenance())
+                    .build();
+            return List.of(ChunkDraft.ofHeading("", "", metadata));
         }
         String text = block.text().strip();
         ChunkMetadata metadata = ChunkMetadata.builder()

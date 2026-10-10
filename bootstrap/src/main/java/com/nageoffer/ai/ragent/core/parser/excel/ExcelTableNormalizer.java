@@ -30,7 +30,7 @@ import java.util.List;
 /**
  * Excel 表格规范化器（简单 key-val 版）
  * <p>
- * 把一个 POI Sheet 转为单个干净的 (headers, rows) 二维结构，只处理「规整单表」的通用清洗：
+ * 把一张表（整张 sheet，或版面分析切出的一个窗口）转为干净的 (headers, rows) 二维结构，只处理通用清洗：
  * <ul>
  *   <li>合并单元格展开：表头区域横向展开以保留层级，数据区域只按行携带一次值，避免同值跨列膨胀</li>
  *   <li>合并续行折叠：仅折叠原始为空、由纵向合并展开形成的连续同值行</li>
@@ -40,8 +40,8 @@ import java.util.List;
  *   <li>全空行 / 尾部全空列跳过</li>
  * </ul>
  * <p>
- * <b>不再做</b>多表格区域切分、文档/section 标题识别、横向重复列折叠等版面启发式
- * 这类复杂版面的 Excel 应由上层路由到 MinerU 解析，POI 只负责一 sheet 一张规整表
+ * 区域切分、标题与表头识别不在这里：开关打开时由 {@link ExcelLayoutAnalyzer} 切出每张表的窗口再交给
+ * {@link #normalizeWindow}；关闭时整张 sheet 当一张表、第 1 行起为表头。横向重复列折叠不做
  */
 public final class ExcelTableNormalizer {
 
@@ -105,27 +105,59 @@ public final class ExcelTableNormalizer {
             return NormalizedTable.empty();
         }
 
-        // 步骤 1: 读取 sheet 到二维 grid（已应用 hyperlink wrap 与公式回退）
+        // 读取 sheet 到二维 grid（已应用 hyperlink wrap 与公式回退），整张 sheet 当一个窗口规范化
         String[][] grid = readGrid(sheet, lastRowNum, maxCol, formatter, evaluator);
+        int effectiveHeaderRows = Math.min(headerRows, lastRowNum + 1);
+        int[] headerRowIndexes = new int[effectiveHeaderRows];
+        for (int i = 0; i < effectiveHeaderRows; i++) {
+            headerRowIndexes[i] = i;
+        }
+        return normalizeWindow(grid, sheet.getMergedRegions(), headerRowIndexes,
+                effectiveHeaderRows, lastRowNum, 0, maxCol - 1);
+    }
+
+    /**
+     * 规范化 grid 中的一个窗口：表头行 + 连续的数据行，列限定在 [firstCol, lastCol]
+     * <p>
+     * 整张 sheet 当一张表时窗口就是全表；版面分析切出的每张表各自一个窗口，表头行可以不与数据行相邻
+     * （分段后沿用首段表头）。不改动入参 grid，同一份 grid 可供多张表复用
+     *
+     * @param grid             {@link #readGrid} 读出的原始值，合并单元格尚未展开
+     * @param mergedRegions    sheet 的全部合并区域，只用锚点在窗口列内的
+     * @param headerRowIndexes 表头行（0 起），为空表示无表头，列名全为空串
+     */
+    static NormalizedTable normalizeWindow(String[][] grid,
+                                           List<CellRangeAddress> mergedRegions,
+                                           int[] headerRowIndexes,
+                                           int firstDataRow,
+                                           int lastDataRow,
+                                           int firstCol,
+                                           int lastCol) {
+        String[][] window = new String[grid.length][];
+        boolean[] header = new boolean[grid.length];
+        for (int r : headerRowIndexes) {
+            window[r] = grid[r].clone();
+            header[r] = true;
+        }
+        for (int r = Math.max(0, firstDataRow); r <= Math.min(lastDataRow, grid.length - 1); r++) {
+            window[r] = grid[r].clone();
+        }
 
         // 后续折叠只允许作用于原始空行；先于合并展开记录，避免误删用户主动录入的重复记录
-        boolean[] rowsWithSourceValues = rowsWithValues(grid);
+        boolean[] rowsWithSourceValues = rowsWithValues(window, firstCol, lastCol);
 
-        int effectiveHeaderRows = Math.min(headerRows, lastRowNum + 1);
+        // 结构感知展开合并单元格（window 上原地填充）
+        expandMergedRegions(window, grid, mergedRegions, header, firstCol, lastCol);
 
-        // 步骤 2: 结构感知展开合并单元格（grid 上原地填充）
-        expandMergedRegions(grid, sheet.getMergedRegions(), lastRowNum, maxCol, effectiveHeaderRows);
-
-        // 步骤 3: 丢弃全空列（表头与数据全程为空的列，含中间与尾部）
-        int[] cols = selectNonEmptyColumns(grid, 0, lastRowNum, maxCol);
+        // 丢弃全空列（表头与数据全程为空的列，含中间与尾部）
+        int[] cols = selectNonEmptyColumns(window, firstCol, lastCol);
         if (cols.length == 0) {
             return NormalizedTable.empty();
         }
 
-        // 步骤 4: 前 headerRows 行展平为表头，其余收集为数据行
-        List<String> headers = flattenHeaders(grid, 0, effectiveHeaderRows, cols);
-        List<NormalizedRow> normalizedRows = effectiveHeaderRows <= lastRowNum
-                ? collectDataRows(grid, effectiveHeaderRows, lastRowNum, cols, rowsWithSourceValues)
+        List<String> headers = flattenHeaders(window, headerRowIndexes, cols);
+        List<NormalizedRow> normalizedRows = firstDataRow <= lastDataRow
+                ? collectDataRows(window, firstDataRow, lastDataRow, cols, rowsWithSourceValues)
                 : List.of();
         return new NormalizedTable(
                 headers,
@@ -138,7 +170,7 @@ public final class ExcelTableNormalizer {
     /**
      * 计算 sheet 内最大列数（跨所有行）
      */
-    private static int computeMaxColumns(Sheet sheet, int lastRowNum) {
+    static int computeMaxColumns(Sheet sheet, int lastRowNum) {
         int maxCol = 0;
         for (int r = 0; r <= lastRowNum; r++) {
             Row row = sheet.getRow(r);
@@ -154,17 +186,20 @@ public final class ExcelTableNormalizer {
     }
 
     /**
-     * 选出非全空列：返回在 [startRow, endRow] 至少有一个非空 cell 的列索引（升序）
+     * 选出非全空列：返回窗口内至少有一个非空 cell 的列索引（升序）
      * <p>
      * 全空列（表头与数据全程为空）不携带信息一律丢弃，既裁尾部空列，也裁夹在数据列中间的空列；
      * 仅表头空但有数据的列保留（数据本身有意义）
      */
-    private static int[] selectNonEmptyColumns(String[][] grid, int startRow, int endRow, int maxCol) {
-        List<Integer> kept = new ArrayList<>(maxCol);
-        for (int c = 0; c < maxCol; c++) {
+    private static int[] selectNonEmptyColumns(String[][] window, int firstCol, int lastCol) {
+        List<Integer> kept = new ArrayList<>(lastCol - firstCol + 1);
+        for (int c = firstCol; c <= lastCol; c++) {
             boolean hasValue = false;
-            for (int r = startRow; r <= endRow; r++) {
-                String v = grid[r][c];
+            for (String[] row : window) {
+                if (row == null) {
+                    continue;
+                }
+                String v = row[c];
                 if (v != null && !v.isEmpty()) {
                     hasValue = true;
                     break;
@@ -187,8 +222,8 @@ public final class ExcelTableNormalizer {
      * 用 {@link Row.MissingCellPolicy#RETURN_NULL_AND_BLANK}：不存在的 cell 返回 null，
      * BLANK cell 仍返回 cell 实例（可携带 hyperlink）。这样空文字 + 超链接的场景能正确解析
      */
-    private static String[][] readGrid(Sheet sheet, int lastRowNum, int maxCol,
-                                       DataFormatter formatter, FormulaEvaluator evaluator) {
+    static String[][] readGrid(Sheet sheet, int lastRowNum, int maxCol,
+                               DataFormatter formatter, FormulaEvaluator evaluator) {
         String[][] grid = new String[lastRowNum + 1][maxCol];
         for (int r = 0; r <= lastRowNum; r++) {
             Row row = sheet.getRow(r);
@@ -216,43 +251,52 @@ public final class ExcelTableNormalizer {
      * <p>
      * 表头合并需要横向复制，下一行的子表头才能分别得到同一个父级；数据行则只把值放在合并区域的
      * 第一列，并在纵向范围内逐行携带。数据区横向复制会让一个长说明在每一列重复一次，既虚增块长度，
-     * 也让向量文本被同一句话支配。
+     * 也让向量文本被同一句话支配。只展开窗口内的行，锚点值取自未展开的 grid
      */
-    private static void expandMergedRegions(String[][] grid,
+    private static void expandMergedRegions(String[][] window,
+                                            String[][] grid,
                                             List<CellRangeAddress> mergedRegions,
-                                            int lastRowNum, int maxCol,
-                                            int effectiveHeaderRows) {
+                                            boolean[] header,
+                                            int firstCol, int lastCol) {
         if (mergedRegions == null || mergedRegions.isEmpty()) {
             return;
         }
         for (CellRangeAddress region : mergedRegions) {
-            int firstRow = region.getFirstRow();
-            int firstCol = region.getFirstColumn();
-            if (firstRow < 0 || firstRow > lastRowNum || firstCol < 0 || firstCol >= maxCol) {
+            int regionFirstRow = region.getFirstRow();
+            int regionFirstCol = region.getFirstColumn();
+            if (regionFirstRow < 0 || regionFirstRow >= grid.length
+                    || regionFirstCol < firstCol || regionFirstCol > lastCol) {
                 continue;
             }
-            String value = grid[firstRow][firstCol];
+            String value = grid[regionFirstRow][regionFirstCol];
             if (value == null || value.isEmpty()) {
                 continue;
             }
-            int rEnd = Math.min(region.getLastRow(), lastRowNum);
-            int cEnd = Math.min(region.getLastColumn(), maxCol - 1);
-            for (int r = firstRow; r <= rEnd; r++) {
-                if (r < effectiveHeaderRows) {
-                    for (int c = firstCol; c <= cEnd; c++) {
-                        grid[r][c] = value;
+            int rEnd = Math.min(region.getLastRow(), grid.length - 1);
+            int cEnd = Math.min(region.getLastColumn(), lastCol);
+            for (int r = regionFirstRow; r <= rEnd; r++) {
+                if (window[r] == null) {
+                    continue;
+                }
+                if (header[r]) {
+                    for (int c = regionFirstCol; c <= cEnd; c++) {
+                        window[r][c] = value;
                     }
                 } else {
-                    grid[r][firstCol] = value;
+                    window[r][regionFirstCol] = value;
                 }
             }
         }
     }
 
-    private static boolean[] rowsWithValues(String[][] grid) {
-        boolean[] result = new boolean[grid.length];
-        for (int r = 0; r < grid.length; r++) {
-            for (String value : grid[r]) {
+    private static boolean[] rowsWithValues(String[][] window, int firstCol, int lastCol) {
+        boolean[] result = new boolean[window.length];
+        for (int r = 0; r < window.length; r++) {
+            if (window[r] == null) {
+                continue;
+            }
+            for (int c = firstCol; c <= lastCol; c++) {
+                String value = window[r][c];
                 if (value != null && !value.isEmpty()) {
                     result[r] = true;
                     break;
@@ -263,15 +307,15 @@ public final class ExcelTableNormalizer {
     }
 
     /**
-     * 展平前 N 行为单行表头：相邻相同值合并（避免合并单元格展开后的重复）
+     * 把表头行展平为单行表头：相邻相同值合并（避免合并单元格展开后的重复）；没有表头行时列名全为空串
      */
-    private static List<String> flattenHeaders(String[][] grid, int startRow, int headerRows, int[] cols) {
+    private static List<String> flattenHeaders(String[][] window, int[] headerRowIndexes, int[] cols) {
         List<String> headers = new ArrayList<>(cols.length);
         for (int c : cols) {
             StringBuilder sb = new StringBuilder();
             String prev = null;
-            for (int r = startRow; r < startRow + headerRows; r++) {
-                String v = grid[r][c];
+            for (int r : headerRowIndexes) {
+                String v = window[r][c];
                 if (v == null || v.isEmpty()) {
                     continue;
                 }

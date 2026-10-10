@@ -127,6 +127,10 @@ rag:
       enabled: true
       drop-repeated-lines: true
       repeated-line-min-occurrences: 3
+    # Excel 版面切分与表头识别（table-structure 计划 §2）：按空行空列切区域，逐张表识别表头，标题与分段进章节路径。
+    # 评测过门槛前默认关闭
+    excel-layout:
+      enabled: false
   knowledge:
     terms-location: classpath:kq/terms.csv  # 领域术语表：元数据抽取、查询侧加权、阶段 3 分词词典共用
     schedule:

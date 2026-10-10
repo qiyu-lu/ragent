@@ -104,7 +104,7 @@ public class ParsedDocumentNormalizer {
         if (block instanceof TableBlock table) {
             return new TableBlock(table.provenance(), normalizeAll(table.headers(), unwrapMath),
                     table.rows() == null ? null : table.rows().stream().map(row -> normalizeAll(row, unwrapMath)).toList(),
-                    table.rowCellRanges());
+                    table.rowCellRanges(), normalizeNullable(table.caption(), unwrapMath));
         }
         if (block instanceof HtmlTableBlock html) {
             return new HtmlTableBlock(html.provenance(), normalize(html.html(), unwrapMath));

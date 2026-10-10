@@ -23,15 +23,24 @@ import java.util.List;
  * 表格 Block：由 TableChunker 按 rowsPerChunk 切分，每个 chunk 都重复带上 headers
  * <p>
  * 到这里合并单元格已被 ExcelTableNormalizer 展开填充，多行表头已展平为单行、列名以竖线拼接如 "财务|收入"
+ *
+ * @param caption 表题，如"二、研究型中心实验室"：Excel 版面分析认出的表格标题，每个 chunk 都带上，没有为 null。
+ *                不另发标题 Block：标题单独成草稿时，表格首块一旦装满就挂不上，会被打包器并到上一张表的末块
  */
 public record TableBlock(
         Provenance provenance,
         List<String> headers,
         List<List<String>> rows,
-        List<String> rowCellRanges
+        List<String> rowCellRanges,
+        String caption
 ) implements Block {
 
+    public TableBlock(Provenance provenance, List<String> headers, List<List<String>> rows,
+                      List<String> rowCellRanges) {
+        this(provenance, headers, rows, rowCellRanges, null);
+    }
+
     public TableBlock(Provenance provenance, List<String> headers, List<List<String>> rows) {
-        this(provenance, headers, rows, List.of());
+        this(provenance, headers, rows, List.of(), null);
     }
 }

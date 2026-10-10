@@ -58,11 +58,12 @@ public class TableChunker implements BlockChunker<TableBlock> {
 
         int maxRows = Math.max(1, ctx.budget().rowsPerChunk());
         int budget = Math.max(1, ctx.budget().maxChars());
+        String caption = block.caption() == null || block.caption().isBlank() ? null : block.caption().strip();
 
         List<ChunkDraft> result = new ArrayList<>();
 
         if (rows.isEmpty()) {
-            result.add(buildDraft(block, ctx, headers, List.of(), List.of()));
+            result.add(buildDraft(block, ctx, caption, headers, List.of(), List.of()));
             return result;
         }
 
@@ -72,23 +73,23 @@ public class TableChunker implements BlockChunker<TableBlock> {
         for (int rowIndex = 0; rowIndex < rows.size(); rowIndex++) {
             List<String> row = rows.get(rowIndex);
             String rowRange = rowIndex < rowCellRanges.size() ? rowCellRanges.get(rowIndex) : null;
-            List<RowPiece> rowPieces = splitWideRow(ctx, headers, row, budget);
+            List<RowPiece> rowPieces = splitWideRow(ctx, caption, headers, row, budget);
             if (!rowPieces.get(0).fullWidth()) {
                 if (!group.isEmpty()) {
-                    result.add(buildDraft(block, ctx, headers, group, groupRanges));
+                    result.add(buildDraft(block, ctx, caption, headers, group, groupRanges));
                     group = new ArrayList<>();
                     groupRanges = new ArrayList<>();
                 }
                 for (RowPiece piece : rowPieces) {
-                    result.add(buildDraft(block, ctx, piece.headers(), List.of(piece.values()),
+                    result.add(buildDraft(block, ctx, caption, piece.headers(), List.of(piece.values()),
                             rowRange == null ? List.of() : List.of(rowRange)));
                 }
                 continue;
             }
             boolean overCap = group.size() >= maxRows;
-            boolean overBudget = !group.isEmpty() && exceedsBudget(ctx, headers, group, row, budget);
+            boolean overBudget = !group.isEmpty() && exceedsBudget(ctx, caption, headers, group, row, budget);
             if (overCap || overBudget) {
-                result.add(buildDraft(block, ctx, headers, group, groupRanges));
+                result.add(buildDraft(block, ctx, caption, headers, group, groupRanges));
                 group = new ArrayList<>();
                 groupRanges = new ArrayList<>();
             }
@@ -98,7 +99,7 @@ public class TableChunker implements BlockChunker<TableBlock> {
             }
         }
         if (!group.isEmpty()) {
-            result.add(buildDraft(block, ctx, headers, group, groupRanges));
+            result.add(buildDraft(block, ctx, caption, headers, group, groupRanges));
         }
         return ChunkDraft.pieces(result);
     }
@@ -107,8 +108,9 @@ public class TableChunker implements BlockChunker<TableBlock> {
      * 稀疏宽行若仅因重复整张表头而超预算，按非空列分成若干窄表片段；每个键值对仍保持原子，来源范围
      * 仍指向同一原始行。单个键值对本身超预算时不截断业务文本，保留为唯一允许的超限例外。
      */
-    private List<RowPiece> splitWideRow(ChunkContext ctx, List<String> headers, List<String> row, int budget) {
-        if (fitsBudget(ctx, headers, List.of(row), budget)) {
+    private List<RowPiece> splitWideRow(ChunkContext ctx, String caption, List<String> headers, List<String> row,
+                                        int budget) {
+        if (fitsBudget(ctx, caption, headers, List.of(row), budget)) {
             return List.of(new RowPiece(headers, row, true));
         }
 
@@ -125,7 +127,8 @@ public class TableChunker implements BlockChunker<TableBlock> {
             List<String> candidateValues = new ArrayList<>(pieceValues);
             candidateHeaders.add(header);
             candidateValues.add(value);
-            if (!pieceValues.isEmpty() && !fitsBudget(ctx, candidateHeaders, List.of(candidateValues), budget)) {
+            if (!pieceValues.isEmpty()
+                    && !fitsBudget(ctx, caption, candidateHeaders, List.of(candidateValues), budget)) {
                 pieces.add(new RowPiece(List.copyOf(pieceHeaders), List.copyOf(pieceValues), false));
                 pieceHeaders = new ArrayList<>();
                 pieceValues = new ArrayList<>();
@@ -142,21 +145,24 @@ public class TableChunker implements BlockChunker<TableBlock> {
     /**
      * 预算同时覆盖两份真正落库的文本：前端/LLM 使用的 Markdown content，以及追加章节路径后的
      * embedding text。旧实现只累计 KV 行，宽表重复表头后会出现 content 已超限但预算仍判定可装入。
+     * 有表题时两份文本各多一行表题，一并计入
      */
-    private boolean exceedsBudget(ChunkContext ctx, List<String> headers, List<List<String>> current,
-                                  List<String> nextRow, int budget) {
+    private boolean exceedsBudget(ChunkContext ctx, String caption, List<String> headers,
+                                  List<List<String>> current, List<String> nextRow, int budget) {
         List<List<String>> candidate = new ArrayList<>(current.size() + 1);
         candidate.addAll(current);
         candidate.add(nextRow);
-        return !fitsBudget(ctx, headers, candidate, budget);
+        return !fitsBudget(ctx, caption, headers, candidate, budget);
     }
 
-    private boolean fitsBudget(ChunkContext ctx, List<String> headers, List<List<String>> rows, int budget) {
-        if (renderMarkdownTable(headers, rows).length() > budget) {
+    private boolean fitsBudget(ChunkContext ctx, String caption, List<String> headers, List<List<String>> rows,
+                               int budget) {
+        int captionChars = caption == null ? 0 : caption.length() + 2;
+        if (captionChars + renderMarkdownTable(headers, rows).length() > budget) {
             return false;
         }
         String body = renderKeyValueRows(headers, rows);
-        int embeddingLength = body.length();
+        int embeddingLength = body.length() + (caption == null ? 0 : caption.length() + 1);
         if (!ctx.outlinePath().isEmpty()) {
             embeddingLength += String.join(" / ", ctx.outlinePath()).length() + 1;
         }
@@ -166,15 +172,28 @@ public class TableChunker implements BlockChunker<TableBlock> {
     private record RowPiece(List<String> headers, List<String> values, boolean fullWidth) {
     }
 
-    private ChunkDraft buildDraft(TableBlock block, ChunkContext ctx, List<String> headers, List<List<String>> rows,
-                                  List<String> rowRanges) {
+    /**
+     * 有表题时每一块的展示文本与检索正文都以表题开头，章节路径也多一级：续块光看表格分不出是哪张表
+     * （如两个实验室的设备表），大模型拿到的只有展示文本
+     */
+    private ChunkDraft buildDraft(TableBlock block, ChunkContext ctx, String caption, List<String> headers,
+                                  List<List<String>> rows, List<String> rowRanges) {
+        List<String> outline = ctx.outlinePath();
+        String content = renderMarkdownTable(headers, rows);
+        String body = renderKeyValueRows(headers, rows);
+        if (caption != null) {
+            outline = new ArrayList<>(outline);
+            outline.add(caption);
+            content = caption + "\n\n" + content;
+            body = caption + "\n" + body;
+        }
         ChunkMetadata metadata = ChunkMetadata.builder()
-                .outlinePath(ctx.outlinePath())
+                .outlinePath(outline)
                 .provenance(withCellRange(block.provenance(), rowRanges))
                 .blockType("table")
                 .build();
         // 章节路径由装配器统一拼进向量文本，此处只给 key-value 正文，避免重复前缀
-        return ChunkDraft.of(renderMarkdownTable(headers, rows), renderKeyValueRows(headers, rows), metadata);
+        return ChunkDraft.of(content, body, metadata);
     }
 
     private Provenance withCellRange(Provenance provenance, List<String> rowRanges) {

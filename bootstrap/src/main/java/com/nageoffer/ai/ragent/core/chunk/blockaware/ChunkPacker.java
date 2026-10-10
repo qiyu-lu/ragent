@@ -197,6 +197,10 @@ public class ChunkPacker {
             return;
         }
         ChunkDraft packed = buffer.size() == 1 ? buffer.get(0) : merge(buffer);
+        if (isBlank(packed)) {
+            // 只剩分节标记（空标题草稿）：没有内容，既不单独成块，也不能并进上一块去改写它的章节路径
+            return;
+        }
         if (!result.isEmpty() && contentLength(packed) < minChars) {
             ChunkDraft previous = result.get(result.size() - 1);
             if (sameTopLevel(previous, packed)
@@ -231,7 +235,7 @@ public class ChunkPacker {
         }
 
         ChunkMetadata merged = ChunkMetadata.builder()
-                .outlinePath(parts.get(0).metadata().outlinePath().subList(0, commonPrefixLength(parts)))
+                .outlinePath(commonOutlinePrefix(parts))
                 .assets(assets)
                 // 标题通常排在表格前且没有 cellRange；若直接拿第一块，会把该表第一行的精确锚点抹掉。
                 .provenance(mostSpecificProvenance(parts))
@@ -270,13 +274,26 @@ public class ChunkPacker {
         return fallback;
     }
 
-    private static int commonPrefixLength(List<ChunkDraft> drafts) {
-        List<String> first = drafts.get(0).metadata().outlinePath();
+    /**
+     * 各块章节路径的公共前缀；分节标记没有内容，不参与
+     */
+    private static List<String> commonOutlinePrefix(List<ChunkDraft> drafts) {
+        List<ChunkDraft> contentful = drafts.stream().filter(draft -> !isBlank(draft)).toList();
+        List<ChunkDraft> considered = contentful.isEmpty() ? drafts : contentful;
+        List<String> first = considered.get(0).metadata().outlinePath();
         int common = first.size();
-        for (ChunkDraft draft : drafts) {
+        for (ChunkDraft draft : considered) {
             common = Math.min(common, commonPrefixLength(first, draft.metadata().outlinePath()));
         }
-        return common;
+        return first.subList(0, common);
+    }
+
+    /**
+     * 分节标记：空标题产出的草稿，没有展示文本、检索正文与资产
+     */
+    private static boolean isBlank(ChunkDraft draft) {
+        return !StringUtils.hasText(draft.content()) && !draft.hasExplicitBody()
+                && draft.metadata().assets().isEmpty();
     }
 
     private static int commonPrefixLength(List<String> a, List<String> b) {

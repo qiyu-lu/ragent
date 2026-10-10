@@ -48,6 +48,9 @@ public class HeadingHandler {
 
     /**
      * 根据 heading 更新章节路径，入参与返回值都不可变
+     * <p>
+     * 空标题只结束同级与更深的章节、不新开一节：Excel 版面分析在每个区域开头放一个，让没有自己标题的表
+     * 回到 sheet 级路径，而不是挂在前一张表的标题下
      */
     public Outline update(Outline current, HeadingBlock heading) {
         Outline base = current == null ? Outline.EMPTY : current;
@@ -64,7 +67,10 @@ public class HeadingHandler {
 
         List<String> path = new ArrayList<>(base.path().subList(0, keep));
         List<Integer> levels = new ArrayList<>(base.levels().subList(0, keep));
-        path.add(heading.text() == null ? "" : heading.text());
+        if (heading.text() == null || heading.text().isBlank()) {
+            return new Outline(path, levels);
+        }
+        path.add(heading.text());
         levels.add(level);
         return new Outline(path, levels);
     }

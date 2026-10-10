@@ -24,6 +24,7 @@ import com.nageoffer.ai.ragent.core.parser.image.ImageAssetProcessor;
 import com.nageoffer.ai.ragent.core.parser.image.ImageParseProperties;
 import com.nageoffer.ai.ragent.core.parser.model.Block;
 import com.nageoffer.ai.ragent.core.parser.model.HeadingBlock;
+import com.nageoffer.ai.ragent.core.parser.model.ParagraphBlock;
 import com.nageoffer.ai.ragent.core.parser.model.ParsedDocument;
 import com.nageoffer.ai.ragent.core.parser.model.Provenance;
 import com.nageoffer.ai.ragent.core.parser.model.TableBlock;
@@ -41,6 +42,7 @@ import org.apache.poi.xssf.usermodel.XSSFDrawing;
 import org.apache.poi.xssf.usermodel.XSSFPicture;
 import org.apache.poi.xssf.usermodel.XSSFPictureData;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayInputStream;
@@ -53,7 +55,8 @@ import java.util.Set;
  * Excel 文档解析器（Apache POI）
  * <p>
  * 单元格规范化交给 {@link ExcelTableNormalizer}：合并单元格展开填充、多行表头展平拼接、超链接内联为
- * {@code [text](url)}、公式求值并在失败时回退缓存值或公式字符串
+ * {@code [text](url)}、公式求值并在失败时回退缓存值或公式字符串。版面切分开关打开时先由
+ * {@link ExcelLayoutAnalyzer} 把 sheet 切成标题、段落与若干张表，再逐张表规范化
  */
 @Slf4j
 @Component
@@ -67,11 +70,23 @@ public class ExcelDocumentParser implements DocumentParser {
 
     private final ImageAssetProcessor imageAssetProcessor;
     private final ImageParseProperties imageParseProperties;
+    private final ExcelLayoutProperties layoutProperties;
 
+    /**
+     * 离线入口与测试用：版面切分关闭
+     */
     public ExcelDocumentParser(ImageAssetProcessor imageAssetProcessor,
                                ImageParseProperties imageParseProperties) {
+        this(imageAssetProcessor, imageParseProperties, new ExcelLayoutProperties());
+    }
+
+    @Autowired
+    public ExcelDocumentParser(ImageAssetProcessor imageAssetProcessor,
+                               ImageParseProperties imageParseProperties,
+                               ExcelLayoutProperties layoutProperties) {
         this.imageAssetProcessor = imageAssetProcessor;
         this.imageParseProperties = imageParseProperties;
+        this.layoutProperties = layoutProperties;
     }
 
     @Override
@@ -197,6 +212,9 @@ public class ExcelDocumentParser implements DocumentParser {
      */
     private List<Block> buildSheetBlocks(Sheet sheet, String sourceFile, int headerRows,
                                          DataFormatter formatter, FormulaEvaluator evaluator) {
+        if (layoutProperties.isEnabled()) {
+            return buildLayoutBlocks(sheet, sourceFile, headerRows, formatter, evaluator);
+        }
         NormalizedTable table = ExcelTableNormalizer.normalize(sheet, formatter, evaluator, headerRows);
         if (table.isEmpty()) {
             log.debug("Sheet [{}] 为空，跳过", sheet.getSheetName());
@@ -208,6 +226,40 @@ public class ExcelDocumentParser implements DocumentParser {
                 new HeadingBlock(prov, 1, sheet.getSheetName()),
                 new TableBlock(prov, table.headers(), table.rows(), table.rowCellRanges())
         );
+    }
+
+    /**
+     * 按版面输出：sheet 名作一级标题，之后逐个区域输出段落与表格，表的标题作为表题随表格走
+     * <p>
+     * 每个区域开头放一个空的二级标题：章节路径回到 sheet 级（见 {@code HeadingHandler#update}），打包器也在这里分节
+     * （见 {@code HeadingChunker}），左右并排的两张表、表下方的"差异化总结"不会被整节装成一个大块
+     */
+    private List<Block> buildLayoutBlocks(Sheet sheet, String sourceFile, int headerRows,
+                                          DataFormatter formatter, FormulaEvaluator evaluator) {
+        List<ExcelLayoutAnalyzer.Region> regions = ExcelLayoutAnalyzer.analyze(sheet, formatter, evaluator, headerRows);
+        if (regions.isEmpty()) {
+            log.debug("Sheet [{}] 为空，跳过", sheet.getSheetName());
+            return List.of();
+        }
+        String sheetName = sheet.getSheetName();
+        Provenance sheetProvenance = Provenance.ofExcelCell(sourceFile, sheetName);
+        List<Block> blocks = new ArrayList<>();
+        blocks.add(new HeadingBlock(sheetProvenance, 1, sheetName));
+        for (ExcelLayoutAnalyzer.Region region : regions) {
+            blocks.add(new HeadingBlock(sheetProvenance, 2, ""));
+            for (ExcelLayoutAnalyzer.Item item : region.items()) {
+                if (item instanceof ExcelLayoutAnalyzer.Text text) {
+                    blocks.add(new ParagraphBlock(Provenance.ofExcelCell(sourceFile, sheetName, text.range()), text.text()));
+                } else if (item instanceof ExcelLayoutAnalyzer.Table table) {
+                    NormalizedTable normalized = table.table();
+                    if (!normalized.isEmpty()) {
+                        blocks.add(new TableBlock(sheetProvenance, normalized.headers(), normalized.rows(),
+                                normalized.rowCellRanges(), table.title()));
+                    }
+                }
+            }
+        }
+        return blocks;
     }
 
     private static String extractString(Map<String, Object> options) {

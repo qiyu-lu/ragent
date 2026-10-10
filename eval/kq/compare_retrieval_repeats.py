@@ -15,6 +15,8 @@ sub-questions (the 15 s channel timeout) than allowed is rejected unless ``--all
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
@@ -150,13 +152,28 @@ def check_validity(arms: Mapping[str, Sequence[Mapping[str, Any]]], max_empty: O
     return problems
 
 
+def replayed_sub_questions(report: Mapping[str, Any]) -> str:
+    """Fingerprint of the sub-questions each question was actually retrieved with.
+
+    The sub-questions file is shared by both splits and grows when a split is recorded, so its hash
+    changes although the replayed sub-questions of the other split do not; arms are compared on this.
+    """
+
+    used = {str(item.get("id")): (item.get("raw_response") or {}).get("subQuestions")
+            for item in report.get("details") or []}
+    return hashlib.sha256(json.dumps(used, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()
+
+
 def check_compatible(arms: Mapping[str, Sequence[Mapping[str, Any]]]) -> List[str]:
     problems: List[str] = []
     all_reports = [r for reports in arms.values() for r in reports]
-    for field in ("split", "questions_sha256", "sub_questions_sha256"):
+    for field in ("split", "questions_sha256"):
         values = {str(r.get(field)) for r in all_reports}
         if len(values) > 1:
             problems.append(f"reports differ in {field}: {sorted(values)}")
+    fingerprints = {replayed_sub_questions(r) for r in all_reports}
+    if len(fingerprints) > 1:
+        problems.append(f"reports replayed different sub-questions: {sorted(f[:12] for f in fingerprints)}")
     for name, reports in arms.items():
         indexes = sorted(r.get("repeat_index") for r in reports)
         if len(indexes) != len(set(indexes)):
@@ -185,6 +202,10 @@ def main() -> int:
     if problems and not args.allow_mismatch:
         print("input error:\n  - " + "\n  - ".join(problems))
         return 1
+    file_hashes = {str(r.get("sub_questions_sha256")) for reports in arms.values() for r in reports}
+    if len(file_hashes) > 1 and not problems:
+        problems.append(f"sub-questions file hash differs across reports ({len(file_hashes)} values) but every report "
+                        "replayed the same sub-questions; the file grew when another split was recorded")
     thresholds = read_json(args.thresholds) if args.thresholds else {}
     invalid = check_validity(arms, (thresholds.get("validity") or {}).get("max_empty_channel_sub_questions"))
     if invalid and not args.allow_invalid_runs:

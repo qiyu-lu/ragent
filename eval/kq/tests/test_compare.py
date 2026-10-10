@@ -62,6 +62,20 @@ class CompareTest(unittest.TestCase):
         self.assertIn("r1", problems[0])
         self.assertEqual(cmp.check_validity({"S2": [bad]}, None), [])
 
+    def test_sub_questions_are_compared_by_what_was_replayed(self):
+        details = [{"id": "q1", "raw_response": {"subQuestions": ["a", "b"]}}]
+        first = report("a1", "a", 1, 0.8, 0.5)
+        first["details"] = details
+        second = report("b1", "b", 1, 0.8, 0.5)
+        second["details"] = details
+        second["sub_questions_sha256"] = "file-grew-later"
+        self.assertEqual(cmp.check_compatible({"a": [first], "b": [second]})[:1],
+                         ["arm a: needs at least 2 repeats to measure a range"])
+        other = report("c1", "c", 1, 0.8, 0.5)
+        other["details"] = [{"id": "q1", "raw_response": {"subQuestions": ["a", "c"]}}]
+        problems = "\n".join(cmp.check_compatible({"a": [first], "c": [other]}))
+        self.assertIn("replayed different sub-questions", problems)
+
     def test_compatibility_checks(self):
         arms = {"a": [report("a1", "a", 1, 0.8, 0.5), report("a2", "a", 1, 0.8, 0.5)],
                 "b": [report("b1", "b", 1, 0.8, 0.5, split="test")]}

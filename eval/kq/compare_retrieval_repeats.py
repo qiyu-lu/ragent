@@ -41,6 +41,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--thresholds", type=Path, help="fixed thresholds and validity rule (eval/kq/manifests/kq-thresholds.json)")
     parser.add_argument("--allow-invalid-runs", action="store_true",
                         help="keep reports that break the validity rule of --thresholds")
+    parser.add_argument("--max-empty-channel", type=int,
+                        help="run-validity limit on its own: the test split is judged against its baseline range, "
+                             "not the fixed thresholds, but invalid runs must still be caught")
     return parser.parse_args()
 
 
@@ -207,7 +210,9 @@ def main() -> int:
         problems.append(f"sub-questions file hash differs across reports ({len(file_hashes)} values) but every report "
                         "replayed the same sub-questions; the file grew when another split was recorded")
     thresholds = read_json(args.thresholds) if args.thresholds else {}
-    invalid = check_validity(arms, (thresholds.get("validity") or {}).get("max_empty_channel_sub_questions"))
+    limit = args.max_empty_channel if args.max_empty_channel is not None \
+        else (thresholds.get("validity") or {}).get("max_empty_channel_sub_questions")
+    invalid = check_validity(arms, limit)
     if invalid and not args.allow_invalid_runs:
         print("invalid runs:\n  - " + "\n  - ".join(invalid))
         return 1

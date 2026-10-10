@@ -21,6 +21,7 @@
 | `run_retrieval.py` | 跑题集：首轮 `--record-sub-questions` 落盘子问题，之后回放；按题型汇总 Hit@5、锚点召回、MRR、上下文精度、文档召回、返回块数 |
 | `compare_retrieval_repeats.py` | 每臂多次重复的均值与极差；`--thresholds manifests/kq-thresholds.json` 用阶段 2 开工时写定的门槛与运行有效性规则判 improved / unproven / regressed，否则以基线极差为门槛 |
 | `doc_metadata.py` | 阶段 2：导出入库抽取的文档元数据与解析审计供核对（`export`），把核对后的值写回为 confirmed（`confirm`） |
+| `verify_boost_beta.py` | 阶段 2：从重排头部的排序反推每次运行实际用的 boost β，核对与臂名一致，并检查空通道上限 |
 | `config/application-kq-s1.example.yaml` | 评测实例的附加配置样例（端口 9093、库 `ragent_eval_kq_s1`、Redis DB 13、独立桶与 MQ 主题） |
 | `config/application-kq-s2.example.yaml` | 阶段 2 实例（端口 9094、库 `ragent_eval_kq_s2`、Redis DB 14）：闸门与归一化打开，boost 关，检索配置与阶段 1 相同 |
 | `manifests/kq-thresholds.json` | 阶段 2、3 的门槛与运行有效性规则（2026-10-09 写定，`kq-s1`），对比脚本读它 |
@@ -107,14 +108,26 @@ python3 eval/kq/parse_metrics.py --facts $QD/numeric-facts-v1.jsonl --full-md <p
 
 ## 阶段 2 运行顺序（用户在仓库根目录的终端跑）
 
-**进度：第 0～7 步已于 2026-10-10 跑完**（入库 `runs/setup-s2.json`、解析层 `runs/S2-chunks/parse-metrics.json`、元数据确认 `metadata/doc-metadata-s2-confirmed.json`、S2-gate 调参集对比 `runs/S2-gate-vs-S1-base-tune.json`，S2-gate 过了门槛）。**接着从第 8 步按顺序跑到第 14 步**，每步看完输出再下一步，不用再来回确认。
+**进度：第 0～7 步已于 2026-10-10 跑完**（入库 `runs/setup-s2.json`、解析层 `runs/S2-chunks/parse-metrics.json`、元数据确认 `metadata/doc-metadata-s2-confirmed.json`、S2-gate 调参集对比 `runs/S2-gate-vs-S1-base-tune.json`，S2-gate 过了门槛）。
+
+**接下来按这个顺序做（2026-10-10 03:00 更新）。** 已挪开作废的：`S2-boost-0.2` 三次（实例当时没开 boost）、`S2-boost-0.1-tune-r1`（24 个空通道）、`S2-gate-test-r2`（18 个空通道）。保留有效的：S2-gate 调参集 3 次、S2-gate 测试集 r1 与 r3、`S2-boost-0.1` 的 r2 与 r3。
+
+1. 第 9 步 β = 0.1：只补 r1（把循环写成 `for r in 1`）。终端 A 还是 β = 0.1 的实例就不用重启，不确定就按第 9 步用 `BETA=0.1` 重启。
+2. 第 10 步 β = 0.2：r1～r3 全跑。
+3. 第 11 步 β = 0.3：r1～r3 全跑。
+4. 第 12 步：boost 对比，按写好的规则选 β。
+5. 第 8 步：只补 r2（`for r in 2`）。终端 A 先换回第 3 步那条不带 boost 参数的启动命令；跑完再执行第 8 步的对比命令。
+6. 第 13 步：第 12 步选出了 β 才跑，否则跳过。
+7. 第 14 步：停实例。
+
+每一轮跑完都先执行该步里的 `verify_boost_beta.py`，全部打印 `OK` 才进下一步。它会从排序结果反推这几次实际用的 β，实例没开 boost、开错了 β、空通道超过 8 个都会打印 `INVALID`。
 
 通用约定（每一步都适用）：
 
 - 两个终端都在仓库根目录。**终端 A** 只跑实例（`java -jar …`，会一直占着），三把 key 必须在它的环境里；**终端 B** 跑评测。终端 B 每次新开都先执行：
   `export B2=http://127.0.0.1:9094/api/ragent QD=local-data/kq-eval/questions`
 - 换配置 = 在终端 A 按 Ctrl-C 停掉实例，再用该步给的命令启动，等日志出现 `Started RagentApplication` 后才在终端 B 开跑。
-- 某次运行作废：对比时打印 `invalid runs: <label>: N empty-channel sub-questions > 8; rerun it`，就把被点名的那次挪开，只重跑那一次（把循环改成 `for r in <那个 r>`），再重跑对比：
+- 某次运行作废（`verify_boost_beta.py` 打印 `INVALID`，或对比时打印 `invalid runs: …; rerun it`）：把被点名的那次挪开，只重跑那一次（把循环改成 `for r in <那个 r>`），再重新检查、重跑对比：
   `L=<被点名的 label>; mv local-data/kq-eval/runs/$L local-data/kq-eval/runs/invalid-$L-$(date +%m%d%H%M)`
 - `run_retrieval.py` 以退出码 2 中止（重排回退成 noop）= 实例进程没拿到 key：在终端 A 重新 export key、重启实例，再重跑这一次。
 
@@ -183,8 +196,8 @@ for r in 1 2 3; do
   python3 eval/kq/run_retrieval.py --base $B2 --label S2-gate-test-r$r --arm S2-gate --split test --repeat-index $r \
     --server-commit $(git rev-parse HEAD) --questions $QD/questions-v1.jsonl
 done
-# 应打印 boost off
-python3 -c "import json,sys;d=json.load(open(f'local-data/kq-eval/runs/{sys.argv[1]}/retrieval.json'));print('boost on' if any(s['stage']=='post-MetadataBoost' for x in d['details'] for s in x['raw_response']['stages']) else 'boost off')" S2-gate-test-r1
+# 三行都应是 OK（boost=off、空通道 ≤ 8）
+python3 eval/kq/verify_boost_beta.py S2-gate-test-r{1,2,3}
 # 测试集只报告：门槛是测试集基线自己的极差，所以不加 --thresholds，只单独查空通道上限
 python3 eval/kq/compare_retrieval_repeats.py --max-empty-channel 8 \
   --arm S1-base local-data/kq-eval/runs/S1-base-test-r{1,2,3}/retrieval.json \
@@ -215,8 +228,8 @@ for r in 1 2 3; do
   python3 eval/kq/run_retrieval.py --base $B2 --label S2-boost-$BETA-tune-r$r --arm S2-boost-$BETA --split tune --repeat-index $r \
     --server-commit $(git rev-parse HEAD) --questions $QD/questions-v1.jsonl
 done
-# 应打印 boost on；打印 boost off 说明终端 A 没带上参数，把这三次挪开重跑
-python3 -c "import json,sys;d=json.load(open(f'local-data/kq-eval/runs/{sys.argv[1]}/retrieval.json'));print('boost on' if any(s['stage']=='post-MetadataBoost' for x in d['details'] for s in x['raw_response']['stages']) else 'boost off')" S2-boost-$BETA-tune-r1
+# 三行都应是 OK（boost=<BETA>、空通道 ≤ 8）；打印 INVALID 就按通用约定挪开重跑那一次
+python3 eval/kq/verify_boost_beta.py S2-boost-$BETA-tune-r{1,2,3}
 ```
 
 ### 第 12 步：boost 对比与选 β（三个 β 都跑完才跑）
@@ -246,6 +259,7 @@ for r in 1 2 3; do
   python3 eval/kq/run_retrieval.py --base $B2 --label S2-boost-$BETA-test-r$r --arm S2-boost-$BETA --split test --repeat-index $r \
     --server-commit $(git rev-parse HEAD) --questions $QD/questions-v1.jsonl
 done
+python3 eval/kq/verify_boost_beta.py S2-boost-$BETA-test-r{1,2,3}
 python3 eval/kq/compare_retrieval_repeats.py --max-empty-channel 8 --baseline S2-gate \
   --arm S2-gate local-data/kq-eval/runs/S2-gate-test-r{1,2,3}/retrieval.json \
   --arm S2-boost-$BETA local-data/kq-eval/runs/S2-boost-$BETA-test-r{1,2,3}/retrieval.json \

@@ -237,7 +237,7 @@ def main() -> int:
     print(f"questions: {dist['total']} rows, sha256={sha256_file(args.questions)}")
     for qtype in QUESTION_TYPES:
         counts = dist["by_type"].get(qtype, {})
-        print(f"  {qtype:13s} tune={counts.get('tune', 0):3d} test={counts.get('test', 0):3d}  (plan ~{TARGET_BY_TYPE[qtype]})")
+        print(f"  {qtype:13s} tune={counts.get('tune', 0):3d} test={counts.get('test', 0):3d}  (plan ~{TARGET_BY_TYPE.get(qtype, '-')})")
     print(f"  paraphrased: {dist['paraphrased']}/{dist['total']}")
     print("  by doc: " + ", ".join(f"{doc}={count}" for doc, count in dist["by_doc"].items()))
     fact_counts = Counter(str(fact.get("doc")) for fact in facts)

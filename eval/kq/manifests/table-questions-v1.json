@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "kind": "kq-dataset-manifest",
+  "created_at": "2026-10-10T14:43:17.512776+00:00",
+  "questions": {
+    "path": "local-data/kq-eval/questions/questions-table-v1.jsonl",
+    "sha256": "6f9d8706b4ff57bae11146218311ea4048b80ece2b82777c10a29389efb6cdcb",
+    "distribution": {
+      "total": 12,
+      "by_type": {
+        "table": {
+          "tune": 6,
+          "test": 6
+        }
+      },
+      "by_split": {
+        "tune": 6,
+        "test": 6
+      },
+      "by_doc": {
+        "survey-v1.2": 12
+      },
+      "paraphrased": 12
+    }
+  },
+  "facts": {
+    "path": "local-data/kq-eval/questions/numeric-facts-v1.jsonl",
+    "sha256": "744e7d5dcd4c56f0ae274adc8d7f38eae09f27a9ece559cadf21cae869a2487a",
+    "count": 141,
+    "by_doc": {
+      "GBT10322.1-2014-sampling": 21,
+      "GBT16574-1996-si": 15,
+      "GBT6730.10-2014-si": 24,
+      "GBT6730.5-2007-tfe": 24,
+      "YST360.2-2011-tfe": 18,
+      "YST360.3-2011-feo": 17,
+      "survey-v1.2": 22
+    }
+  },
+  "corpus": {
+    "path": "/home/sd101t/IdeaProjects/ragent-iron-ore-rag/local-data/kq-eval/corpus-kq-s1.json",
+    "sha256": "cde2a65fb6a74f52f8b8a4696f53ab594e260ceb69a596a9da4305391aa23665",
+    "version": "kq-s1-corpus-v1"
+  }
+}

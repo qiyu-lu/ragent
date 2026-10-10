@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "kind": "table-layout-golden-manifest",
+  "written": "2026-10-10",
+  "plan": "docs/iron-ore-rag/table-structure-plan-2026-10-10.md §4.1",
+  "note": "Hand-labelled from the cell grid before any layout or chunking code; confirmed by the user on 2026-10-10. Never edited afterwards.",
+  "golden": {
+    "path": "local-data/kq-eval/table-layout/survey-layout-golden.json",
+    "sha256": "b030605bcbaccf3f5ba897a7e18f67defcc97001a5c25f702474b277d8678ff2",
+    "tables": 25,
+    "text_cells": 52,
+    "source_md": {
+      "path": "local-data/kq-eval/table-layout/survey-layout-golden.md",
+      "sha256": "55abba068d8c5e290cc77bb1353df595d17670cc83de22169685182475a98f38"
+    }
+  },
+  "workbooks": [
+    {
+      "path": "local-data/source/铁矿石人工检测流程调研V1.2.xlsx",
+      "sha256": "6fdc4cf3b94533faa497a85972e35fb7cab8b62d8d86139b82d8f947fec83bf8"
+    },
+    {
+      "path": "local-data/source/铁矿石人工检测流程调研V1.3-demo.xlsx",
+      "sha256": "74adff1ff24b76d562aff6b86df75e5b8039169ed831e076576582ea431344ed"
+    }
+  ]
+}

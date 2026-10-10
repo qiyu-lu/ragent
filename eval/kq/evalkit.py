@@ -22,7 +22,8 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 
 CUTOFFS = (1, 3, 5, 10)
-QUESTION_TYPES = ("numeric", "procedure", "survey", "confusion", "unanswerable")
+# "table" is the table-structure plan's own set (questions-table-v1.jsonl, report only), not part of the 120
+QUESTION_TYPES = ("numeric", "procedure", "survey", "confusion", "unanswerable", "table")
 SPLITS = ("tune", "test")
 
 # ---------------------------------------------------------------------------

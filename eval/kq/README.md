@@ -344,3 +344,34 @@ python3 eval/kq/run_gate_fix_check.py
 测试集不跑：它已经为这一项用过一次，修正也没有改阈值。中途断了，重新执行同一条命令会接着跑。跑完由下一个会话读汇总，回填闸门改动说明与计划 §10。
 
 阶段 3 的敏感性分析不需要服务，直接读已有运行：`python3 eval/kq/stage3_sensitivity.py`（加 `--output <路径>` 另存 JSON）。
+
+## 表格版面切分与按内容定界（table-structure 计划）
+
+计划：[`docs/iron-ore-rag/table-structure-plan-2026-10-10.md`](../../docs/iron-ore-rag/table-structure-plan-2026-10-10.md)；状态：同目录 `table-structure-status.md`。新题 `questions/questions-table-v1.jsonl`（12 道，题型 `table`，哈希在 `manifests/table-questions-v1.json`）和标准答案 `table-layout/survey-layout-golden.json`（哈希在 `manifests/table-layout-golden.json`）都在写代码之前冻结。
+
+**离线检查**（不调模型，会话跑；读两版调研表和标准答案，缺文件就跳过）：
+
+```bash
+./mvnw -o -pl bootstrap -am test -Dtest=TableStructureOfflineReport -Dsurefire.failIfNoSpecifiedTests=false
+```
+
+报告写 `runs/table-structure-offline-*.json`：25 张表与 52 个文字格对照标准答案、表内格子不能当段落输出、三种配置的块数，以及插、删、改一行时的失效块数和"改动之后第一个内容切点以后的块全部不变"的不变式。
+
+**检索评测**（用户跑）：在**有三把 key 的终端**里，确认 9095、9096 上没有实例、没有客户端连着 `ragent_eval_kq_s2b`，执行：
+
+```bash
+python3 eval/kq/run_table_structure.py --plan   # 只看计划与预检
+python3 eval/kq/run_table_structure.py          # 约 60 分钟，不用改参数
+```
+
+脚本按顺序：
+
+1. 离线构建 jar；代码目录有未提交的改动就拒绝开跑。
+2. 由 `ragent_eval_kq_s2b` 复制出 `ragent_eval_kq_t1`、`ragent_eval_kq_t2`（已有就保留），由 S2b 配置生成两份配置：端口 9096、Redis DB 11 / 12、独立的 RocketMQ 名字，调研表原件从 S2b 的桶读取。开关从启动参数传：T1 只开版面切分，T2 再开按内容定界。
+3. 启动 S2b（开关都关，库不动），12 道新题回放 3 次；第一次在线改写并存档子问题（`questions/sub-questions-table-v1.jsonl`），之后都回放这批子问题。
+4. T1、T2 依次：启动实例，只重切调研表，核对新版面生效（设备表不再有"标题当表头"的块，研究型中心实验室的块以表题开头），导出切片（`runs/<臂>-chunks/`），调参集回放 3 次、新题回放 3 次；向量通道空结果 > 8 的自动挪开重跑。重切结果（块数、向量缓存命中与未命中）记在 `runs/<臂>-rechunk.json`。
+5. 按写定门槛比较（`runs/table-structure-vs-S2b-tune.json`、`runs/table-structure-T2-vs-T1-tune.json`）并定最终配置：T2；T2 退化而 T1 不退化则 T1；都退化则不跑测试集。
+6. S2b 与最终配置在测试集各回放 3 次，只报告（`runs/table-structure-test.json`）。
+7. 写汇总 `runs/table-structure-summary-*.json`；新题对比在 `runs/table-structure-table-questions.json`。
+
+中途断了，重新执行同一条命令会接着跑。

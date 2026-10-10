@@ -79,6 +79,12 @@
             <version>0.1.6</version>
         </dependency>
 
+        <!-- 中文全文通道的应用侧分词（knowledge-quality 阶段 3），用户词典来自术语表 -->
+        <dependency>
+            <groupId>com.huaban</groupId>
+            <artifactId>jieba-analysis</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-jdbc</artifactId>

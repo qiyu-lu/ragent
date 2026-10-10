@@ -29,6 +29,12 @@ public enum SearchChannelType {
     VECTOR,
 
     /**
+     * 中文全文检索
+     * 在 t_knowledge_chunk.content_tsv 上用 @@ 取候选、应用侧算 BM25，与向量通道共用检索作用域
+     */
+    FULL_TEXT,
+
+    /**
      * 联网检索
      * 基于外部 Web 搜索 API（如 You.com Search）的实时网络召回，与本地知识库通道互补
      */

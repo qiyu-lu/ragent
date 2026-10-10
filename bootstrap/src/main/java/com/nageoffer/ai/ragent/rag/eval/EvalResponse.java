@@ -20,6 +20,7 @@ package com.nageoffer.ai.ragent.rag.eval;
 import com.nageoffer.ai.ragent.rag.dto.RetrievalSelectionDiagnostics;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 评测检索出参：只有检索证据，没有生成
@@ -48,9 +49,10 @@ public record EvalResponse(String question,
      * @param subQuestion    子问题
      * @param rerankHeadSize Rerank 模型实际打分的头部条数（等于该子问题的 Rerank topN 与候选池大小的较小者；
      *                       Rerank 关闭或失败时为 0）
+     * @param rerankScored   头部里分数确实被 Rerank 改过的条数；为 0 而头部不止一条时 Rerank 回退成了 noop
      * @param candidates     候选池，按最后一个后置处理阶段的输出顺序（Rerank 之后即模型头部 + 融合尾部）
      */
-    public record SubQuestionResult(String subQuestion, int rerankHeadSize, List<Candidate> candidates) {
+    public record SubQuestionResult(String subQuestion, int rerankHeadSize, int rerankScored, List<Candidate> candidates) {
     }
 
     /**
@@ -59,7 +61,8 @@ public record EvalResponse(String question,
      * @param docId          所属文档 id，元数据富化后才有
      * @param docName        所属文档名
      * @param collectionName 所属知识库 collection
-     * @param channelScore   通道原始分（向量通道为余弦相似度）；该 chunk 未出现在通道阶段时为 null
+     * @param channelScore   通道原始分（向量通道为余弦相似度，只被全文通道召回的为 BM25）；该 chunk 未出现在通道阶段时为 null
+     * @param channelScores  每个召回它的通道各自的原始分，键为通道名（VectorSearch / FullTextSearch）
      * @param rerankScore    Rerank 模型写回的相关性分，只对 {@code rerankHead} 为 true 的候选有值
      * @param rerankHead     是否属于 Rerank 模型打分的头部
      * @param finalSelected  是否进入请求级最终上下文
@@ -72,6 +75,7 @@ public record EvalResponse(String question,
                             String docName,
                             String collectionName,
                             Float channelScore,
+                            Map<String, Float> channelScores,
                             Float rerankScore,
                             boolean rerankHead,
                             boolean finalSelected,

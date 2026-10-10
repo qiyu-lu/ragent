@@ -20,6 +20,7 @@ package com.nageoffer.ai.ragent.rag.eval;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nageoffer.ai.ragent.framework.convention.RetrievedChunk;
 import com.nageoffer.ai.ragent.framework.exception.ClientException;
+import com.nageoffer.ai.ragent.rag.config.ScoreBlendProperties;
 import com.nageoffer.ai.ragent.rag.config.SearchChannelProperties;
 import com.nageoffer.ai.ragent.rag.core.retrieval.RetrievalCapture;
 import com.nageoffer.ai.ragent.rag.core.retrieval.RetrievalEngine;
@@ -75,6 +76,7 @@ class EvalControllerTest {
 
         EvalResponse.SubQuestionResult result = response.results().get(0);
         assertEquals(2, result.rerankHeadSize());
+        assertEquals(2, result.rerankScored());
         List<EvalResponse.Candidate> candidates = result.candidates();
         assertEquals(List.of("b", "a", "c"), candidates.stream().map(EvalResponse.Candidate::id).toList());
 
@@ -164,6 +166,54 @@ class EvalControllerTest {
     }
 
     @Test
+    void rerankTopNCoversTheWholePoolWhenScoresAreBlended() {
+        assertEquals(List.of(40, 40), fixture(10, false, true).controller().rerankTopN(2));
+    }
+
+    @Test
+    void noopRerankAfterFusionIsVisibleAsZeroRescoredChunks() {
+        // 两通道融合后头部带 RRF 分，与通道分不等；回退成 noop 时它和进入 Rerank 前的分数一样
+        Fixture fixture = fixture(2, false);
+        when(fixture.retrievalEngine().retrieve(anyList(), any(RetrievalCapture.class))).thenAnswer(invocation -> {
+            RetrievalCapture capture = invocation.getArgument(1);
+            capture.record("子问题", "channel-VectorSearch", List.of(chunk("a", 0.5F)), 3, null);
+            capture.record("子问题", "channel-FullTextSearch", List.of(chunk("b", 9.0F)), 2, null);
+            capture.record("子问题", "post-Fusion", List.of(chunk("a", 0.0476F), chunk("b", 0.0476F)), 0, null);
+            capture.record("子问题", "post-Rerank", List.of(chunk("a", 0.0476F), chunk("b", 0.0476F)), 1, null);
+            return RetrievalContext.builder().kbChunks(List.of(chunk("a", 0.0476F))).build();
+        });
+
+        EvalResponse.SubQuestionResult result = fixture.controller()
+                .replay(new EvalReplayRequest("原问题", List.of("子问题"))).getData().results().get(0);
+
+        assertEquals(2, result.rerankHeadSize());
+        assertEquals(0, result.rerankScored());
+    }
+
+    @Test
+    void candidatesCarryEachChannelsOwnScore() {
+        Fixture fixture = fixture(10, false);
+        when(fixture.retrievalEngine().retrieve(anyList(), any(RetrievalCapture.class))).thenAnswer(invocation -> {
+            RetrievalCapture capture = invocation.getArgument(1);
+            capture.record("子问题", "channel-VectorSearch", List.of(chunk("a", 0.5F), chunk("b", 0.4F)), 3, null);
+            capture.record("子问题", "channel-FullTextSearch", List.of(chunk("c", 9.5F), chunk("a", 7.2F)), 2, null);
+            capture.record("子问题", "post-Rerank", List.of(chunk("c", 0.9F), chunk("a", 0.8F), chunk("b", 0.3F)), 20, null);
+            return RetrievalContext.builder().kbChunks(List.of(chunk("c", 0.9F), chunk("a", 0.8F))).build();
+        });
+
+        List<EvalResponse.Candidate> candidates = fixture.controller()
+                .replay(new EvalReplayRequest("原问题", List.of("子问题"))).getData().results().get(0).candidates();
+
+        EvalResponse.Candidate c = candidates.get(0);
+        assertEquals(9.5F, c.channelScore(), "只被全文通道召回的块，通道分就是 BM25");
+        assertEquals(Map.of("FullTextSearch", 9.5F), c.channelScores());
+        EvalResponse.Candidate a = candidates.get(1);
+        assertEquals(0.5F, a.channelScore());
+        assertEquals(Map.of("VectorSearch", 0.5F, "FullTextSearch", 7.2F), a.channelScores());
+        assertEquals(Map.of("VectorSearch", 0.4F), candidates.get(2).channelScores());
+    }
+
+    @Test
     void failedRerankStageLeavesRerankScoresEmpty() {
         Fixture fixture = fixture(10, false);
         when(fixture.retrievalEngine().retrieve(anyList(), any(RetrievalCapture.class))).thenAnswer(invocation -> {
@@ -187,6 +237,10 @@ class EvalControllerTest {
     }
 
     private static Fixture fixture(int defaultTopK, boolean refill) {
+        return fixture(defaultTopK, refill, false);
+    }
+
+    private static Fixture fixture(int defaultTopK, boolean refill, boolean blend) {
         QueryRewriteService rewrite = mock(QueryRewriteService.class);
         RetrievalEngine retrieval = mock(RetrievalEngine.class);
         SearchChannelProperties searchProperties = new SearchChannelProperties();
@@ -194,7 +248,10 @@ class EvalControllerTest {
         searchProperties.setRequestLevelRefillEnabled(refill);
         EvalProperties evalProperties = new EvalProperties();
         evalProperties.setRewriteLog("");
-        EvalController controller = new EvalController(rewrite, retrieval, searchProperties, evalProperties, new ObjectMapper());
+        ScoreBlendProperties blendProperties = new ScoreBlendProperties();
+        blendProperties.setEnabled(blend);
+        EvalController controller = new EvalController(rewrite, retrieval, searchProperties, blendProperties,
+                evalProperties, new ObjectMapper());
         return new Fixture(controller, rewrite, retrieval, evalProperties);
     }
 

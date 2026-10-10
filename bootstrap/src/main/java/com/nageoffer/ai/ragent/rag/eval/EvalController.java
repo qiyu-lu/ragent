@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nageoffer.ai.ragent.framework.convention.Result;
 import com.nageoffer.ai.ragent.framework.exception.ClientException;
 import com.nageoffer.ai.ragent.framework.web.Results;
+import com.nageoffer.ai.ragent.rag.config.ScoreBlendProperties;
 import com.nageoffer.ai.ragent.rag.config.SearchChannelProperties;
 import com.nageoffer.ai.ragent.rag.core.retrieval.RetrievalCapture;
 import com.nageoffer.ai.ragent.rag.core.retrieval.RetrievalEngine;
@@ -67,6 +68,7 @@ public class EvalController {
     private final QueryRewriteService queryRewriteService;
     private final RetrievalEngine retrievalEngine;
     private final SearchChannelProperties searchProperties;
+    private final ScoreBlendProperties scoreBlendProperties;
     private final EvalProperties evalProperties;
     private final ObjectMapper objectMapper;
 
@@ -100,12 +102,17 @@ public class EvalController {
 
     /**
      * 每个子问题送给 Rerank 模型的 topN，与 {@code RetrievalEngine#allocateQuestionBudgets} 同一算法：
-     * 请求级公平回填开启时每题都是请求级 TopK；关闭时按子问题数均分，余数按顺序每题多一条
+     * 请求级公平回填开启时每题都是请求级 TopK；关闭时按子问题数均分，余数按顺序每题多一条。
+     * 分数融合打开时 Rerank 给整个候选池打分，头部就是整个池（不超过候选池上限）
      */
     List<Integer> rerankTopN(int questionCount) {
         int requestTopK = searchProperties.getDefaultTopK();
         if (questionCount <= 0) {
             return List.of();
+        }
+        if (scoreBlendProperties.isEnabled()) {
+            int limit = searchProperties.getFusion().getRerankCandidateLimit();
+            return Collections.nCopies(questionCount, limit > 0 ? limit : Integer.MAX_VALUE);
         }
         if (searchProperties.isRequestLevelRefillEnabled()) {
             return Collections.nCopies(questionCount, requestTopK);

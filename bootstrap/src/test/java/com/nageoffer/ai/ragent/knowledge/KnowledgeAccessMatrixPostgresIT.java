@@ -18,6 +18,7 @@
 package com.nageoffer.ai.ragent.knowledge;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.nageoffer.ai.ragent.core.ingest.metadata.TermDictionary;
 import com.nageoffer.ai.ragent.framework.context.LoginUser;
 import com.nageoffer.ai.ragent.framework.context.UserContext;
 import com.nageoffer.ai.ragent.framework.exception.ClientException;
@@ -43,6 +44,16 @@ import com.nageoffer.ai.ragent.knowledge.service.KnowledgeBaseService;
 import com.nageoffer.ai.ragent.knowledge.service.KnowledgeChunkService;
 import com.nageoffer.ai.ragent.knowledge.service.KnowledgeDocumentService;
 import com.nageoffer.ai.ragent.knowledge.support.IngestionSpecSchemaProvider;
+import com.nageoffer.ai.ragent.rag.config.SearchChannelProperties;
+import com.nageoffer.ai.ragent.rag.core.fulltext.FullTextIndexer;
+import com.nageoffer.ai.ragent.rag.core.fulltext.FullTextStore;
+import com.nageoffer.ai.ragent.rag.core.fulltext.FullTextTokenizer;
+import com.nageoffer.ai.ragent.rag.core.retrieval.RetrievalBudget;
+import com.nageoffer.ai.ragent.rag.core.retrieval.channel.KbCollectionProvider;
+import com.nageoffer.ai.ragent.rag.core.retrieval.channel.PgFullTextSearchChannel;
+import com.nageoffer.ai.ragent.rag.core.retrieval.channel.RetrievalScope;
+import com.nageoffer.ai.ragent.rag.core.retrieval.channel.RetrievalScopeResolver;
+import com.nageoffer.ai.ragent.rag.core.retrieval.channel.SearchContext;
 import com.nageoffer.ai.ragent.rag.service.FileStorageService;
 import com.nageoffer.ai.ragent.rag.service.handler.StreamTaskManager;
 import com.nageoffer.ai.ragent.rag.service.impl.RAGChatServiceImpl;
@@ -51,7 +62,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.mockito.ArgumentCaptor;
+import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.mock.web.MockHttpServletResponse;
 
@@ -301,6 +314,57 @@ class KnowledgeAccessMatrixPostgresIT {
             if (denied) verify(tasks, org.mockito.Mockito.never()).cancel(anyString());
             else verify(tasks).cancel(parts[1]);
         }
+    }
+
+    /**
+     * 全文通道与向量通道共用检索作用域：最佳匹配放在私有库，B 用 TopK=1 仍只拿到可读库的块，说明过滤在召回之前；
+     * 所有者能读三个库，TopK=1 命中私有库作对照。分词、写 content_tsv、词项统计与检索都走真实代码和 PostgreSQL
+     */
+    @Test
+    void fullTextChannelOnlySearchesReadableKnowledgeBasesBeforeRecall() {
+        Map<KbVisibility, String> body = Map.of(
+                KbVisibility.PRIVATE, "焦硫酸钾 焦硫酸钾 焦硫酸钾 熔融",
+                KbVisibility.PUBLIC, "加入焦硫酸钾熔融",
+                KbVisibility.RESTRICTED, "焦硫酸钾 熔融 冷却");
+        for (KbVisibility visibility : KbVisibility.values()) {
+            jdbc.update("INSERT INTO t_knowledge_chunk (id, kb_id, doc_id, chunk_index, content, embedding_text, created_by) VALUES (?, ?, ?, 0, ?, ?, ?)",
+                    "ft" + docs.get(visibility), kbs.get(visibility), docs.get(visibility), body.get(visibility), body.get(visibility), userA);
+        }
+        SearchChannelProperties properties = new SearchChannelProperties();
+        properties.getChannels().getFullText().setEnabled(true);
+        DefaultResourceLoader loader = new DefaultResourceLoader();
+        FullTextTokenizer tokenizer = new FullTextTokenizer(new TermDictionary(loader, "classpath:kq/terms.csv"), loader, "classpath:kq/stopwords.txt");
+        FullTextStore store = new FullTextStore(jdbc);
+        FullTextIndexer indexer = new FullTextIndexer(store, tokenizer, properties, new DataSourceTransactionManager(jdbc.getDataSource()));
+        kbs.values().forEach(indexer::rebuild);
+        PgFullTextSearchChannel channel = new PgFullTextSearchChannel(properties, tokenizer, store);
+
+        assertEquals(List.of(kbs.get(KbVisibility.PRIVATE)), fullTextTop1(channel, userA, "user"), "所有者：最佳匹配在私有库");
+        assertEquals(List.of(kbs.get(KbVisibility.PUBLIC)), fullTextTop1(channel, userB, "user"), "B 只读得到公开库");
+        asUser(userA);
+        access.grant(kbs.get(KbVisibility.RESTRICTED), KbGrantSubjectType.USER, userB, KbPermission.READ);
+        List<String> granted = fullTextTop(channel, userB, "user", 3);
+        assertTrue(Set.of(kbs.get(KbVisibility.PUBLIC), kbs.get(KbVisibility.RESTRICTED)).containsAll(granted), granted.toString());
+        assertEquals(2, granted.size());
+        UserContext.clear();
+        assertTrue(fullTextTop(channel, null, null, 3).isEmpty(), "没有登录身份时作用域为空");
+    }
+
+    private List<String> fullTextTop1(PgFullTextSearchChannel channel, String userId, String role) {
+        return fullTextTop(channel, userId, role, 1);
+    }
+
+    private List<String> fullTextTop(PgFullTextSearchChannel channel, String userId, String role, int topK) {
+        if (userId != null) {
+            UserContext.set(LoginUser.builder().userId(userId).username(userId).role(role).build());
+        }
+        KbCollectionProvider active = mock(KbCollectionProvider.class);
+        when(active.listActiveCollections()).thenReturn(kbs.values().stream().map(kb -> "cs_" + kb).toList());
+        RetrievalScope scope = new RetrievalScopeResolver(active, access).resolve();
+        SearchContext context = SearchContext.builder().originalQuestion("焦硫酸钾熔融").rewrittenQuestion("焦硫酸钾熔融")
+                .budget(new RetrievalBudget(topK, 40, topK)).retrievalScope(scope).build();
+        Map<String, String> kbByCollection = kbs.values().stream().collect(Collectors.toMap(kb -> "cs_" + kb, kb -> kb));
+        return channel.search(context).getChunks().stream().map(chunk -> kbByCollection.get(chunk.getCollectionName())).toList();
     }
 
     private Set<String> fixtureOnly(Collection<String> scope, Set<String> fixture) {

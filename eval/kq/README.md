@@ -19,10 +19,11 @@
 | `audit_chunks.py` | 导出入库切片为 JSONL，并统计每份文档的块数、数字、空槽、噪声、含 `$` 的块 |
 | `parse_metrics.py` | 解析层四指标：数值事实覆盖率（原文 / LaTeX 去壳两列）、数字保留率、每千字空槽、噪声行 |
 | `run_retrieval.py` | 跑题集：首轮 `--record-sub-questions` 落盘子问题，之后回放；按题型汇总 Hit@5、锚点召回、MRR、上下文精度、文档召回、返回块数 |
-| `compare_retrieval_repeats.py` | 每臂多次重复的均值与极差；`--thresholds manifests/kq-thresholds.json` 用阶段 2 开工时写定的门槛与运行有效性规则判 improved / unproven / regressed，否则以基线极差为门槛 |
+| `compare_retrieval_repeats.py` | 每臂多次重复的均值与极差；`--thresholds manifests/kq-thresholds.json` 用阶段 2 开工时写定的门槛与运行有效性规则判 improved / unproven / regressed，否则以基线极差为门槛。作废规则只数向量通道的空结果（全文通道查不到词是正常结果） |
 | `doc_metadata.py` | 阶段 2：导出入库抽取的文档元数据与解析审计供核对（`export`），把核对后的值写回为 confirmed（`confirm`） |
 | `verify_boost_beta.py` | 阶段 2：从重排头部的排序反推每次运行实际用的 boost β，核对与臂名一致，并检查空通道上限 |
 | `run_stage2_remaining.py` | 阶段 2：无人值守跑完剩下的运行（自己启停实例、按臂设 β、检查并重跑作废的、对比、按规则选 β、跑测试集），`--plan` 只看计划 |
+| `run_stage3.py` | 阶段 3：无人值守跑完全部运行（构建、快照与升级 `ragent_eval_kq_s1`、按臂启停实例、回填全文索引、检查并重跑作废的、按状态文件的规则选臂、跑测试集），`--plan` 只看计划 |
 | `config/application-kq-s1.example.yaml` | 评测实例的附加配置样例（端口 9093、库 `ragent_eval_kq_s1`、Redis DB 13、独立桶与 MQ 主题） |
 | `config/application-kq-s2.example.yaml` | 阶段 2 实例（端口 9094、库 `ragent_eval_kq_s2`、Redis DB 14）：闸门与归一化打开，boost 关，检索配置与阶段 1 相同 |
 | `manifests/kq-thresholds.json` | 阶段 2、3 的门槛与运行有效性规则（2026-10-09 写定，`kq-s1`），对比脚本读它 |
@@ -280,3 +281,37 @@ python3 eval/kq/compare_retrieval_repeats.py --max-empty-channel 8 --baseline S2
 ### 第 14 步：收工
 
 终端 A 按 Ctrl-C 停掉实例。阶段 2 的运行到此结束；结果都在 `local-data/kq-eval/runs/`，由阶段 3 会话读取、写改动说明并打 `kq-s2`。
+
+## 阶段 3 运行顺序（用户在仓库根目录的终端跑）
+
+### 一条命令（2026-10-10）
+
+在**有三把 key 的终端**里（`BAILIAN_API_KEY`、`SILICONFLOW_API_KEY` 必须在；本阶段不入库，`MINERU_API_KEY` 用不到），确认 9093 上没有实例在跑，然后执行：
+
+```bash
+python3 eval/kq/run_stage3.py
+```
+
+不用改任何参数，约 1 小时。想先看它要跑什么、预检过不过：`python3 eval/kq/run_stage3.py --plan`。
+
+脚本按顺序做完下面这些，中间不用人工操作：
+
+1. 用离线 Maven 构建 jar（`jieba-analysis` 已在本机 `~/.m2`）。代码目录有未提交的改动就拒绝开跑：每次运行记的服务端版本是 `git rev-parse HEAD`。
+2. 第一次运行时把 `ragent_eval_kq_s1` 用 `pg_dump` 快照到 `local-data/kq-eval/snapshots/ragent_eval_kq_s1-pre-s3-*.dump`（约 18 MB 的库），再执行升级脚本 `261010_knowledge_chunk_full_text.sql`（只加列、索引与两张统计表，可重复执行）。
+3. 7 个臂各启动一次实例（端口 9093，配置就是 `application-kq-s1.yaml`，与 `S1-base` 相同，只在启动参数里加开关），启动后调 `POST /admin/full-text/rebuild` 回填全文索引（224 块约 0.4 秒），调参集各跑 3 次：
+   - `S3-rrf`：全文通道 + 现有 RRF（权重 1.0）；
+   - `S3-thr-0.1` / `0.2` / `0.3`：再加重排分阈值；
+   - `S3-blend-0.3` / `0.5` / `0.7`：再加词项分与重排分融合。
+4. 每次运行都自动检查：全文通道阶段在、阈值或融合阶段与臂一致、阈值臂没有低于阈值的块、融合臂的排序符合本臂的 α、向量通道空结果 ≤ 8。超时作废的自动挪开重跑；向量通道整体没响应（嵌入 key）或 Rerank 回退成 noop（百炼 key）就报原因停下。
+5. 对比并按状态文件里写定的规则选臂：`S3-rrf`、`S3-blend` 对 `S1-base`（`runs/S3-vs-S1-base-tune.json`），`S3-thr` 对 `S3-rrf`（`runs/S3-thr-vs-S3-rrf-tune.json`）。选出一臂就在测试集跑 3 次并与 `S1-base` 对比（`runs/<臂>-vs-S1-base-test.json`）；一臂都没过就不跑测试集。
+6. 停掉实例，写汇总 `runs/stage3-summary-*.json`（快照位置、回填结果、选臂过程、各对比文件）。
+
+中途断了，重新执行同一条命令会接着跑，已有效的运行不会重跑。跑完之后由收尾会话读结果、写改动说明、打 `kq-s3`。
+
+想把 `ragent_eval_kq_s1` 恢复到阶段 3 之前（全文列与统计表是加法，一般不需要）：
+
+```bash
+docker exec -i ragent-iron-ore-dev-postgres-1 sh -c 'exec pg_restore -U "$POSTGRES_USER" --clean --if-exists -d ragent_eval_kq_s1' \
+  < local-data/kq-eval/snapshots/ragent_eval_kq_s1-pre-s3-*.dump
+```
+

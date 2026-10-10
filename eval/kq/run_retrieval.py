@@ -197,9 +197,9 @@ def main() -> int:
             noop = rerank_looks_noop(response)
             if noop and not args.allow_noop_rerank:
                 head = [(c["id"], c["channelScore"], c["rerankScore"]) for c in response["results"][0]["candidates"] if c.get("rerankHead")][:3]
-                print(f"aborting at {row['id']}: every rerank-head candidate carries its channel score, e.g. {head}; the rerank "
-                      f"fell back to rerank-noop (server log: 'bailian rerank 请求失败'). Fix BAILIAN_API_KEY in the app "
-                      f"process, restart it and run again (or pass --allow-noop-rerank)")
+                print(f"aborting at {row['id']}: the rerank model rescored none of the head (id, channel, rerank: {head}); "
+                      f"the rerank fell back to rerank-noop (server log: 'bailian rerank 请求失败'). Fix BAILIAN_API_KEY in "
+                      f"the app process, restart it and run again (or pass --allow-noop-rerank)")
                 return 2
             score = score_question(row, response, stems)
             score["rerank_noop_suspected"] = noop

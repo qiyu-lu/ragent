@@ -21,6 +21,7 @@ import com.nageoffer.ai.ragent.framework.convention.RetrievedChunk;
 import com.nageoffer.ai.ragent.framework.convention.RetrievedChunkKey;
 import com.nageoffer.ai.ragent.infra.rerank.RerankService;
 import com.nageoffer.ai.ragent.rag.config.RAGConfigProperties;
+import com.nageoffer.ai.ragent.rag.config.ScoreBlendProperties;
 import com.nageoffer.ai.ragent.rag.core.retrieval.channel.SearchChannelResult;
 import com.nageoffer.ai.ragent.rag.core.retrieval.channel.SearchChannelType;
 import com.nageoffer.ai.ragent.rag.core.retrieval.channel.SearchContext;
@@ -29,7 +30,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -41,14 +45,23 @@ import java.util.Set;
  * <p>
  * 模型返回的 Top-K 作为候选池头部，未进入头部的融合候选按原顺序追加为回填尾部。请求级最终 Top-K
  * 由上层在多子问题全局去重后统一选择，避免各子问题提前截断后无法利用剩余额度。
+ * <p>
+ * 分数融合打开时让模型给整个候选池打分（模型本来就逐条打分，topN 只截返回）。模型实际打过分的块记进
+ * 检索上下文的 {@link #SCORED_KEYS}：回退成 noop 时头部原样带着融合分，下游的阈值与分数融合据此跳过
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class RerankPostProcessor implements SearchResultPostProcessor {
 
+    /**
+     * {@link SearchContext#getMetadata()} 里的键：Rerank 模型实际打过分的块（{@link RetrievedChunkKey}）
+     */
+    public static final String SCORED_KEYS = "rerankScoredKeys";
+
     private final RerankService rerankService;
     private final RAGConfigProperties ragConfigProperties;
+    private final ScoreBlendProperties scoreBlendProperties;
 
     @Override
     public String getName() {
@@ -74,18 +87,44 @@ public class RerankPostProcessor implements SearchResultPostProcessor {
             return chunks;
         }
 
+        int topN = scoreBlendProperties.isEnabled() ? chunks.size() : context.getBudget().contextTopK();
         List<RetrievedChunk> rerankedHead = rerankService.rerank(
                 context.getMainQuestion(),
                 chunks,
-                context.getBudget().contextTopK()
+                topN
         );
         List<RetrievedChunk> safeRerankedHead = rerankedHead == null ? List.of() : rerankedHead;
+        context.getMetadata().put(SCORED_KEYS, scoredKeys(safeRerankedHead, chunks));
 
         List<RetrievedChunk> candidatePool = appendFusionTail(safeRerankedHead, chunks);
         logAttribution(chunks, safeRerankedHead, results);
         log.info("Rerank 候选池完成 - 模型头部: {}, 融合尾部回填后: {}",
                 safeRerankedHead.size(), candidatePool.size());
         return candidatePool;
+    }
+
+    /**
+     * 本子问题里 Rerank 模型实际打过分的块；没有 Rerank 阶段或模型没打分时为空集
+     */
+    @SuppressWarnings("unchecked")
+    public static Set<String> scoredKeys(SearchContext context) {
+        Object keys = context.getMetadata() == null ? null : context.getMetadata().get(SCORED_KEYS);
+        return keys instanceof Set<?> set ? (Set<String>) set : Set.of();
+    }
+
+    /**
+     * 模型打过分的块是客户端拷贝出的新对象（只覆盖分数）；noop 与补位的块原样返回输入对象
+     */
+    private static Set<String> scoredKeys(List<RetrievedChunk> head, List<RetrievedChunk> input) {
+        Set<RetrievedChunk> inputs = Collections.newSetFromMap(new IdentityHashMap<>());
+        inputs.addAll(input);
+        Set<String> keys = new LinkedHashSet<>();
+        for (RetrievedChunk chunk : head) {
+            if (chunk != null && chunk.getScore() != null && !inputs.contains(chunk)) {
+                keys.add(RetrievedChunkKey.of(chunk));
+            }
+        }
+        return Set.copyOf(keys);
     }
 
     /**

@@ -98,6 +98,7 @@ final class ChannelAttribution {
     static String label(SearchChannelType type) {
         return switch (type) {
             case VECTOR -> "向量";
+            case FULL_TEXT -> "全文";
             case WEB_SEARCH -> "联网";
             case HYBRID -> "混合";
         };

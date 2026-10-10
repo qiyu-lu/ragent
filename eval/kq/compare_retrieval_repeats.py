@@ -61,13 +61,20 @@ def load_reports(paths: Sequence[Path]) -> List[dict]:
     return reports
 
 
+VALIDITY_CHANNEL = "channel-VectorSearch"
+
+
 def empty_channel_sub_questions(report: Mapping[str, Any]) -> int:
-    """Sub-questions whose retrieval channel came back empty; in the S1 baseline all were 15 s channel timeouts."""
+    """Sub-questions whose vector channel came back empty; in the S1 baseline all were 15 s channel timeouts.
+
+    Only the vector channel counts (stage-3 rule): the full-text channel legitimately returns nothing when no
+    query term is in the index, which says nothing about whether the run was healthy.
+    """
 
     count = 0
     for item in report.get("details") or []:
         for stage in (item.get("raw_response") or {}).get("stages") or []:
-            if str(stage.get("stage", "")).startswith("channel-") and not stage.get("chunkCount"):
+            if stage.get("stage") == VALIDITY_CHANNEL and not stage.get("chunkCount"):
                 count += 1
     return count
 

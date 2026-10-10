@@ -27,6 +27,7 @@
         <redisson.version>4.0.0</redisson.version>
         <rocketmq-spring-boot-starter.version>2.3.5</rocketmq-spring-boot-starter.version>
         <commonmark.version>0.22.0</commonmark.version>
+        <jieba-analysis.version>1.0.2</jieba-analysis.version>
         <batik.version>1.18</batik.version>
         <okhttp.version>4.12.0</okhttp.version>
         <bizlog-sdk.version>3.0.6</bizlog-sdk.version>
@@ -151,6 +152,12 @@
                 <groupId>org.commonmark</groupId>
                 <artifactId>commonmark-ext-gfm-tables</artifactId>
                 <version>${commonmark.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.huaban</groupId>
+                <artifactId>jieba-analysis</artifactId>
+                <version>${jieba-analysis.version}</version>
             </dependency>
 
             <dependency>

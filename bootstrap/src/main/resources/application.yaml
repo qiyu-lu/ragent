@@ -141,6 +141,13 @@ rag:
       timeout-ms: 15000     # 单通道查询超时上限（毫秒）
       vector:
         enabled: true       # 向量通道总开关
+      # 中文全文通道（knowledge-quality 计划 §6）：jieba + 术语表分词，content_tsv 上 @@ 召回、应用侧 BM25。
+      # 开关同时管索引维护；打开前执行 upgrades/v1.1.0/261010_knowledge_chunk_full_text.sql，再 POST /admin/full-text/rebuild 回填存量
+      full-text:
+        enabled: false
+        max-matches: 2000   # @@ 命中块的安全上限，命中都在应用侧算 BM25；超过时按 ts_rank（无 IDF）截断
+        k1: 1.2
+        b: 0.75
       web-search:
         enabled: false
         count: 5
@@ -152,11 +159,20 @@ rag:
       rerank-candidate-limit: 40  # ② RRF 融合后送入 Rerank 的候选池上限，<=0 不截断（经验值 40~100）
       channel-weights:
         vector: 1.0
+        full-text: 1.0      # 两通道并集不超过 rerank-candidate-limit 时，Rerank 给整个池打分，这个权重不影响最终结果
         web-search: 0.5
     # 查询侧文档元数据加权（§5.3）：查询提到的检测对象 / 组分与文档元数据对上时，重排头部 最终分 = 重排分 + β × 匹配度
     metadata-boost:
       enabled: false
       beta: 0.2
+    # 重排分阈值（§6 的 S3-thr 臂）：丢掉重排分低于 min-score 的块和没被重排打分的尾部；Rerank 回退成 noop 时不过滤
+    rerank-threshold:
+      enabled: false
+      min-score: 0.2
+    # 词项分与重排分融合（§6 的 S3-blend 臂）：Rerank 给整个候选池打分，最终分 = α·BM25/本题最大 BM25 + (1−α)·重排分
+    score-blend:
+      enabled: false
+      alpha: 0.5
 
   trace:
     enabled: true

@@ -92,12 +92,15 @@ final class EvalCandidateAssembler {
                                                              int rerankTopN,
                                                              Map<String, Integer> finalRanks) {
         Map<String, Float> channelScores = new LinkedHashMap<>();
+        Map<String, Map<String, Float>> scoresByChannel = new LinkedHashMap<>();
         List<RetrievalCapture.Chunk> channelChunks = new ArrayList<>();
         own.stream()
                 .filter(stage -> stage.stage().startsWith(CHANNEL_PREFIX))
                 .forEach(stage -> stage.chunks().forEach(chunk -> {
                     channelChunks.add(chunk);
                     channelScores.putIfAbsent(chunk.id(), chunk.score());
+                    scoresByChannel.computeIfAbsent(chunk.id(), id -> new LinkedHashMap<>())
+                            .putIfAbsent(stage.stage().substring(CHANNEL_PREFIX.length()), chunk.score());
                 }));
 
         List<RetrievalCapture.Stage> postStages = own.stream()
@@ -115,16 +118,35 @@ final class EvalCandidateAssembler {
             int head = Math.max(0, Math.min(rerankTopN, stage.chunks().size()));
             stage.chunks().subList(0, head).forEach(chunk -> rerankScores.putIfAbsent(chunk.id(), chunk.score()));
         });
+        int modelScored = rerank.map(stage -> countChangedByRerank(postStages, stage, rerankScores)).orElse(0);
 
         List<EvalResponse.Candidate> candidates = new ArrayList<>(pool.size());
         for (int rank = 0; rank < pool.size(); rank++) {
             RetrievalCapture.Chunk chunk = pool.get(rank);
             Integer finalRank = finalRanks.get(chunk.id());
             candidates.add(new EvalResponse.Candidate(rank, chunk.id(), chunk.docId(), chunk.docName(),
-                    chunk.collectionName(), channelScores.get(chunk.id()), rerankScores.get(chunk.id()),
+                    chunk.collectionName(), channelScores.get(chunk.id()),
+                    scoresByChannel.getOrDefault(chunk.id(), Map.of()), rerankScores.get(chunk.id()),
                     rerankScores.containsKey(chunk.id()), finalRank != null, finalRank, chunk.text()));
         }
-        return new EvalResponse.SubQuestionResult(subQuestion, rerankScores.size(), candidates);
+        return new EvalResponse.SubQuestionResult(subQuestion, rerankScores.size(), modelScored, candidates);
+    }
+
+    /**
+     * 头部里分数被 Rerank 改过的块数：与进入 Rerank 前那个阶段的分数比。为 0 说明回退成了 noop——
+     * 多通道时头部带的是 RRF 分，不能再拿"重排分 == 通道分"判断
+     */
+    private static int countChangedByRerank(List<RetrievalCapture.Stage> postStages, RetrievalCapture.Stage rerank,
+                                            Map<String, Float> rerankScores) {
+        int index = postStages.indexOf(rerank);
+        if (index <= 0) {
+            return rerankScores.size();
+        }
+        Map<String, Float> before = new LinkedHashMap<>();
+        postStages.get(index - 1).chunks().forEach(chunk -> before.putIfAbsent(chunk.id(), chunk.score()));
+        return (int) rerankScores.entrySet().stream()
+                .filter(entry -> !Objects.equals(entry.getValue(), before.get(entry.getKey())))
+                .count();
     }
 
     static boolean hasText(String value) {

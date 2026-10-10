@@ -35,14 +35,14 @@ psql_p2 < resources/database/init_data_pg.sql
 
 p2_catalog_sql="SELECT table_name, column_name, udt_name, is_nullable, column_default
   FROM information_schema.columns
-  WHERE table_schema = 'public' AND table_name IN ('t_research_run', 't_research_evidence', 't_research_event', 't_research_corpus_document', 't_knowledge_base', 't_knowledge_base_grant', 't_embedding_cache', 't_knowledge_document_chunk_log', 't_knowledge_document')
+  WHERE table_schema = 'public' AND table_name IN ('t_research_run', 't_research_evidence', 't_research_event', 't_research_corpus_document', 't_knowledge_base', 't_knowledge_base_grant', 't_embedding_cache', 't_knowledge_document_chunk_log', 't_knowledge_document', 't_knowledge_chunk', 't_kq_term_stats', 't_kq_kb_stats')
   ORDER BY table_name, ordinal_position;
   SELECT conrelid::regclass, conname, pg_get_constraintdef(oid)
   FROM pg_constraint
-  WHERE conrelid IN ('t_research_run'::regclass, 't_research_evidence'::regclass, 't_research_event'::regclass, 't_research_corpus_document'::regclass, 't_knowledge_base'::regclass, 't_knowledge_base_grant'::regclass, 't_embedding_cache'::regclass, 't_knowledge_document_chunk_log'::regclass)
+  WHERE conrelid IN ('t_research_run'::regclass, 't_research_evidence'::regclass, 't_research_event'::regclass, 't_research_corpus_document'::regclass, 't_knowledge_base'::regclass, 't_knowledge_base_grant'::regclass, 't_embedding_cache'::regclass, 't_knowledge_document_chunk_log'::regclass, 't_knowledge_chunk'::regclass, 't_kq_term_stats'::regclass, 't_kq_kb_stats'::regclass)
   ORDER BY conrelid::regclass::text, conname;
   SELECT tablename, indexname, indexdef FROM pg_indexes
-  WHERE schemaname = 'public' AND tablename IN ('t_research_run', 't_research_evidence', 't_research_event', 't_research_corpus_document', 't_knowledge_vector', 't_knowledge_base', 't_knowledge_base_grant', 't_embedding_cache', 't_knowledge_document_chunk_log')
+  WHERE schemaname = 'public' AND tablename IN ('t_research_run', 't_research_evidence', 't_research_event', 't_research_corpus_document', 't_knowledge_vector', 't_knowledge_base', 't_knowledge_base_grant', 't_embedding_cache', 't_knowledge_document_chunk_log', 't_knowledge_chunk', 't_kq_term_stats', 't_kq_kb_stats')
   ORDER BY tablename, indexname;
   SELECT 't_intent_node retired', to_regclass('public.t_intent_node') IS NULL;"
 psql_p2 -Atc "$p2_catalog_sql" > "$p2_scratch/fresh-catalog.txt"
@@ -80,6 +80,12 @@ ALTER TABLE t_knowledge_document_chunk_log DROP COLUMN embed_cache_misses;
 -- knowledge-quality stage 2: rewind the document metadata column.
 ALTER TABLE t_knowledge_document DROP COLUMN doc_metadata;
 
+-- knowledge-quality stage 3: rewind the full-text column, its indexes and the BM25 statistics tables.
+ALTER TABLE t_knowledge_chunk DROP COLUMN content_tsv;
+DROP INDEX idx_chunk_kb_id;
+DROP TABLE t_kq_term_stats;
+DROP TABLE t_kq_kb_stats;
+
 -- Intent tree: existing deployments still carry the node table.
 CREATE TABLE t_intent_node (id VARCHAR(20) NOT NULL PRIMARY KEY, intent_code VARCHAR(64) NOT NULL);
 INSERT INTO t_intent_node (id, intent_code) VALUES ('p2-intent', 'legacy');
@@ -100,6 +106,8 @@ psql_p2 < resources/database/upgrades/v1.1.0/260919_01_drop_intent_node.sql
 psql_p2 < resources/database/upgrades/v1.1.0/260919_01_drop_intent_node.sql
 psql_p2 < resources/database/upgrades/v1.1.0/261009_knowledge_document_metadata.sql
 psql_p2 < resources/database/upgrades/v1.1.0/261009_knowledge_document_metadata.sql
+psql_p2 < resources/database/upgrades/v1.1.0/261010_knowledge_chunk_full_text.sql
+psql_p2 < resources/database/upgrades/v1.1.0/261010_knowledge_chunk_full_text.sql
 psql_p2 -Atc "$p2_catalog_sql" > "$p2_scratch/upgraded-catalog.txt"
 diff -u "$p2_scratch/fresh-catalog.txt" "$p2_scratch/upgraded-catalog.txt"
 

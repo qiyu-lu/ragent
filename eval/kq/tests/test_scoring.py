@@ -100,6 +100,17 @@ class ScoringTest(unittest.TestCase):
         self.assertTrue(evalkit.rerank_looks_noop(noop))
         self.assertIsNone(evalkit.rerank_looks_noop(single))
 
+    def test_rerank_noop_detection_after_fusion_uses_the_rescored_count(self):
+        # 两通道融合后头部带 RRF 分：noop 回退时重排分 != 通道分，旧判据认不出来，要看 rerankScored
+        fused_noop = response([{"subQuestion": "a", "rerankHeadSize": 2, "rerankScored": 0, "candidates": [
+            candidate("c1", "x", "硅含量", final_rank=0, rerank=0.0476, channel=0.80),
+            candidate("c2", "y", "硅含量", final_rank=1, rerank=0.0455, channel=12.5)]}], ["c1", "c2"])
+        fused_live = response([{"subQuestion": "a", "rerankHeadSize": 2, "rerankScored": 2, "candidates": [
+            candidate("c1", "x", "硅含量", final_rank=0, rerank=0.91, channel=0.80),
+            candidate("c2", "y", "硅含量", final_rank=1, rerank=0.40, channel=12.5)]}], ["c1", "c2"])
+        self.assertTrue(evalkit.rerank_looks_noop(fused_noop))
+        self.assertFalse(evalkit.rerank_looks_noop(fused_live))
+
     def test_rewrite_fallback_detection(self):
         q = "碱熔那一步，坩埚先在炉口放多久、进炉后又要放多久？"
         self.assertTrue(evalkit.looks_like_rewrite_fallback(q, [q]))

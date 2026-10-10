@@ -110,9 +110,11 @@ def infer_beta(report: Mapping, terms: Terms, metadata: Mapping[str, Mapping], b
 
 
 def empty_channels(report: Mapping) -> int:
+    """Empty vector-channel sub-questions, the same count as compare_retrieval_repeats."""
+
     return sum(1 for item in report.get("details") or []
                for stage in (item.get("raw_response") or {}).get("stages") or []
-               if str(stage.get("stage", "")).startswith("channel-") and not stage.get("chunkCount"))
+               if stage.get("stage") == "channel-VectorSearch" and not stage.get("chunkCount"))
 
 
 def check_run(report: Mapping, terms: Terms, metadata: Mapping[str, Mapping], betas: Sequence[float],

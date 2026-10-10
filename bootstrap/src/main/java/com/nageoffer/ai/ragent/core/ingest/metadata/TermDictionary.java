@@ -143,4 +143,25 @@ public class TermDictionary {
     public int size() {
         return byForm.size();
     }
+
+    /**
+     * 全部写法的比对形态（规范写法与同义写法），全文分词把含汉字的写法加进用户词典
+     */
+    public Set<String> forms() {
+        return byForm.keySet();
+    }
+
+    /**
+     * 按比对形态查术语；传入的已是分词结果时不再归一化
+     */
+    public Term termOf(String form) {
+        return form == null ? null : byForm.get(form);
+    }
+
+    /**
+     * 术语规范写法的比对形态，全文索引用它把同义写法归到同一个词项
+     */
+    public static String canonicalForm(Term term) {
+        return form(term.canonical());
+    }
 }

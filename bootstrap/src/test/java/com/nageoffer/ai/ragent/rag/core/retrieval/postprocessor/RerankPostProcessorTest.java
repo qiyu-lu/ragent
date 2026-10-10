@@ -20,15 +20,19 @@ package com.nageoffer.ai.ragent.rag.core.retrieval.postprocessor;
 import com.nageoffer.ai.ragent.framework.convention.RetrievedChunk;
 import com.nageoffer.ai.ragent.infra.rerank.RerankService;
 import com.nageoffer.ai.ragent.rag.config.RAGConfigProperties;
+import com.nageoffer.ai.ragent.rag.config.ScoreBlendProperties;
 import com.nageoffer.ai.ragent.rag.core.retrieval.RetrievalBudget;
 import com.nageoffer.ai.ragent.rag.core.retrieval.channel.SearchContext;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class RerankPostProcessorTest {
@@ -73,8 +77,51 @@ class RerankPostProcessorTest {
         assertSame(rerankedA, result.get(0));
     }
 
+    @Test
+    void recordsOnlyTheChunksTheModelActuallyScored() {
+        RetrievedChunk a = chunk("a", 0.4F);
+        RetrievedChunk b = chunk("b", 0.3F);
+        RetrievedChunk c = chunk("c", 0.2F);
+        RerankService rerankService = mock(RerankService.class);
+        // 模型只返回了一条，客户端用输入对象 c 补位：c 没有模型分
+        when(rerankService.rerank("问题", List.of(a, b, c), 2)).thenReturn(List.of(b.toBuilder().score(0.9F).build(), c));
+        SearchContext context = context(2);
+
+        processor(rerankService).process(List.of(a, b, c), List.of(), context);
+
+        assertEquals(Set.of("b"), RerankPostProcessor.scoredKeys(context));
+    }
+
+    @Test
+    void noopRerankLeavesNoScoredKeys() {
+        RetrievedChunk a = chunk("a", 0.04F);
+        RetrievedChunk b = chunk("b", 0.03F);
+        RerankService noop = mock(RerankService.class);
+        when(noop.rerank("问题", List.of(a, b), 2)).thenReturn(List.of(a, b));
+        SearchContext context = context(2);
+
+        processor(noop).process(List.of(a, b), List.of(), context);
+
+        assertTrue(RerankPostProcessor.scoredKeys(context).isEmpty());
+    }
+
+    @Test
+    void scoresTheWholePoolWhenBlendingIsOn() {
+        List<RetrievedChunk> pool = List.of(chunk("a", 0.4F), chunk("b", 0.3F), chunk("c", 0.2F));
+        RerankService rerankService = mock(RerankService.class);
+        when(rerankService.rerank("问题", pool, 3)).thenReturn(pool.stream().map(x -> x.toBuilder().score(0.5F).build()).toList());
+        ScoreBlendProperties blend = new ScoreBlendProperties();
+        blend.setEnabled(true);
+        SearchContext context = context(2);
+
+        new RerankPostProcessor(rerankService, mock(RAGConfigProperties.class), blend).process(pool, List.of(), context);
+
+        verify(rerankService).rerank("问题", pool, 3);
+        assertEquals(Set.of("a", "b", "c"), RerankPostProcessor.scoredKeys(context));
+    }
+
     private RerankPostProcessor processor(RerankService rerankService) {
-        return new RerankPostProcessor(rerankService, mock(RAGConfigProperties.class));
+        return new RerankPostProcessor(rerankService, mock(RAGConfigProperties.class), new ScoreBlendProperties());
     }
 
     private SearchContext context(int contextTopK) {

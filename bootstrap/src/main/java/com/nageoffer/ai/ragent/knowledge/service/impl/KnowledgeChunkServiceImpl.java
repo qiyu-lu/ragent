@@ -54,6 +54,7 @@ import com.nageoffer.ai.ragent.infra.token.TokenCounterService;
 import com.nageoffer.ai.ragent.knowledge.enums.DocumentStatus;
 import com.nageoffer.ai.ragent.rag.core.vector.VectorStoreService;
 import com.nageoffer.ai.ragent.knowledge.service.KnowledgeChunkService;
+import com.nageoffer.ai.ragent.rag.core.fulltext.FullTextIndexer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -83,6 +84,7 @@ public class KnowledgeChunkServiceImpl implements KnowledgeChunkService {
     private final VectorStoreService vectorStoreService;
     private final TransactionOperations transactionOperations;
     private final BizChangeLogContext bizChangeLogContext;
+    private final FullTextIndexer fullTextIndexer;
 
     @Override
     public IPage<KnowledgeChunkVO> pageQuery(String docId, KnowledgeChunkPageRequest requestParam) {
@@ -165,6 +167,7 @@ public class KnowledgeChunkServiceImpl implements KnowledgeChunkService {
 
         // 同步写入向量库
         syncChunkToVector(collectionName, docId, chunkDO, vectorTargetResolver.resolve(kbDO));
+        syncFullText(documentDO.getKbId(), List.of(chunkDO.getId()));
 
         bizChangeLogContext.put(String.valueOf(chunkDO.getId()), null, chunkDO);
         return BeanUtil.toBean(chunkDO, KnowledgeChunkVO.class);
@@ -219,6 +222,7 @@ public class KnowledgeChunkServiceImpl implements KnowledgeChunkService {
         // 同步向量数据库
         vectorStoreService.updateChunk(collectionName, docId,
                 embedPersisted(List.of(chunkDO), vectorTargetResolver.resolve(kbDO)).get(0));
+        syncFullText(documentDO.getKbId(), List.of(chunkId));
         bizChangeLogContext.put(chunkId, before, chunkMapper.selectById(chunkId));
     }
 
@@ -258,6 +262,7 @@ public class KnowledgeChunkServiceImpl implements KnowledgeChunkService {
         log.info("删除 Chunk 成功, kbId={}, docId={}, chunkId={}", documentDO.getKbId(), docId, chunkId);
 
         deleteChunkFromVector(collectionName, chunkId);
+        syncFullText(documentDO.getKbId(), List.of());
         bizChangeLogContext.put(chunkId, before, null);
     }
 
@@ -306,6 +311,7 @@ public class KnowledgeChunkServiceImpl implements KnowledgeChunkService {
         } else {
             deleteChunkFromVector(collectionName, chunkId);
         }
+        syncFullText(documentDO.getKbId(), List.of());
         bizChangeLogContext.put(chunkId, before, chunkMapper.selectById(chunkId));
     }
 
@@ -393,6 +399,7 @@ public class KnowledgeChunkServiceImpl implements KnowledgeChunkService {
             });
         }
 
+        syncFullText(documentDO.getKbId(), List.of());
         log.info("批量{}Chunk 成功, kbId={}, docId={}, count={}", enabled ? "启用" : "禁用",
                 documentDO.getKbId(), docId, needUpdateIds.size());
         bizChangeLogContext.put(docId, before, chunkMapper.selectByIds(needUpdateIds));
@@ -408,6 +415,7 @@ public class KnowledgeChunkServiceImpl implements KnowledgeChunkService {
                         .set(KnowledgeChunkDO::getEnabled, enabledValue)
                         .set(KnowledgeChunkDO::getUpdatedBy, UserContext.getUsername())
         );
+        syncFullText(kbId, List.of());
         log.info("根据文档ID更新所有Chunk启用状态, kbId={}, docId={}, enabled={}", kbId, docId, enabled);
     }
 
@@ -437,6 +445,17 @@ public class KnowledgeChunkServiceImpl implements KnowledgeChunkService {
     }
 
     // ==================== 私有方法 ====================
+
+    /**
+     * 全文索引跟着块走（与向量库同步并列）：重写给定块的 content_tsv，提交后重算该库的词项统计；通道关闭时不动
+     */
+    private void syncFullText(String kbId, List<String> chunkIds) {
+        if (!fullTextIndexer.enabled()) {
+            return;
+        }
+        fullTextIndexer.indexChunks(chunkIds);
+        fullTextIndexer.refreshStatsAfterCommit(kbId);
+    }
 
     /**
      * 启用 chunk 前必须保证所属文档为启用状态

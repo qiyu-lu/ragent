@@ -43,3 +43,7 @@ P1 已移除送检、任务模拟与 ROS1 代码，P5 已用研究 artifact 替�
 ## 2026-10-09：文档元数据列（knowledge-quality 阶段 2）
 
 `t_knowledge_document` 新增 JSONB 列 `doc_metadata`：标准号、发布年、代替的旧标准、检测对象、组分、方法（入库抽取，人工确认后 `source=confirmed`），以及解析质量审计 `parseAudit` 与归一化摘要 `normalization`。新环境的 `schema_pg.sql` 已包含（列在表尾，与升级后的列序一致）；已有环境执行 `upgrades/v1.1.0/261009_knowledge_document_metadata.sql`，只加列、可重复执行、不回填，重新分块时由入库流程写入。**应用代码读取文档时会选这一列，未升级的库查文档会报错**，部署新代码前先执行。`bash scripts/validate-agentic-research-p2-database.sh` 已把 `t_knowledge_document` 纳入新建与升级的列一致性比对。
+
+## 2026-10-10：全文索引列与 BM25 统计表（knowledge-quality 阶段 3）
+
+`t_knowledge_chunk` 新增 `content_tsv tsvector`（GIN 索引 `idx_chunk_content_tsv`，另加 `idx_chunk_kb_id`），新增 `t_kq_term_stats`（按知识库的词项文档频率）与 `t_kq_kb_stats`（按知识库的块数与词项位置总数）。新环境的 `schema_pg.sql` 已包含（列在表尾，与升级后的列序一致）；已有环境执行 `upgrades/v1.1.0/261010_knowledge_chunk_full_text.sql`，只加列、索引与表，可重复执行，不回填。应用代码只在 `rag.search.channels.full-text.enabled=true` 时读写它们；打开前先执行升级脚本，再调一次 `POST /admin/full-text/rebuild`（管理员）回填存量，之后由入库与单块编辑维护。`content_tsv` 由应用侧分词后直接写字面量，术语表或停用词改了要重跑回填。`bash scripts/validate-agentic-research-p2-database.sh` 已把这一列和两张表纳入新建与升级的一致性比对。

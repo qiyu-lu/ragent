@@ -114,9 +114,41 @@ public class SearchChannelProperties implements InitializingBean {
         private Vector vector = new Vector();
 
         /**
+         * 中文全文检索配置（knowledge-quality 计划 §6）
+         */
+        private FullText fullText = new FullText();
+
+        /**
          * 联网检索配置（You.com Search）
          */
         private WebSearch webSearch = new WebSearch();
+    }
+
+    @Data
+    public static class FullText {
+
+        /**
+         * 是否启用：同时管通道与索引维护（入库写 content_tsv、重算词项统计）
+         * 默认关闭；打开前先执行升级脚本 261010_knowledge_chunk_full_text.sql，再调一次 POST /admin/full-text/rebuild 回填存量
+         */
+        private boolean enabled = false;
+
+        /**
+         * @@ 命中块的安全上限：命中的块都取轻量行（块 ID、长度、查询词项的词频）在应用侧算 BM25，再回表取前 recallBudget 条的正文。
+         * 不按 recallBudget 的倍数截：OR 查询在 224 块的评测库上命中中位数约 140 块，按不含 IDF 的 ts_rank 先截到 60 块，
+         * 调参集一半子问题的 BM25 前 20 会被截掉一部分。超过上限时才按 ts_rank 截断并告警
+         */
+        private int maxMatches = 2000;
+
+        /**
+         * BM25 的词频饱和参数
+         */
+        private double k1 = 1.2;
+
+        /**
+         * BM25 的长度归一化参数
+         */
+        private double b = 0.75;
     }
 
     @Data
@@ -203,6 +235,12 @@ public class SearchChannelProperties implements InitializingBean {
          * 向量模态最可信
          */
         private double vector = 1.0;
+
+        /**
+         * 中文全文检索权重
+         * 两通道并集不超过候选池上限时，RRF 只定池内顺序、Rerank 给整个池打分，这个权重不影响最终结果
+         */
+        private double fullText = 1.0;
 
         /**
          * 联网检索权重

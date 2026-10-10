@@ -218,7 +218,8 @@ public class ResearchRunCommand {
                 };
                 var ragProperties = new com.nageoffer.ai.ragent.rag.config.RAGConfigProperties();
                 ragProperties.setRerankEnabled(true);
-                processors.add(new com.nageoffer.ai.ragent.rag.core.retrieval.postprocessor.RerankPostProcessor(reranking, ragProperties));
+                processors.add(new com.nageoffer.ai.ragent.rag.core.retrieval.postprocessor.RerankPostProcessor(reranking, ragProperties,
+                        new com.nageoffer.ai.ragent.rag.config.ScoreBlendProperties()));
             }
             var engine = new MultiChannelRetrievalEngine(List.of(vector), processors,
                     new RetrievalScopeResolver(new KbCollectionProvider(bases), new com.nageoffer.ai.ragent.knowledge.service.KnowledgeAccessService(corpusJdbc)), retrieval, searchProperties);

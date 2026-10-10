@@ -504,10 +504,13 @@ def all_candidates(response: Mapping[str, Any]) -> List[dict]:
 
 
 def rerank_looks_noop(response: Mapping[str, Any]) -> Optional[bool]:
-    """True when every rerank-head candidate carries exactly its channel score.
+    """True when the rerank model scored nothing in any sub-question with a head of two or more.
 
-    The BaiLian client writes the model's relevance_score back to the head objects; after a fallback to
-    ``rerank-noop`` the head keeps the vector cosine, so the two columns coincide for the whole head.
+    Servers from stage 3 on report ``rerankScored``: how many head candidates changed score at the rerank
+    stage. With two channels the head entering rerank carries RRF scores, so a ``rerank-noop`` fallback no
+    longer looks like "rerank score == channel score"; zero rescored chunks is the signal. Older reports
+    lack the field: there the BaiLian client wrote relevance_score back to the head while the noop
+    fallback kept the vector cosine, so the two columns coincided for the whole head.
     Returns None when no sub-question has a head of at least two candidates (nothing to judge).
     """
 
@@ -515,6 +518,9 @@ def rerank_looks_noop(response: Mapping[str, Any]) -> Optional[bool]:
     for result in response.get("results") or []:
         head = [c for c in result.get("candidates") or [] if c.get("rerankHead")]
         if len(head) < 2:
+            continue
+        if "rerankScored" in result:
+            verdicts.append(not result.get("rerankScored"))
             continue
         verdicts.append(all(c.get("rerankScore") is not None and c.get("rerankScore") == c.get("channelScore") for c in head))
     if not verdicts:

@@ -62,6 +62,13 @@ class CompareTest(unittest.TestCase):
         self.assertIn("r1", problems[0])
         self.assertEqual(cmp.check_validity({"S2": [bad]}, None), [])
 
+    def test_an_empty_full_text_channel_does_not_invalidate_a_run(self):
+        # 全文通道查不到词是正常结果；作废规则只看向量通道的超时
+        run = report("r3", "S3", 1, 0.8, 0.5)
+        run["details"] = [{"raw_response": {"stages": [{"stage": "channel-VectorSearch", "chunkCount": 20},
+                                                       {"stage": "channel-FullTextSearch", "chunkCount": 0}]}}] * 9
+        self.assertEqual(cmp.empty_channel_sub_questions(run), 0)
+
     def test_sub_questions_are_compared_by_what_was_replayed(self):
         details = [{"id": "q1", "raw_response": {"subQuestions": ["a", "b"]}}]
         first = report("a1", "a", 1, 0.8, 0.5)

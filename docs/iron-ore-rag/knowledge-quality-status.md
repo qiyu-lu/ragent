@@ -3,18 +3,19 @@
 计划：[knowledge-quality-plan-2026-10-09.md](knowledge-quality-plan-2026-10-09.md)（2026-10-09 修订版）。本文件 ≤ 40 行，每个会话结束时更新。命令全文见 [eval/kq/README.md](../../eval/kq/README.md) 的各阶段"运行顺序"。阶段 2 的根因、取舍与完整数字见改动说明 [解析质量闸门](changes/2026-10-10-parse-quality-gate.md)、[文档元数据治理](changes/2026-10-10-document-metadata-governance.md)。
 | 项 | 值 |
 | --- | --- |
-| 更新时间 | 2026-10-10（阶段 3 会话开始：阶段 2 结果已回填，写定阶段 3 的臂与选臂规则，之后才改代码） |
-| 当前阶段 | 阶段 3 会话 |
-| 分支 / 标签 | `feat/knowledge-quality`；`kq-v0-baseline` = 443e4e2；`kq-s1` = 6d246db；`kq-s2` = 回填阶段 2 结果的提交（其后是 `kq(s3):` 代码） |
-| 回归基线 | 2026-10-10 阶段 2 收工复跑：Python 53/53、Java 13 + 211、p2 通过；`eval/kq/tests` 37 个；阶段 2 新增 Java 测试 52 个（含 2 个本机语料标定，无 `local-data` 时跳过） |
+| 更新时间 | 2026-10-10（阶段 3 会话结束：`kq-s2` 已打，全文通道、阈值与融合代码已提交，等用户跑 `run_stage3.py`） |
+| 当前阶段 | 阶段 3 用户运行。之后开收尾会话：读 S3 结果，写 `changes/2026-10-xx-hybrid-full-text-retrieval.md`，回填本文件，打 `kq-s3`，写计划 §10 简历映射，ff 合并 |
+| 分支 / 标签 | `feat/knowledge-quality`；`kq-v0-baseline` = 443e4e2；`kq-s1` = 6d246db；`kq-s2` = 2c1303f（阶段 2 结果与阶段 3 选臂规则）；阶段 3 代码是其后的 `kq(s3):` 提交 |
+| 回归基线 | 2026-10-10 阶段 3 收工：p7 Python 53/53、Java 13 + 212（+1 全文越权用例）；p2 通过（含全文列与两张统计表的新建 / 升级一致性）；`eval/kq/tests` 58；阶段 3 新增或扩展 Java 测试 41 个。bootstrap 全量 441 个里 12 个错误是既有问题（测试源码的 `ResearchBrowserFixture` 让整个 Spring 上下文起不来、`JdbcConversationMemorySummaryServiceTest` 多余打桩），在 `kq-s2` 上同样失败 |
 | 评测数据 | `local-data/kq-eval/`：题集 `questions/questions-v1.jsonl`（120）+ `numeric-facts-v1.jsonl`（141），哈希在 `eval/kq/manifests/kq-s1-dataset.json`；子问题 `sub-questions-v1.jsonl`；库 `ragent_eval_kq_s1` 7 份 224 块（基线与阶段 3）、`ragent_eval_kq_s2` 7 份 227 块（闸门后重新入库）；切片 `runs/S{1,2}-chunks/`；运行 `runs/S1-base-*`、`runs/S2-*`；对比 `runs/S2-gate-vs-S1-base-{tune,test}.json`、`runs/S2-boost-vs-S2-gate-tune.json`；门槛 `eval/kq/manifests/kq-thresholds.json` |
 
 ## 进度
 - [x] 阶段 1；[x] 阶段 2：会话（闸门、归一化与去家具、`doc_metadata`、术语表 60 条、`MetadataBoostPostProcessor`，三项默认关）与用户运行（2026-10-10 跑完，汇总 `runs/stage2-remaining-summary-1010112845.json`）
-- [ ] 阶段 3 会话；[ ] 阶段 3 用户运行；[ ] 收尾（阶段 3 改动说明、`kq-s3`、简历映射、ff 合并；闸门与归一化是否默认开启在收尾时定）
+- [x] 阶段 3 会话：`FULL_TEXT` 通道（`PgFullTextSearchChannel`）、jieba + 术语表 + 停用词分词、`content_tsv` 与 `t_kq_term_stats` / `t_kq_kb_stats`、应用侧 BM25、入库与单块编辑维护索引、`POST /admin/full-text/rebuild`、重排分阈值与分数融合两个后处理器，全部默认关；在 S1 库副本上冒烟（无 key：回填 224 块 0.4 s，全文通道每题 20 块）
+- [ ] 阶段 3 用户运行；[ ] 收尾（闸门与归一化是否默认开启在收尾时定）
 
-## 用户要跑的命令
-- 阶段 3 会话结束时写在这里。
+## 用户要跑的命令（全文见 eval/kq/README.md"阶段 3 运行顺序"，跑完清空）
+1. 在有 key 的终端、9093 上没有实例时执行 `python3 eval/kq/run_stage3.py`（约 1 小时，无需改参数）：构建 → 快照并升级 `ragent_eval_kq_s1` → 7 臂调参集各 3 次（每臂启动时回填全文索引）→ 按下面的规则选臂 → 选中的跑测试集 → 写 `runs/stage3-summary-*.json`。中断后重跑同一条命令接着跑
 
 ## 门槛（2026-10-09 阶段 2 改代码前写定，之后不改）
 - **通用**：调参集 3 次均值对比对照臂。门槛 = max(S1-base 调参集极差, 1/n)：总体可答 53 题 Hit@5 0.019、MRR 0.022、上下文精度 0.004；数值题 22 题 Hit@5 0.045、MRR 0.045。目标指标提升 ≥ 门槛记"过"，不足记"未证实"；总体 Hit@5 或 MRR 降幅超过门槛记"退化"，不默认开启。一次运行空通道子问题 > 8（基线 6 次为 2～5）即作废重跑。测试集一轮只报告：提升小于测试集基线极差（总体 Hit@5 0.058、MRR 0.048）写"测试集未复现"。
@@ -34,3 +35,5 @@
 - `S2-gate` 调参集混淆题变差：`con-07`、`con-11` 锚点块内容未变，但掉出向量召回前 20（调研表归一化后在池里变多）；测试集混淆题反而变好，各 7～8 题不判定。阶段 3 的全文通道针对的就是池子这一层
 - 基线里的"空通道"是 15 s 向量通道超时（超时分支把耗时记成 0），每次 2～5 个子问题；各臂与基线同配置，靠作废规则兜底。入库前确认 rocketmq-broker 与 nameserver 都在；根分区 96%；评测实例的 key 必须在启动它的进程环境里。`docs/iron-ore-rag/notes/面试问答.md` 有用户未提交的修改，任何提交都不要带上
 - 阶段 2 的取舍与限制已写进两份改动说明（术语表在 classpath、页眉乱码删不掉、NFKC 上标、术语表 3 处待核对项未改、时效性无真实样本）
+- 阶段 3 与计划写法的偏离（收尾改动说明要写）：tsvector 直接写带位置的字面量（`to_tsvector('simple')` 会把 400°c、1.00%、0.5000g 再拆开）；候选不按 3 × recall 截：S1 库调参集 67 个子问题有 51 个命中超过 60 块，按不含 IDF 的排序截到 60 块时 32 个会丢掉部分 BM25 前 20，改成命中全取轻量行（上限 2000）在应用侧算 BM25；统计分两张表，入库提交后整库重算；HMM 猜出的词再补单字（"测硅时"产出"硅"）；去 LaTeX 命令名；同义写法在原位置补规范写法；融合臂让 Rerank 给整个池打分；阈值臂连未打分的尾部一起丢；Rerank 回退成 noop 时阈值与融合都跳过；评测出参加 `channelScores` 与 `rerankScored`（两通道下 noop 判据改用后者）；jieba 依赖由会话联网拉取；研究 Agent 的限定来源检索仍只走向量通道
+- 阶段 3 实现前的离线诊断（S1 库、调参集 53 道可答题、同一分词函数）：全文单通道前 20 含锚点 40 题，向量池 20 块 36 题，并集 40 题；只有全文捞得到的 4 题里数值题 1 道，数值题 MRR 门槛 +0.045 约等于 1 题从未命中到第 1 名

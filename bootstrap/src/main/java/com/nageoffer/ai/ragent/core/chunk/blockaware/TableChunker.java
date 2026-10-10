@@ -22,8 +22,12 @@ import com.nageoffer.ai.ragent.core.chunk.model.ChunkMetadata;
 import com.nageoffer.ai.ragent.core.parser.model.Provenance;
 import com.nageoffer.ai.ragent.core.parser.model.TableBlock;
 import org.apache.poi.ss.util.CellRangeAddress;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -35,9 +39,32 @@ import java.util.List;
  * markdown 表格，向量文本改用 {@code 列名: 值}，因为 markdown 表格靠位置对齐列名与值、嵌入模型
  * 读不懂位置；表头不拼进向量文本，KV 正文已逐格自带列名，重复前缀会把同一张表各块的向量朝同一
  * 方向拉、压缩块间距离，表身份由 sheet 名经章节路径承载
+ * <p>
+ * 按内容定界打开时（{@link TableChunkingProperties#isContentDefined()}），除预算与行数上限这两个强制切点外，
+ * 还在"内容切点"行之后落块，见 {@link #isContentCut}：切点只由行内容决定，插、删、改一行，块文本的变化只到
+ * 改动之后的第一个内容切点为止，其余块的向量缓存照常命中
  */
 @Component
 public class TableChunker implements BlockChunker<TableBlock> {
+
+    /**
+     * 两个内容切点之间的平均字数取块大小的这么多倍：原型上 1、1.5、2 倍的单行改动失效块数相近，2 倍块数增幅最小
+     */
+    private static final int CONTENT_CUT_SPACING_FACTOR = 2;
+
+    private final TableChunkingProperties properties;
+
+    /**
+     * 离线入口与测试用：按内容定界关闭
+     */
+    public TableChunker() {
+        this(new TableChunkingProperties());
+    }
+
+    @Autowired
+    public TableChunker(TableChunkingProperties properties) {
+        this.properties = properties;
+    }
 
     @Override
     public Class<TableBlock> blockType() {
@@ -97,11 +124,41 @@ public class TableChunker implements BlockChunker<TableBlock> {
             if (rowRange != null) {
                 groupRanges.add(rowRange);
             }
+            if (properties.isContentDefined() && isContentCut(renderKeyValueRow(headers, row), budget)) {
+                result.add(buildDraft(block, ctx, caption, headers, group, groupRanges));
+                group = new ArrayList<>();
+                groupRanges = new ArrayList<>();
+            }
         }
         if (!group.isEmpty()) {
             result.add(buildDraft(block, ctx, caption, headers, group, groupRanges));
         }
         return ChunkDraft.pieces(result);
+    }
+
+    /**
+     * 内容切点：这一行"列名: 值"渲染的 SHA-256 取前 7 字节折成 [0, 1) 的 u，u &lt; 行长 / (2 × maxChars) 时在这行之后切
+     * <p>
+     * 切不切只看这一行自己的内容、与它是第几行无关，所以插、删、改一行只影响到改动之后的第一个切点为止；按行长定概率，
+     * 两个切点之间平均约 2 × maxChars 字（中间再按预算切），长行更容易成为切点、短行很少单独成块。不设最小块长：
+     * 一行能否当切点若要看它离上一个切点多远，位置依赖又回来了（原型上删一行反而失效更多）
+     */
+    public static boolean isContentCut(String keyValueRow, int maxChars) {
+        if (keyValueRow == null || keyValueRow.isEmpty() || maxChars <= 0) {
+            return false;
+        }
+        byte[] digest;
+        try {
+            digest = MessageDigest.getInstance("SHA-256").digest(keyValueRow.getBytes(StandardCharsets.UTF_8));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 不可用", e);
+        }
+        long top = 0;
+        for (int i = 0; i < 7; i++) {
+            top = (top << 8) | (digest[i] & 0xFF);
+        }
+        double u = top / (double) (1L << 56);
+        return u < (double) keyValueRow.length() / ((double) CONTENT_CUT_SPACING_FACTOR * maxChars);
     }
 
     /**
@@ -214,7 +271,7 @@ public class TableChunker implements BlockChunker<TableBlock> {
         }
     }
 
-    private String renderKeyValueRows(List<String> headers, List<List<String>> rows) {
+    private static String renderKeyValueRows(List<String> headers, List<List<String>> rows) {
         StringBuilder sb = new StringBuilder();
         for (List<String> row : rows) {
             String line = renderKeyValueRow(headers, row);
@@ -230,9 +287,9 @@ public class TableChunker implements BlockChunker<TableBlock> {
     }
 
     /**
-     * 单行渲染成 {@code 列名: 值}，"; " 拼接、跳过空值、整行空返回空串；同时用作预算切分的行体量度量
+     * 单行渲染成 {@code 列名: 值}，"; " 拼接、跳过空值、整行空返回空串；同时用作预算切分的行体量度量与内容切点的输入
      */
-    private String renderKeyValueRow(List<String> headers, List<String> row) {
+    public static String renderKeyValueRow(List<String> headers, List<String> row) {
         StringBuilder line = new StringBuilder();
         for (int c = 0; c < row.size(); c++) {
             String value = row.get(c);

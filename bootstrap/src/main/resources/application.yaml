@@ -131,6 +131,10 @@ rag:
     # 评测过门槛前默认关闭
     excel-layout:
       enabled: false
+    # 表格分块按内容定界（table-structure 计划 §3）：切点由行内容的哈希决定，插、删一行只让附近几块的向量缓存失效。
+    # 评测过门槛前默认关闭
+    table-chunking:
+      content-defined: false
   knowledge:
     terms-location: classpath:kq/terms.csv  # 领域术语表：元数据抽取、查询侧加权、阶段 3 分词词典共用
     schedule:

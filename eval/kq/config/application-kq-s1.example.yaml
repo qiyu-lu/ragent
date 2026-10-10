@@ -28,6 +28,11 @@ rag:
     asset-bucket: ragent-assets-kq-s1
   image-parse:
     embedded-describe-enabled: false  # §4.1：图片解析关闭
+  ingestion:
+    parse-quality:
+      enabled: false     # S1-base 是闸门之前的基线；2026-10-10 起闸门与归一化默认开启，这里显式关掉
+    normalize:
+      enabled: false
   query-rewrite:
     enabled: true
   rerank:

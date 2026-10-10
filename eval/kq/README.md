@@ -24,7 +24,7 @@
 | `verify_boost_beta.py` | 阶段 2：从重排头部的排序反推每次运行实际用的 boost β，核对与臂名一致，并检查空通道上限 |
 | `run_stage2_remaining.py` | 阶段 2：无人值守跑完剩下的运行（自己启停实例、按臂设 β、检查并重跑作废的、对比、按规则选 β、跑测试集），`--plan` 只看计划 |
 | `run_stage3.py` | 阶段 3：无人值守跑完全部运行（构建、快照与升级 `ragent_eval_kq_s1`、按臂启停实例、回填全文索引、检查并重跑作废的、按状态文件的规则选臂、跑测试集），`--plan` 只看计划 |
-| `config/application-kq-s1.example.yaml` | 评测实例的附加配置样例（端口 9093、库 `ragent_eval_kq_s1`、Redis DB 13、独立桶与 MQ 主题） |
+| `config/application-kq-s1.example.yaml` | 评测实例的附加配置样例（端口 9093、库 `ragent_eval_kq_s1`、Redis DB 13、独立桶与 MQ 主题）；闸门与归一化显式关闭，保留 S1-base 条件（2026-10-10 起两者默认开启） |
 | `config/application-kq-s2.example.yaml` | 阶段 2 实例（端口 9094、库 `ragent_eval_kq_s2`、Redis DB 14）：闸门与归一化打开，boost 关，检索配置与阶段 1 相同 |
 | `manifests/kq-thresholds.json` | 阶段 2、3 的门槛与运行有效性规则（2026-10-09 写定，`kq-s1`），对比脚本读它 |
 | `tests/` | `python3 -m unittest discover -s eval/kq/tests` |
@@ -283,6 +283,8 @@ python3 eval/kq/compare_retrieval_repeats.py --max-empty-channel 8 --baseline S2
 终端 A 按 Ctrl-C 停掉实例。阶段 2 的运行到此结束；结果都在 `local-data/kq-eval/runs/`，由阶段 3 会话读取、写改动说明并打 `kq-s2`。
 
 ## 阶段 3 运行顺序（用户在仓库根目录的终端跑）
+
+**进度：阶段 3 已于 2026-10-10 全部跑完**（调参集 `runs/stage3-summary-1010143009.json`；比较工具按门槛存储精度修正后补跑测试集 `runs/stage3-summary-1010151953.json`）。选中 `S3-thr-0.3`，测试集对比 `runs/S3-thr-0.3-vs-S1-base-test.json`；结论见 `docs/iron-ore-rag/changes/2026-10-10-hybrid-full-text-retrieval.md`。下面的命令留作复现。
 
 ### 一条命令（2026-10-10）
 

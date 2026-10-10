@@ -22,7 +22,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Excel 版面切分与表头识别配置（table-structure 计划 §2）。默认关闭，评测过门槛后再打开
+ * Excel 版面切分与表头识别配置（table-structure 计划 §2）。Java 字段默认关闭，{@code application.yaml}
+ * 自 2026-10-11 起打开（调参集、测试集都没有退化）
  */
 @Data
 @Configuration

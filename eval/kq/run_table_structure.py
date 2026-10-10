@@ -71,12 +71,14 @@ CODE_PATHS = ("bootstrap", "framework", "infra-ai", "pom.xml")
 OFF_STAGES = ("post-MetadataBoost", "channel-FullTextSearch", "post-RerankThreshold", "post-ScoreBlend")
 LAYOUT_FLAG = "--rag.ingestion.excel-layout.enabled=true"
 CDC_FLAG = "--rag.ingestion.table-chunking.content-defined=true"
+# the layout default turned on on 2026-10-11; the baseline keeps the switches explicitly off when run again
+BASELINE_FLAGS = ["--rag.ingestion.excel-layout.enabled=false", "--rag.ingestion.table-chunking.content-defined=false"]
 
 BASELINE = "S2b-gate"
 T1 = "T1-layout"
 T2 = "T2-layout-cdc"
 ARMS: Dict[str, dict] = {
-    BASELINE: {"database": SOURCE_DATABASE, "config": S2B_CONFIG, "port": 9095, "flags": []},
+    BASELINE: {"database": SOURCE_DATABASE, "config": S2B_CONFIG, "port": 9095, "flags": BASELINE_FLAGS},
     T1: {"database": "ragent_eval_kq_t1", "config": DATA / "config/application-kq-t1.yaml", "port": 9096,
          "redis": 11, "unique": "_kq_t1", "rewrites": "rewrites-t1.jsonl", "flags": [LAYOUT_FLAG]},
     T2: {"database": "ragent_eval_kq_t2", "config": DATA / "config/application-kq-t2.yaml", "port": 9096,

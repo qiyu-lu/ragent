@@ -39,7 +39,7 @@ class ConfigTest(unittest.TestCase):
                 self.assertNotIn(gone, config)
         self.assertIn(ts.CDC_FLAG, ts.ARMS[ts.T2]["flags"])
         self.assertNotIn(ts.CDC_FLAG, ts.ARMS[ts.T1]["flags"])
-        self.assertEqual([], ts.ARMS[ts.BASELINE]["flags"])
+        self.assertTrue(all(flag.endswith("=false") for flag in ts.ARMS[ts.BASELINE]["flags"]))
 
     def test_a_changed_s2b_config_is_refused_instead_of_half_rewritten(self):
         with self.assertRaises(RuntimeError):

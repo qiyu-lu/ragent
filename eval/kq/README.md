@@ -347,6 +347,8 @@ python3 eval/kq/run_gate_fix_check.py
 
 ## 表格版面切分与按内容定界（table-structure 计划）
 
+**进度：2026-10-11 已跑完**（汇总 `runs/table-structure-summary-1010235701.json`）：最终配置为 T1，版面切分默认开启，按内容定界保持关闭。结论见两份改动说明（`docs/iron-ore-rag/changes/2026-10-11-*.md`）。下面的命令留作复现；2026-10-11 起版面切分默认开启，S1、S2 配置样例与脚本里的 S2b 基线显式关闭它。
+
 计划：[`docs/iron-ore-rag/table-structure-plan-2026-10-10.md`](../../docs/iron-ore-rag/table-structure-plan-2026-10-10.md)；状态：同目录 `table-structure-status.md`。新题 `questions/questions-table-v1.jsonl`（12 道，题型 `table`，哈希在 `manifests/table-questions-v1.json`）和标准答案 `table-layout/survey-layout-golden.json`（哈希在 `manifests/table-layout-golden.json`）都在写代码之前冻结。
 
 **离线检查**（不调模型，会话跑；读两版调研表和标准答案，缺文件就跳过）：

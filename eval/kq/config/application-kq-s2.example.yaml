@@ -34,6 +34,8 @@ rag:
       enabled: true      # §5.1 闸门；阈值用 application.yaml 里标定的默认值
     normalize:
       enabled: true      # §5.2 归一化与去页面家具
+    excel-layout:
+      enabled: false     # 2026-10-11 起 Excel 版面切分默认开启（table-structure 计划），S2 / S2b 是它之前的切法
   query-rewrite:
     enabled: true
   rerank:

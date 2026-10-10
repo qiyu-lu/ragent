@@ -127,12 +127,12 @@ rag:
       enabled: true
       drop-repeated-lines: true
       repeated-line-min-occurrences: 3
-    # Excel 版面切分与表头识别（table-structure 计划 §2）：按空行空列切区域，逐张表识别表头，标题与分段进章节路径。
-    # 评测过门槛前默认关闭
+    # Excel 版面切分与表头识别（table-structure 计划 §2）：按空行空列切区域，逐张表识别表头，标题随表格进每一块。
+    # 2026-10-11 调参集、测试集都没有退化（按写定门槛），默认开启（changes/2026-10-11-excel-layout-detection.md）
     excel-layout:
-      enabled: false
+      enabled: true
     # 表格分块按内容定界（table-structure 计划 §3）：切点由行内容的哈希决定，插、删一行只让附近几块的向量缓存失效。
-    # 评测过门槛前默认关闭
+    # 2026-10-11 叠加版面切分的对照组在调参集按写定门槛判为退化，保持关闭（changes/2026-10-11-content-defined-table-chunks.md）
     table-chunking:
       content-defined: false
   knowledge:

@@ -33,6 +33,8 @@ rag:
       enabled: false     # S1-base 是闸门之前的基线；2026-10-10 起闸门与归一化默认开启，这里显式关掉
     normalize:
       enabled: false
+    excel-layout:
+      enabled: false     # 2026-10-11 起 Excel 版面切分默认开启（table-structure 计划），S1-base 是它之前的切法
   query-rewrite:
     enabled: true
   rerank:

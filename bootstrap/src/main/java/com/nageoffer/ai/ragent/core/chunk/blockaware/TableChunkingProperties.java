@@ -22,7 +22,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * 表格分块配置（table-structure 计划 §3）。默认关闭，评测过门槛后再打开
+ * 表格分块配置（table-structure 计划 §3）。默认关闭：2026-10-11 叠加版面切分的对照组在调参集按写定门槛判为退化
+ * （主要是那几次运行向量通道超时更多，见改动说明），没有开启
  */
 @Data
 @Configuration

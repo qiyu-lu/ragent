@@ -34,7 +34,10 @@ import com.nageoffer.ai.ragent.core.chunk.model.ChunkDraft;
 import com.nageoffer.ai.ragent.core.parser.image.ImageParseProperties;
 import com.nageoffer.ai.ragent.core.parser.model.Block;
 import com.nageoffer.ai.ragent.core.parser.model.HeadingBlock;
+import com.nageoffer.ai.ragent.core.parser.model.ParsedDocument;
 import com.nageoffer.ai.ragent.core.parser.model.TableBlock;
+import com.nageoffer.ai.ragent.core.parser.normalize.ParsedDocumentNormalizer;
+import com.nageoffer.ai.ragent.core.parser.normalize.TextNormalizeProperties;
 import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.FormulaEvaluator;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -70,7 +73,8 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * 类名不以 Test 结尾，常规测试不跑；显式运行：
  * {@code ./mvnw -o -pl bootstrap -am test -Dtest=TableStructureOfflineReport -Dsurefire.failIfNoSpecifiedTests=false}。
  * 缺文件（local-data 不进 Git）就跳过。门槛：25 张表与 52 个文字格与标准答案一致、表内格子不当段落输出、
- * 按内容定界的不变式（改动之后第一个内容切点以后的块全部不变）100% 成立；失效块数、块数只报告
+ * 按内容定界的不变式（改动之后第一个内容切点以后的块全部不变）100% 成立；失效块数、块数只报告。
+ * 块数与失效块数在入库归一化之后算，与入库口径一致（归一化会压缩空白，块数比不归一化时少）
  */
 class TableStructureOfflineReport {
 
@@ -94,6 +98,7 @@ class TableStructureOfflineReport {
         report.put("created_at", LocalDateTime.now().toString());
         report.put("golden_sha256", sha256(Files.readAllBytes(GOLDEN)));
         report.put("budget", Map.of("maxChars", BUDGET.maxChars(), "rowsPerChunk", BUDGET.rowsPerChunk()));
+        report.put("ingestion_normalization", true);
 
         List<Map<String, Object>> structure = new ArrayList<>();
         List<Map<String, Object>> chunking = new ArrayList<>();
@@ -412,12 +417,18 @@ class TableStructureOfflineReport {
 
     // ---------------------------------------------------------------- 解析与分块
 
+    /**
+     * 解析后再走一遍入库归一化（默认开启），与入库时分块看到的文本一致
+     */
     private static List<Block> parse(Path workbook, boolean layout) throws Exception {
         ExcelLayoutProperties properties = new ExcelLayoutProperties();
         properties.setEnabled(layout);
         ExcelDocumentParser parser = new ExcelDocumentParser(null, new ImageParseProperties(), properties);
-        return parser.parseStructured(Files.readAllBytes(workbook), XLSX,
-                Map.of(ExcelDocumentParser.OPT_SOURCE_FILE, workbook.getFileName().toString())).blocks();
+        ParsedDocument parsed = parser.parseStructured(Files.readAllBytes(workbook), XLSX,
+                Map.of(ExcelDocumentParser.OPT_SOURCE_FILE, workbook.getFileName().toString()));
+        TextNormalizeProperties normalize = new TextNormalizeProperties();
+        normalize.setEnabled(true);
+        return new ParsedDocumentNormalizer(normalize).normalize(parsed, null, false).document().blocks();
     }
 
     private static List<Chunk> chunk(List<Block> blocks, boolean contentDefined) {

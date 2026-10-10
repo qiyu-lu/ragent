@@ -322,6 +322,8 @@ docker exec -i ragent-iron-ore-dev-postgres-1 sh -c 'exec pg_restore -U "$POSTGR
 
 ## 审查修正复核（2026-10-10 晚，用户在仓库根目录的终端跑）
 
+**进度：2026-10-10 已跑完**（汇总 `runs/gate-fix-check-summary-1010164625.json`，对比 `runs/S2b-gate-vs-S1-base-tune.json`、`runs/S2b-gate-vs-S2-gate-tune.json`）。结论见闸门改动说明的"复核结果"。下面的命令留作复现。
+
 收尾后的审查修正了闸门与归一化的实现（重解析失败不再拒收、图片只在选中的那次上传、审计误报、入库正文保留中文标点与上下标，见闸门改动说明的"审查后的修正"）。入库正文变了，需要重新入库确认阶段 2 的结论还在。
 
 在**有三把 key 的终端**里（这次要入库，`MINERU_API_KEY` 也要在），确认 9095 上没有实例，执行：

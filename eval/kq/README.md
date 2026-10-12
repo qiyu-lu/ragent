@@ -377,3 +377,14 @@ python3 eval/kq/run_table_structure.py          # 约 60 分钟，不用改参�
 7. 写汇总 `runs/table-structure-summary-*.json`；新题对比在 `runs/table-structure-table-questions.json`。
 
 中途断了，重新执行同一条命令会接着跑。
+
+## 表头判定改用 Jev（jev-header 计划）
+
+计划与门槛：[`docs/iron-ore-rag/jev-header-plan-2026-10-12.md`](../../docs/iron-ore-rag/jev-header-plan-2026-10-12.md)。只用两版调研表与冻结的版面标准答案，不入库、不回放检索题。需要 `TYPESAFE_API_KEY`，约 3 分钟：
+
+```bash
+./mvnw -o -q -pl bootstrap -am test -Dtest=JevHeaderJudgeReport -Dsurefire.failIfNoSpecifiedTests=false
+```
+
+报告写 `runs/jev-header-*.json`：原表组 G 与去表头组 R 上规则、Jev 单独、混合三种判定的准确率，每次运行用混合判定做的完整版面对照，三次之间的稳定性、调用次数、token 与耗时，以及计划 §4 两条门槛是否通过。
+

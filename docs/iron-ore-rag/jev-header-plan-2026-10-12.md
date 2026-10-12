@@ -76,4 +76,13 @@
 
 ## 6. 命令
 
-实现后补。
+在有 `TYPESAFE_API_KEY` 的终端里运行，约 3 分钟，调用约 220 次：
+
+```bash
+./mvnw -o -q -pl bootstrap -am test -Dtest=JevHeaderJudgeReport -Dsurefire.failIfNoSpecifiedTests=false
+```
+
+- 也可以在 IDEA 里直接运行 `JevHeaderJudgeReport`，JUnit 运行配置里要有这个环境变量。
+- 结果写 `local-data/kq-eval/runs/jev-header-*.json`，控制台打印三次的汇总和门槛判定。
+- 缺密钥就跳过；密钥无效时第一次调用就失败，不写报告。
+- 报告代码先用本地桩自测过（桩的概率是假的，报告没有保留）：G 25 个、R 24 个，没有对不上标准答案的候选；每次运行调用 74 次（两版完整版面分析 50 次 + R 24 次）。

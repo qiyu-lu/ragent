@@ -78,9 +78,9 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  */
 class TableStructureOfflineReport {
 
-    private static final Path REPO = locateRepo();
-    private static final Path GOLDEN = REPO.resolve("local-data/kq-eval/table-layout/survey-layout-golden.json");
-    private static final Path RUNS = REPO.resolve("local-data/kq-eval/runs");
+    static final Path REPO = locateRepo();
+    static final Path GOLDEN = REPO.resolve("local-data/kq-eval/table-layout/survey-layout-golden.json");
+    static final Path RUNS = REPO.resolve("local-data/kq-eval/runs");
     private static final String XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     private static final ChunkBudget BUDGET = ChunkBudget.defaults();
 
@@ -103,7 +103,7 @@ class TableStructureOfflineReport {
         List<Map<String, Object>> structure = new ArrayList<>();
         List<Map<String, Object>> chunking = new ArrayList<>();
         for (Path workbook : workbooks) {
-            structure.add(structureCheck(workbook, golden));
+            structure.add(structureCheck(workbook, golden, RuleHeaderJudge.INSTANCE));
             chunking.add(chunkStats(workbook));
         }
         report.put("structure", structure);
@@ -132,7 +132,10 @@ class TableStructureOfflineReport {
 
     // ---------------------------------------------------------------- 结构：与标准答案对照
 
-    private static Map<String, Object> structureCheck(Path workbook, JsonNode golden) throws Exception {
+    /**
+     * 按标准答案核对一版调研表的版面：表格（范围、表头、标题）、文字格、表内格子不当段落；表头交给 {@code judge}
+     */
+    static Map<String, Object> structureCheck(Path workbook, JsonNode golden, HeaderJudge judge) throws Exception {
         int tablesTotal = 0;
         int tablesMatched = 0;
         int textTotal = 0;
@@ -147,7 +150,7 @@ class TableStructureOfflineReport {
                 List<ExcelLayoutAnalyzer.Table> tables = new ArrayList<>();
                 Set<String> texts = new LinkedHashSet<>();
                 for (ExcelLayoutAnalyzer.Region region
-                        : ExcelLayoutAnalyzer.analyze(book.getSheet(sheet), formatter, evaluator, 1)) {
+                        : ExcelLayoutAnalyzer.analyze(book.getSheet(sheet), formatter, evaluator, 1, judge)) {
                     for (ExcelLayoutAnalyzer.Item item : region.items()) {
                         if (item instanceof ExcelLayoutAnalyzer.Table table) {
                             tables.add(table);
@@ -445,7 +448,7 @@ class TableStructureOfflineReport {
         return new TableChunker(properties);
     }
 
-    private static String sha256(byte[] bytes) {
+    static String sha256(byte[] bytes) {
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
         } catch (Exception e) {

@@ -131,6 +131,9 @@ rag:
     # 2026-10-11 调参集、测试集都没有退化（按写定门槛），默认开启（changes/2026-10-11-excel-layout-detection.md）
     excel-layout:
       enabled: true
+      # 表的第一行是不是表头：rule 按字数与数字占比；jev 交给 Jev 判定模型（ai.jev），没把握或调用失败按规则，
+      # 没有密钥时整个退回 rule（jev-header-plan-2026-10-12.md）
+      header-judge: rule
     # 表格分块按内容定界（table-structure 计划 §3）：切点由行内容的哈希决定，插、删一行只让附近几块的向量缓存失效。
     # 2026-10-11 叠加版面切分的对照组在调参集按写定门槛判为退化，保持关闭（changes/2026-10-11-content-defined-table-chunks.md）
     table-chunking:
@@ -344,6 +347,14 @@ ai:
       - id: qwen-vl-max
         provider: bailian
         model: qwen-vl-max
+
+  # TypeSafe System One（Jev 判定模型）：不是聊天模型，不进上面的路由；目前只用于 Excel 表头判定
+  jev:
+    api-key: ${TYPESAFE_API_KEY:}
+    base-url: https://api.typesafe.ai
+    model: jev-1.13.0  # 钉版本，jev-latest 会随发版换模型
+    timeout: 5s
+    max-retries: 2
 
 # MinerU SaaS API 配置（PDF / Word / PPT 走 MinerU 解析）
 mineru:

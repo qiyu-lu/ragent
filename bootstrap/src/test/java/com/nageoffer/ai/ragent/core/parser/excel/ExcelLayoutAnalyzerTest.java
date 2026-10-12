@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -262,6 +263,57 @@ class ExcelLayoutAnalyzerTest {
             Table table = tables(regions).get(0);
             assertEquals("粒度", table.table().rows().get(1).get(5));
         }
+    }
+
+    @Test
+    void theJudgeDecidesTheFirstRowAndSeesThisSegmentAlignedByColumn() throws IOException {
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("词表");
+            put(sheet, 0, 0, "样品说明");
+            merge(sheet, "A1:C1");
+            put(sheet, 1, 0, "名称", "说明");
+            merge(sheet, "B2:C2");
+            put(sheet, 1, 4, "右：图片");
+            put(sheet, 2, 0, "原矿", "刚采出", "未选别");
+            put(sheet, 3, 0, "磁尾", "磁选后", "含铁低");
+            List<HeaderJudge.Candidate> seen = new ArrayList<>();
+
+            List<Region> regions = ExcelLayoutAnalyzer.analyze(sheet, new DataFormatter(),
+                    workbook.getCreationHelper().createFormulaEvaluator(), 1, candidate -> {
+                        seen.add(candidate);
+                        return new HeaderJudge.Decision(false, HeaderJudge.Source.JEV, 0.1);
+                    });
+            Table table = tables(regions).get(0);
+
+            assertNull(table.headerRow(), "判定说不是表头，就按无表头处理");
+            assertEquals(1, table.firstDataRow());
+            assertEquals("样品说明", table.title());
+            assertEquals(1, seen.size(), "只有表格区域交给判定，右侧的单格说明不算");
+            HeaderJudge.Candidate candidate = seen.get(0);
+            assertEquals("词表", candidate.sheet());
+            assertEquals("样品说明", candidate.title());
+            assertEquals(List.of(1, 2, 3), candidate.rowIndexes());
+            assertEquals(List.of("名称", "说明", ""), candidate.rows().get(0), "合并块只在首列出现一次");
+            assertEquals(List.of("原矿", "刚采出", "未选别"), candidate.rows().get(1));
+            assertEquals(List.of("名称", "说明"), candidate.firstRowCells());
+        }
+    }
+
+    @Test
+    void theRuleJudgeKeepsTheOldThresholds() {
+        HeaderJudge rule = RuleHeaderJudge.INSTANCE;
+
+        assertTrue(rule.judge(candidate(List.of("设备", "数量", "说明"))).header());
+        assertFalse(rule.judge(candidate(List.of("天平", "2", "称样", "3"))).header(), "数字占一半就像数据");
+        assertTrue(rule.judge(candidate(List.of("天平", "2", "称样", "备注"))).header(), "数字不到一半仍算表头");
+        assertFalse(rule.judge(candidate(List.of("原矿", "x".repeat(41)))).header(), "超过 40 字像数据");
+        assertTrue(rule.judge(candidate(List.of("原矿", "x".repeat(40)))).header());
+        assertFalse(rule.judge(candidate(List.of("", ""))).header());
+        assertEquals(HeaderJudge.Source.RULE, rule.judge(candidate(List.of("设备"))).source());
+    }
+
+    private static HeaderJudge.Candidate candidate(List<String> firstRow) {
+        return new HeaderJudge.Candidate("s", null, List.of(0), List.of(firstRow));
     }
 
     private static List<Region> analyze(Sheet sheet) {

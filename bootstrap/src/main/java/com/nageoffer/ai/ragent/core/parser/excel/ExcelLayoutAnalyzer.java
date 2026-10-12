@@ -36,7 +36,6 @@ import java.util.Deque;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.regex.Pattern;
 
 /**
  * Excel 版面分析：把一个 sheet 切成区域，区域里分出标题、段落和表格，逐张表识别表头（table-structure 计划 §2）
@@ -49,8 +48,9 @@ import java.util.regex.Pattern;
  *       所以检测表里只有"操作步骤"一格有值的续行不是单格行</li>
  *   <li>区域开头的单格行是标题或说明，结尾的是段落，中间横跨一半以上宽度的是分段（从这里拆表），
  *       中间其他单格行是稀疏数据行；全是单格行的区域是文字区域</li>
- *   <li>每张表第一行当表头；它像数据（有格子超过 40 字，或一半以上非空格子是数字）就按无表头处理。
- *       分段后的表沿用首段表头，分段后紧跟着的重复表头不当数据</li>
+ *   <li>每张表第一行是不是表头交给 {@link HeaderJudge}：默认 {@link RuleHeaderJudge}（有格子超过 40 字，
+ *       或一半以上非空格子是数字，就按无表头处理），可换成 {@link JevHeaderJudge}。
+ *       分段后的表沿用首段表头，分段后紧跟着的重复表头不当数据；首段没有表头时，后续段也交给判定</li>
  *   <li>不超过 30 字的区域开头行是这张表的标题；区域没有开头行时，往前找最近一个列范围与表重叠的区域，
  *       它是文字区域就取它的最后一行当标题（中间隔着的列不重叠的区域，如表右侧的图片说明，不算）</li>
  *   <li>上方（同样按列重叠找）是一张表、列布局与它的表头相同、首行又不像表头（不是整行加粗或带底色）的区域，
@@ -68,19 +68,9 @@ public final class ExcelLayoutAnalyzer {
     static final int MAX_TITLE_CHARS = 30;
 
     /**
-     * 表头单元格最多这么多字，再长就是数据
-     */
-    static final int MAX_HEADER_CELL_CHARS = 40;
-
-    /**
      * 合并区域向右能把读取宽度撑到多远：防一个误设的整行合并把 grid 撑到上万列
      */
     private static final int MAX_MERGE_EXTENT_COLS = 1024;
-
-    /**
-     * 数字样子的单元格：整数、小数、千分位、可带正负号与百分号，只用于区分表头与数据
-     */
-    private static final Pattern NUMERIC_CELL = Pattern.compile("^[$+\\-]?[\\d,]+(\\.\\d+)?%?$");
 
     private ExcelLayoutAnalyzer() {
     }
@@ -118,12 +108,22 @@ public final class ExcelLayoutAnalyzer {
     }
 
     /**
-     * 分析一个 sheet；区域按（首行，首列）排序
+     * 分析一个 sheet，表头按规则判断；区域按（首行，首列）排序
      *
      * @param headerRows 每张表的表头行数，{@code >= 1}
      */
     public static List<Region> analyze(Sheet sheet, DataFormatter formatter, FormulaEvaluator evaluator,
                                        int headerRows) {
+        return analyze(sheet, formatter, evaluator, headerRows, RuleHeaderJudge.INSTANCE);
+    }
+
+    /**
+     * 分析一个 sheet，每张表的第一行是不是表头交给 {@code judge}；区域按（首行，首列）排序
+     *
+     * @param headerRows 每张表的表头行数，{@code >= 1}
+     */
+    public static List<Region> analyze(Sheet sheet, DataFormatter formatter, FormulaEvaluator evaluator,
+                                       int headerRows, HeaderJudge judge) {
         if (headerRows < 1) {
             throw new IllegalArgumentException("headerRows must be >= 1, got " + headerRows);
         }
@@ -141,7 +141,7 @@ public final class ExcelLayoutAnalyzer {
             width = extended;
             grid = ExcelTableNormalizer.readGrid(sheet, lastRowNum, width, formatter, evaluator);
         }
-        return new Analysis(sheet, grid, width, headerRows).run();
+        return new Analysis(sheet, grid, width, headerRows, judge).run();
     }
 
     /**
@@ -225,16 +225,18 @@ public final class ExcelLayoutAnalyzer {
         private final String[][] grid;
         private final int width;
         private final int headerRowCount;
+        private final HeaderJudge judge;
         private final List<CellRangeAddress> merges;
         private final List<Owner> owners = new ArrayList<>();
         private final int[][] ownerOf;
         private final int[][] regionOf;
 
-        Analysis(Sheet sheet, String[][] grid, int width, int headerRowCount) {
+        Analysis(Sheet sheet, String[][] grid, int width, int headerRowCount, HeaderJudge judge) {
             this.sheet = sheet;
             this.grid = grid;
             this.width = width;
             this.headerRowCount = headerRowCount;
+            this.judge = judge;
             this.merges = sheet.getMergedRegions();
             this.ownerOf = new int[grid.length][width];
             this.regionOf = new int[grid.length][width];
@@ -461,7 +463,7 @@ public final class ExcelLayoutAnalyzer {
         }
 
         /**
-         * 首段：第一行像表头就当表头。后续段：首行与首段表头相同是重复表头，否则沿用首段表头
+         * 首段：第一行是不是表头交给判定。后续段：首行与首段表头相同是重复表头，否则沿用首段表头；首段没有表头时也交给判定
          */
         private void assignHeader(Planned p, Segment segment, Segment first) {
             int start = segment.logicalRows.get(0);
@@ -474,11 +476,42 @@ public final class ExcelLayoutAnalyzer {
                 }
                 return;
             }
-            if (headerLike(p, start)) {
+            if (judge.judge(candidate(p, segment, first == null)).header()) {
                 takeHeaderRows(segment);
             } else {
                 segment.firstDataRow = start;
             }
+        }
+
+        /**
+         * 交给判定的输入：这一段的逻辑行，按区域的列对齐；表题候选是首段的开头行或后续段的分段行里最后一行
+         */
+        private HeaderJudge.Candidate candidate(Planned p, Segment segment, boolean firstSegment) {
+            List<List<String>> rows = new ArrayList<>();
+            for (int row : segment.logicalRows) {
+                rows.add(alignedRow(p, row));
+            }
+            List<Integer> captions = firstSegment ? p.leading : segment.sectionRows;
+            String title = null;
+            if (!captions.isEmpty()) {
+                String text = soleOwner(p, captions.get(captions.size() - 1)).text();
+                title = text.length() <= MAX_TITLE_CHARS ? text : null;
+            }
+            return new HeaderJudge.Candidate(sheet.getSheetName(), title, segment.logicalRows, rows);
+        }
+
+        /**
+         * 本区域这一行新出现的单元格放在各自的首列，其余格子（空、被合并块覆盖、属于别的区域）记空串
+         */
+        private List<String> alignedRow(Planned p, int row) {
+            List<String> cells = new ArrayList<>(p.lastCol - p.firstCol + 1);
+            for (int c = p.firstCol; c <= p.lastCol; c++) {
+                int id = ownerOf[row][c];
+                Owner owner = id == -1 || regionOf[row][c] != p.id ? null : owners.get(id);
+                boolean anchored = owner != null && owner.firstRow() == row && c == Math.max(owner.firstCol(), p.firstCol);
+                cells.add(anchored ? owner.text() : "");
+            }
+            return cells;
         }
 
         private void takeHeaderRows(Segment segment) {
@@ -520,23 +553,6 @@ public final class ExcelLayoutAnalyzer {
                 }
             }
             return result;
-        }
-
-        private boolean headerLike(Planned p, int row) {
-            List<Owner> cells = anchoredOwners(p, row);
-            if (cells.isEmpty()) {
-                return false;
-            }
-            int numeric = 0;
-            for (Owner cell : cells) {
-                if (cell.text().length() > MAX_HEADER_CELL_CHARS) {
-                    return false;
-                }
-                if (NUMERIC_CELL.matcher(cell.text()).matches()) {
-                    numeric++;
-                }
-            }
-            return numeric * 2 < cells.size();
         }
 
         private boolean sameCells(Planned p, int rowA, int rowB) {

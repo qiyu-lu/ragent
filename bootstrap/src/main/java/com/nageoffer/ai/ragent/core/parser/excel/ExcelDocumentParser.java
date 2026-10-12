@@ -71,6 +71,7 @@ public class ExcelDocumentParser implements DocumentParser {
     private final ImageAssetProcessor imageAssetProcessor;
     private final ImageParseProperties imageParseProperties;
     private final ExcelLayoutProperties layoutProperties;
+    private final HeaderJudge headerJudge;
 
     /**
      * 离线入口与测试用：版面切分关闭
@@ -80,13 +81,24 @@ public class ExcelDocumentParser implements DocumentParser {
         this(imageAssetProcessor, imageParseProperties, new ExcelLayoutProperties());
     }
 
-    @Autowired
+    /**
+     * 离线入口与测试用：表头按规则判断
+     */
     public ExcelDocumentParser(ImageAssetProcessor imageAssetProcessor,
                                ImageParseProperties imageParseProperties,
                                ExcelLayoutProperties layoutProperties) {
+        this(imageAssetProcessor, imageParseProperties, layoutProperties, RuleHeaderJudge.INSTANCE);
+    }
+
+    @Autowired
+    public ExcelDocumentParser(ImageAssetProcessor imageAssetProcessor,
+                               ImageParseProperties imageParseProperties,
+                               ExcelLayoutProperties layoutProperties,
+                               HeaderJudge headerJudge) {
         this.imageAssetProcessor = imageAssetProcessor;
         this.imageParseProperties = imageParseProperties;
         this.layoutProperties = layoutProperties;
+        this.headerJudge = headerJudge;
     }
 
     @Override
@@ -236,7 +248,8 @@ public class ExcelDocumentParser implements DocumentParser {
      */
     private List<Block> buildLayoutBlocks(Sheet sheet, String sourceFile, int headerRows,
                                           DataFormatter formatter, FormulaEvaluator evaluator) {
-        List<ExcelLayoutAnalyzer.Region> regions = ExcelLayoutAnalyzer.analyze(sheet, formatter, evaluator, headerRows);
+        List<ExcelLayoutAnalyzer.Region> regions =
+                ExcelLayoutAnalyzer.analyze(sheet, formatter, evaluator, headerRows, headerJudge);
         if (regions.isEmpty()) {
             log.debug("Sheet [{}] 为空，跳过", sheet.getSheetName());
             return List.of();

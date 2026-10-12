@@ -139,4 +139,15 @@
   - Strudel 是 CSV 转成的 sheet，没有合并和样式，数字以 "2013.0"、"18 080" 这样的字符串出现。
   - TableQA 的去表头组和调研表的 R 一样，是构造出来的。
   - 两批都不是工业检测领域的表。
+- **命令**：在有 `TYPESAFE_API_KEY` 的终端里运行，约 15 分钟，3 次共约 2.3 万次调用：
+
+  ```bash
+  ./mvnw -o -q -pl bootstrap -am test -Dtest=JevHeaderExternalReport -Dsurefire.failIfNoSpecifiedTests=false
+  ```
+
+  - 结果写 `runs/jev-header-external-*.json`，控制台每 500 个判定打一次进度。
+  - 报告代码先用本地桩自测过，桩的概率是假的，报告没有保留。去重后共 7753 个判定：
+    - Strudel 5444 个：troy 226、saus 966、cius 298、deex 3954，其中 1614 个标为表头；
+    - TableQA 2309 个：有表头 1155、去表头 1154。
+  - 没有对不上的候选。
 

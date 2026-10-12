@@ -388,3 +388,11 @@ python3 eval/kq/run_table_structure.py          # 约 60 分钟，不用改参�
 
 报告写 `runs/jev-header-*.json`：原表组 G 与去表头组 R 上规则、Jev 单独、混合三种判定的准确率，每次运行用混合判定做的完整版面对照，三次之间的稳定性、调用次数、token 与耗时，以及计划 §4 两条门槛是否通过。
 
+集外表格（计划 §8）：Strudel 四个逐行人工标注的英文数据集与 TableQA 中文验证集，数据在 `local-data/kq-eval/external-tables/`，哈希在 `manifests/jev-header-external.json`。约 15 分钟：
+
+```bash
+./mvnw -o -q -pl bootstrap -am test -Dtest=JevHeaderExternalReport -Dsurefire.failIfNoSpecifiedTests=false
+```
+
+报告写 `runs/jev-header-external-*.json`：两批、六个子集上规则、Jev 单独、混合三种判定的准确率，Jev 有把握的判定的准确率，三次之间的稳定性，以及 §8 门槛是否通过。
+

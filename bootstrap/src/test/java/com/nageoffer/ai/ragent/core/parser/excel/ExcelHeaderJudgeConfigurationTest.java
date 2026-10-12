@@ -17,10 +17,19 @@
 
 package com.nageoffer.ai.ragent.core.parser.excel;
 
+import com.nageoffer.ai.ragent.core.parser.image.ImageAssetProcessor;
+import com.nageoffer.ai.ragent.core.parser.image.ImageParseProperties;
 import com.nageoffer.ai.ragent.infra.jev.JevClient;
+import com.nageoffer.ai.ragent.infra.jev.JevProperties;
+import okhttp3.OkHttpClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.autoconfigure.context.ConfigurationPropertiesAutoConfiguration;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.test.util.ReflectionTestUtils;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.Mockito.mock;
@@ -29,6 +38,32 @@ import static org.mockito.Mockito.when;
 class ExcelHeaderJudgeConfigurationTest {
 
     private final ExcelHeaderJudgeConfiguration configuration = new ExcelHeaderJudgeConfiguration();
+
+    /**
+     * 只装配表头判定相关的 bean：全量上下文测试因既有问题起不来，装配与配置绑定在这里验证
+     */
+    private final ApplicationContextRunner context = new ApplicationContextRunner()
+            .withConfiguration(AutoConfigurations.of(ConfigurationPropertiesAutoConfiguration.class))
+            .withUserConfiguration(ExcelLayoutProperties.class, JevProperties.class, ExcelHeaderJudgeConfiguration.class)
+            .withBean("syncHttpClient", OkHttpClient.class, OkHttpClient::new)
+            .withBean(JevClient.class)
+            .withBean(ImageParseProperties.class)
+            .withBean(ImageAssetProcessor.class, () -> mock(ImageAssetProcessor.class))
+            .withBean(ExcelDocumentParser.class);
+
+    @Test
+    void springBindsTheSwitchAndHandsTheJudgeToTheParser() {
+        context.withPropertyValues("rag.ingestion.excel-layout.header-judge=jev", "ai.jev.api-key=test-key",
+                        "rag.ingestion.excel-layout.jev.confident-header=0.9")
+                .run(ctx -> {
+                    HeaderJudge judge = ctx.getBean(HeaderJudge.class);
+                    assertInstanceOf(JevHeaderJudge.class, judge);
+                    assertEquals(0.9, ctx.getBean(ExcelLayoutProperties.class).getJev().getConfidentHeader());
+                    assertSame(judge, ReflectionTestUtils.getField(ctx.getBean(ExcelDocumentParser.class), "headerJudge"));
+                });
+        context.run(ctx -> assertSame(RuleHeaderJudge.INSTANCE,
+                ReflectionTestUtils.getField(ctx.getBean(ExcelDocumentParser.class), "headerJudge")));
+    }
 
     @Test
     void ruleIsTheDefault() {

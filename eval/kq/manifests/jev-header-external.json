@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "kind": "jev-header-external-manifest",
+  "written": "2026-10-12",
+  "plan": "docs/iron-ore-rag/jev-header-plan-2026-10-12.md §8",
+  "note": "Downloaded before any header judge ran on them; the evaluation refuses to run if a hash differs.",
+  "datasets": [
+    {
+      "name": "strudel",
+      "language": "en",
+      "source": "https://github.com/lanchiang/strudel/tree/main/data",
+      "commit": "765570bfa29fa3493dfdcfcd0852759b4ad44ad2",
+      "license": "Apache-2.0 (repository licence)",
+      "paper": "Jiang, Vitagliano, Naumann. Structure Detection in Verbose CSV Files. EDBT 2021",
+      "labels": "one class per line: metadata, header, group, data, derived, notes, empty",
+      "files": [
+        {
+          "path": "local-data/kq-eval/external-tables/strudel/troy.jl.gz",
+          "sha256": "74b64172ccb1845032978f9c1976c8af77747b977c90d20c839aa2d35daa2f50"
+        },
+        {
+          "path": "local-data/kq-eval/external-tables/strudel/saus.jl.gz",
+          "sha256": "0db667958923e04b357925e47639dbd398c54eb12f44ce5f7cc01943ee4ec3c4"
+        },
+        {
+          "path": "local-data/kq-eval/external-tables/strudel/cius.jl.gz",
+          "sha256": "2fff7acaf863dfaef7abfd2e647b633684ee590ee5497960a79eba23accfcc2a"
+        },
+        {
+          "path": "local-data/kq-eval/external-tables/strudel/deex.jl.gz",
+          "sha256": "873abdffec13afe3892eabdb51cec231ff75dcb6d57bb213ca17629cacc23279"
+        }
+      ]
+    },
+    {
+      "name": "tableqa",
+      "language": "zh",
+      "source": "https://github.com/ZhuiyiTechnology/TableQA/tree/master/val",
+      "commit": "46aff3e65ff5db1f90a4094a3c4c411f673b3a5c",
+      "license": "GPL-3.0 (repository licence); used locally for evaluation only, not redistributed",
+      "paper": "Zhuiyi Technology, first Chinese NL2SQL challenge (TableQA), 2019",
+      "labels": "each table gives title, header and rows explicitly",
+      "files": [
+        {
+          "path": "local-data/kq-eval/external-tables/tableqa/val.tables.json",
+          "sha256": "7235b23d79219ed054667eaf47d09a50a3d44061c11d10cce3c538f2e9be650d"
+        }
+      ]
+    }
+  ]
+}

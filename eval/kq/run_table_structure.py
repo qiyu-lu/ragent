@@ -71,6 +71,8 @@ CODE_PATHS = ("bootstrap", "framework", "infra-ai", "pom.xml")
 OFF_STAGES = ("post-MetadataBoost", "channel-FullTextSearch", "post-RerankThreshold", "post-ScoreBlend")
 LAYOUT_FLAG = "--rag.ingestion.excel-layout.enabled=true"
 CDC_FLAG = "--rag.ingestion.table-chunking.content-defined=true"
+# the header judge default turned to jev on 2026-10-12 (jev-header plan); T1 and T2 were measured with the rule
+RULE_HEADER_FLAG = "--rag.ingestion.excel-layout.header-judge=rule"
 # the layout default turned on on 2026-10-11; the baseline keeps the switches explicitly off when run again
 BASELINE_FLAGS = ["--rag.ingestion.excel-layout.enabled=false", "--rag.ingestion.table-chunking.content-defined=false"]
 
@@ -80,9 +82,10 @@ T2 = "T2-layout-cdc"
 ARMS: Dict[str, dict] = {
     BASELINE: {"database": SOURCE_DATABASE, "config": S2B_CONFIG, "port": 9095, "flags": BASELINE_FLAGS},
     T1: {"database": "ragent_eval_kq_t1", "config": DATA / "config/application-kq-t1.yaml", "port": 9096,
-         "redis": 11, "unique": "_kq_t1", "rewrites": "rewrites-t1.jsonl", "flags": [LAYOUT_FLAG]},
+         "redis": 11, "unique": "_kq_t1", "rewrites": "rewrites-t1.jsonl", "flags": [LAYOUT_FLAG, RULE_HEADER_FLAG]},
     T2: {"database": "ragent_eval_kq_t2", "config": DATA / "config/application-kq-t2.yaml", "port": 9096,
-         "redis": 12, "unique": "_kq_t2", "rewrites": "rewrites-t2.jsonl", "flags": [LAYOUT_FLAG, CDC_FLAG]},
+         "redis": 12, "unique": "_kq_t2", "rewrites": "rewrites-t2.jsonl",
+         "flags": [LAYOUT_FLAG, RULE_HEADER_FLAG, CDC_FLAG]},
 }
 
 SURVEY_SQL = ("SELECT d.id FROM t_knowledge_document d JOIN t_knowledge_base kb ON kb.id = d.kb_id "

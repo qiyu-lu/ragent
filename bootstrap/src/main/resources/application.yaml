@@ -132,8 +132,9 @@ rag:
     excel-layout:
       enabled: true
       # 表的第一行是不是表头：rule 按字数与数字占比；jev 交给 Jev 判定模型（ai.jev），没把握或调用失败按规则，
-      # 没有密钥时整个退回 rule（jev-header-plan-2026-10-12.md）
-      header-judge: rule
+      # 没有密钥时整个退回 rule。2026-10-12 两条门槛都过（3 次版面与标准答案一致，原表 + 去表头 49 个判定
+      # 规则 43 → 混合 46），默认 jev（changes/2026-10-12-jev-header-judge.md）
+      header-judge: jev
     # 表格分块按内容定界（table-structure 计划 §3）：切点由行内容的哈希决定，插、删一行只让附近几块的向量缓存失效。
     # 2026-10-11 叠加版面切分的对照组在调参集按写定门槛判为退化，保持关闭（changes/2026-10-11-content-defined-table-chunks.md）
     table-chunking:

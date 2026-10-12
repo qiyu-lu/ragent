@@ -23,7 +23,8 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * Excel 版面切分与表头识别配置（table-structure 计划 §2）。版面切分 Java 字段默认关闭，{@code application.yaml}
- * 自 2026-10-11 起打开（调参集、测试集都没有退化）；表头判定默认按规则
+ * 自 2026-10-11 起打开（调参集、测试集都没有退化）；表头判定 Java 字段默认按规则，{@code application.yaml}
+ * 自 2026-10-12 起用 Jev（jev-header 计划两条门槛都过），没有密钥时退回规则
  */
 @Data
 @Configuration
